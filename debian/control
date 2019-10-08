@@ -1,0 +1,18 @@
+Source: libncicore
+Section: libs
+Priority: optional
+Maintainer: Slava Monich <slava.monich@jolla.com>
+Build-Depends: debhelper (>= 7), libglib2.0-dev (>= 2.0), libglibutil-dev
+Standards-Version: 3.8.4
+
+Package: libncicore
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, libglibutil-dev, ${misc:Depends}
+Description: Bluez5 client library
+
+Package: libncicore-dev
+Section: libdevel
+Architecture: any
+Depends: libncicore (= ${binary:Version}), ${misc:Depends}
+Description: Development files for libncicore

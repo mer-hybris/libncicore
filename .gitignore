@@ -1,0 +1,12 @@
+*~
+debian/files
+debian/libncicore
+debian/libncicore-dev
+debian/*.debhelper.log
+debian/*.debhelper
+debian/*.substvars
+debian/tmp
+documentation.list
+installroot
+build
+RPMS
