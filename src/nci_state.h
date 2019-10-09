@@ -30,14 +30,12 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef NCI_STATE_H
-#define NCI_STATE_H
+#ifndef NCI_STATE_PRIVATE_H
+#define NCI_STATE_PRIVATE_H
 
-#include "nci_types.h"
+#include "nci_types_p.h"
 
 #include <glib-object.h>
-
-G_BEGIN_DECLS
 
 typedef struct nci_state_priv NciStatePriv;
 
@@ -62,9 +60,72 @@ void
 nci_state_unref(
     NciState* state);
 
-G_END_DECLS
+NciTransition*
+nci_state_get_transition(
+    NciState* state,
+    NCI_STATE dest);
 
-#endif /* NCI_STATE_H */
+void
+nci_state_add_transition(
+    NciState* state,
+    NciTransition* transition);
+
+void
+nci_state_enter(
+    NciState* state,
+    void* param);
+
+void
+nci_state_reenter(
+    NciState* state,
+    void* param);
+
+void
+nci_state_leave(
+    NciState* state);
+
+void
+nci_state_handle_ntf(
+    NciState* state,
+    guint8 gid,
+    guint8 oid,
+    const GUtilData* payload);
+
+/* Specific states */
+
+NciState* /* NCI_STATE_INIT */
+nci_state_init_new(
+    NciSm* sm);
+
+NciState* /* NCI_STATE_ERROR */
+nci_state_error_new(
+    NciSm* sm);
+
+NciState* /* NCI_STATE_STOP */
+nci_state_stop_new(
+    NciSm* sm);
+
+NciState* /* NCI_RFST_IDLE */
+nci_state_idle_new(
+    NciSm* sm);
+
+NciState* /* NCI_RFST_DISCOVERY */
+nci_state_discovery_new(
+    NciSm* sm);
+
+NciState* /* NCI_RFST_POLL_ACTIVE */
+nci_state_poll_active_new(
+    NciSm* sm);
+
+NciState* /* NCI_RFST_W4_ALL_DISCOVERIES */
+nci_state_w4_all_discoveries_new(
+    NciSm* sm);
+
+NciState* /* NCI_RFST_W4_HOST_SELECT */
+nci_state_w4_host_select_new(
+    NciSm* sm);
+
+#endif /* NCI_STATE_PRIVATE_H */
 
 /*
  * Local Variables:

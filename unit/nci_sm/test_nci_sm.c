@@ -35,7 +35,6 @@
 #include "nci_types_p.h"
 #include "nci_sm.h"
 #include "nci_state.h"
-#include "nci_state_p.h"
 #include "nci_state_impl.h"
 #include "nci_transition_impl.h"
 #include "nci_param_w4_all_discoveries.h"

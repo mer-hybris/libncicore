@@ -33,7 +33,7 @@
 #include "nci_sm.h"
 #include "nci_sar.h"
 #include "nci_param.h"
-#include "nci_state_p.h"
+#include "nci_state.h"
 #include "nci_transition.h"
 #include "nci_log.h"
 

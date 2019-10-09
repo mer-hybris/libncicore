@@ -42,7 +42,6 @@ G_BEGIN_DECLS
 typedef struct nci_core NciCore;
 typedef struct nci_hal_client NciHalClient;
 typedef struct nci_hal_io NciHalIo;
-typedef struct nci_state NciState;
 
 /* Table 4: Conn ID
  * 0: Static RF Connection between the DH and a Remote NFC Endpoint */

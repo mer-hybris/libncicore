@@ -38,6 +38,7 @@
 typedef struct nci_param NciParam;
 typedef struct nci_sar NciSar;
 typedef struct nci_sm NciSm;
+typedef struct nci_state NciState;
 typedef struct nci_transition NciTransition;
 
 typedef enum nci_request_status {

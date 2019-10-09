@@ -30,7 +30,6 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "nci_state_p.h"
 #include "nci_state_impl.h"
 #include "nci_sm.h"
 #include "nci_transition.h"
