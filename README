@@ -1,0 +1,16 @@
+NFC NCI state machine implementatiton
+=====================================
+
+The following states are implemented according to NCI 1.0 spec:
+
+  RFST_IDLE
+  RFST_DISCOVERY
+  RFST_W4_ALL_DISCOVERIES
+  RFST_W4_HOST_SELECT
+  RFST_POLL_ACTIVE
+
+as well as a limited subset of NCI 2.0 features.
+
+This library doesn't provide any hardware access methods. It's up to
+the code linking with this library to implement interfaces described
+by nci_hal.h
