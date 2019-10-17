@@ -33,6 +33,9 @@ make KEEP_SYMBOLS=1 release pkgconfig
 rm -rf %{buildroot}
 make install-dev DESTDIR=%{buildroot}
 
+%check
+make test
+
 %post -p /sbin/ldconfig
 
 %postun -p /sbin/ldconfig
