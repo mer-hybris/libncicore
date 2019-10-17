@@ -161,20 +161,8 @@ print_debug_lib:
 print_release_lib:
 	@echo $(RELEASE_STATIC_LIB)
 
-print_debug_link:
-	@echo $(DEBUG_LINK)
-
 print_coverage_lib:
 	@echo $(COVERAGE_STATIC_LIB)
-
-print_release_link:
-	@echo $(RELEASE_LINK)
-
-print_debug_path:
-	@echo $(DEBUG_BUILD_DIR)
-
-print_release_path:
-	@echo $(RELEASE_BUILD_DIR)
 
 clean:
 	make -C unit clean
