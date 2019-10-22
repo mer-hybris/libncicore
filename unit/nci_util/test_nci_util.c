@@ -363,7 +363,7 @@ static const TestDiscoverFailData discover_fail_tests[] = {
         .data = { TEST_ARRAY_AND_SIZE(discover_fail_data_too_short_2) }
     },{
         .name = "too_short/3",
-        .data = { TEST_ARRAY_AND_SIZE(discover_fail_data_too_short_2) }
+        .data = { TEST_ARRAY_AND_SIZE(discover_fail_data_too_short_3) }
     }
 };
 
