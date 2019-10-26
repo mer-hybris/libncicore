@@ -39,6 +39,8 @@
 #include "nci_transition_impl.h"
 #include "nci_param_w4_all_discoveries.h"
 
+#include <glib-object.h> /* For g_type_init() */
+
 static TestOpt test_opt;
 
 static
@@ -555,6 +557,9 @@ test_transitions(
 
 int main(int argc, char* argv[])
 {
+    G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
+    g_type_init();
+    G_GNUC_END_IGNORE_DEPRECATIONS;
     g_test_init(&argc, &argv, NULL);
     g_test_add_func(TEST_("null"), test_null);
     g_test_add_func(TEST_("state"), test_state);
