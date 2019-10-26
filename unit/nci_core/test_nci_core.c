@@ -2130,7 +2130,7 @@ static const TestSmEntry test_nci_sm_discovery_ntf_isodep[] = {
     TEST_NCI_SM_END()
 };
 
-const const TestNciSmData nci_sm_tests[] = {
+static const TestNciSmData nci_sm_tests[] = {
     { "init-ok", test_nci_sm_init_ok },
     { "init-timeout", test_nci_sm_init_timeout },
     { "get-config-timeout", test_nci_sm_get_config_timeout },
@@ -2177,6 +2177,8 @@ const const TestNciSmData nci_sm_tests[] = {
     { "discovery-poll-activate-error4",  test_nci_sm_dscvr_poll_act_error4 },
     { "discovery-poll-deactivate-t4a-bad-act-param1",
        test_nci_sm_dscvr_poll_deact_t4a_badparam1 },
+    { "discovery-poll-deactivate-t4a-bad-act-param2",
+       test_nci_sm_dscvr_poll_deact_t4a_badparam2 },
     { "discovery-ntf-t2t", test_nci_sm_discovery_ntf_t2t },
     { "discovery-ntf-isodep", test_nci_sm_discovery_ntf_isodep }
 };
