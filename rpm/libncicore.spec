@@ -1,5 +1,5 @@
 Name: libncicore
-Version: 1.0.3
+Version: 1.0.5
 Release: 0
 Summary: NCI state machine
 Group: Development/Libraries

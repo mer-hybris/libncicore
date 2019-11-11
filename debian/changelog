@@ -1,3 +1,9 @@
+libncicore (1.0.4) unstable; urgency=low
+
+  * Avoid overlinking
+
+ -- Slava Monich <slava.monich@jolla.com>  Mon, 11 Nov 2019 18:35:15 +0300
+
 libncicore (1.0.3) unstable; urgency=low
 
   * Another housekeeping release
