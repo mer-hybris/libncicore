@@ -8,7 +8,6 @@ URL: https://github.com/mer-hybris/libncicore
 Source: %{name}-%{version}.tar.bz2
 BuildRequires:  pkgconfig(glib-2.0)
 BuildRequires:  pkgconfig(libglibutil)
-BuildRequires:  pkgconfig(mce)
 Requires(post): /sbin/ldconfig
 Requires(postun): /sbin/ldconfig
 

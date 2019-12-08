@@ -8,11 +8,11 @@ Standards-Version: 3.8.4
 Package: libncicore
 Section: libs
 Architecture: any
-Depends: ${shlibs:Depends}, libglibutil-dev, ${misc:Depends}
-Description: Bluez5 client library
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: NFC NCI implementation
 
 Package: libncicore-dev
 Section: libdevel
 Architecture: any
-Depends: libncicore (= ${binary:Version}), ${misc:Depends}
+Depends: libncicore (= ${binary:Version}), libglibutil-dev, ${misc:Depends}
 Description: Development files for libncicore
