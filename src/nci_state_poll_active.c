@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -79,12 +79,15 @@ nci_state_poll_active_interface_error_ntf(
         switch (pkt[0]) {
         case NCI_RF_TRANSMISSION_ERROR:
             GDEBUG("CORE_INTERFACE_ERROR_NTF (Transmission Error)");
+            nci_sm_switch_to(nci_state_sm(self), NCI_RFST_DISCOVERY);
             return TRUE;
         case NCI_RF_PROTOCOL_ERROR:
             GDEBUG("CORE_INTERFACE_ERROR_NTF (Protocol Error)");
+            nci_sm_switch_to(nci_state_sm(self), NCI_RFST_DISCOVERY);
             return TRUE;
         case NCI_RF_TIMEOUT_ERROR:
             GDEBUG("CORE_INTERFACE_ERROR_NTF (Timeout)");
+            nci_sm_switch_to(nci_state_sm(self), NCI_RFST_DISCOVERY);
             return TRUE;
         }
     }
