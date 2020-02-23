@@ -29,12 +29,15 @@ LIB = $(LIB_SONAME).$(VERSION_MINOR).$(VERSION_RELEASE)
 STATIC_LIB = $(LIB_NAME).a
 
 #
-# Library version
+# Pull library version from nci_version.h
 #
 
-VERSION_MAJOR = 1
-VERSION_MINOR = 0
-VERSION_RELEASE = 5
+VERSION_FILE = $(INCLUDE_DIR)/nci_version.h
+get_version = $(shell grep -E "^ *\\\#define +NCI_CORE_VERSION_$1 +[0-9]+$$" $(VERSION_FILE) | sed "s/  */ /g" | cut -d " " -f 3)
+
+VERSION_MAJOR = $(call get_version,MAJOR)
+VERSION_MINOR = $(call get_version,MINOR)
+VERSION_RELEASE = $(call get_version,NANO)
 
 # Version for pkg-config
 PCVERSION = $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_RELEASE)
@@ -147,9 +150,9 @@ RELEASE_LIB = $(RELEASE_BUILD_DIR)/$(LIB)
 DEBUG_LINK = $(DEBUG_BUILD_DIR)/$(LIB_SONAME)
 RELEASE_LINK = $(RELEASE_BUILD_DIR)/$(LIB_SONAME)
 
-debug: $(DEBUG_STATIC_LIB) $(DEBUG_LIB) $(DEBUG_LINK)
+debug: $(DEBUG_STATIC_LIB) $(DEBUG_LIB) $(DEBUG_LINK) $(PKGCONFIG)
 
-release: $(RELEASE_STATIC_LIB) $(RELEASE_LIB) $(RELEASE_LINK)
+release: $(RELEASE_STATIC_LIB) $(RELEASE_LIB) $(RELEASE_LINK) $(PKGCONFIG)
 
 coverage: $(COVERAGE_STATIC_LIB)
 
@@ -226,7 +229,7 @@ $(DEBUG_BUILD_DIR)/$(LIB_SYMLINK2): $(DEBUG_LIB)
 $(RELEASE_BUILD_DIR)/$(LIB_SYMLINK2): $(RELEASE_LIB)
 	ln -sf $(LIB) $@
 
-$(PKGCONFIG): $(LIB_NAME).pc.in
+$(PKGCONFIG): $(LIB_NAME).pc.in $(VERSION_FILE) $(BUILD_DIR)
 	sed -e 's/\[version\]/'$(PCVERSION)/g $< > $@
 
 #
