@@ -113,7 +113,8 @@ typedef enum nci_rf_interface {
     NCI_RF_INTERFACE_NFCEE_DIRECT = 0x00,
     NCI_RF_INTERFACE_FRAME = 0x01,
     NCI_RF_INTERFACE_ISO_DEP = 0x02,
-    NCI_RF_INTERFACE_NFC_DEP = 0x03
+    NCI_RF_INTERFACE_NFC_DEP = 0x03,
+    NCI_RF_INTERFACE_PROPRIETARY = 0x80 /* Since 1.0.6 */
 } NCI_RF_INTERFACE;
 
 /* See Table 54: Specific Parameters for NFC-A Poll Mode */

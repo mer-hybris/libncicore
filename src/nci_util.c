@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -346,6 +346,7 @@ nci_parse_activation_param(
         break;
     case NCI_RF_INTERFACE_NFCEE_DIRECT:
     case NCI_RF_INTERFACE_NFC_DEP:
+    case NCI_RF_INTERFACE_PROPRIETARY:
         GDEBUG("Unhandled interface type");
         break;
     }
