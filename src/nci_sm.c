@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -738,6 +738,7 @@ nci_sm_supports_protocol(
     case NCI_PROTOCOL_T1T:
     case NCI_PROTOCOL_T3T:
     case NCI_PROTOCOL_NFC_DEP:
+    case NCI_PROTOCOL_PROPRIETARY:
         break;
     }
     return FALSE;

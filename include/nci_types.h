@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018-2019 Jolla Ltd.
- * Copyright (C) 2018-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2018-2020 Jolla Ltd.
+ * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -105,6 +105,7 @@ typedef enum nci_protocol {
     NCI_PROTOCOL_T3T = 0x03,
     NCI_PROTOCOL_ISO_DEP = 0x04,
     NCI_PROTOCOL_NFC_DEP = 0x05,
+    NCI_PROTOCOL_PROPRIETARY = 0x80 /* Since 1.0.6 */
 } NCI_PROTOCOL;
 
 /* Table 99: RF Interfaces */
