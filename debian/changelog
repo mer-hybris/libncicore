@@ -1,3 +1,13 @@
+libncicore (1.0.6) unstable; urgency=low
+
+  * Switch from POLL_ACTIVE to DISCOVERY on ERROR_NTF
+  * Added nci_version.h and NCI_CORE_VERSION macro
+  * Added NCI_RF_INTERFACE_PROPRIETARY contant
+  * Added NCI_PROTOCOL_PROPRIETARY constant
+  * Ignore known Glib deprecation warnings
+
+ -- Slava Monich <slava.monich@jolla.com>  Sun, 23 Feb 2020 14:10:06 +0200
+
 libncicore (1.0.5) unstable; urgency=low
 
   * Housekeeping release
