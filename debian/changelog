@@ -1,3 +1,11 @@
+libncicore (1.0.7) unstable; urgency=low
+
+  * Removed unnecessary makefile dependency
+  * Switch from HOST_SELECT to DISCOVERY on activation failure
+  * Optimized two-step transitions through IDLE state
+
+ -- Slava Monich <slava.monich@jolla.com>  Mon, 24 Feb 2020 18:46:09 +0200
+
 libncicore (1.0.6) unstable; urgency=low
 
   * Switch from POLL_ACTIVE to DISCOVERY on ERROR_NTF
