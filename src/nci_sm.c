@@ -449,11 +449,12 @@ nci_sm_switch_to(
                 }
             }
         } else {
-            NciTransition* next_transition =
+            NciTransition* direct_transition =
                 nci_state_get_transition(sm->last_state, id);
 
-            if (next_transition) {
-                if (nci_sm_start_transition(self, next_transition)) {
+            if (direct_transition) {
+                /* Found direct transition */
+                if (nci_sm_start_transition(self, direct_transition)) {
                     nci_sm_set_next_state(self, next);
                 } else {
                     nci_sm_stall_internal(self, NCI_STALL_ERROR);
@@ -463,10 +464,17 @@ nci_sm_switch_to(
                  * take no parameters. */
                 nci_sm_enter_state_internal(self, next, NULL);
             } else {
-                NciState* idle = nci_sm_state_by_id(self, NCI_RFST_IDLE);
-
                 /* Switch to idle state first */
-                if (nci_sm_start_transition(self, self->reset_transition)) {
+                NciTransition* transition_to_idle =
+                    nci_state_get_transition(sm->last_state, NCI_RFST_IDLE);
+
+                if (!transition_to_idle) {
+                    /* No direct transition to IDLE, must reset */
+                    transition_to_idle = self->reset_transition;
+                }
+                if (nci_sm_start_transition(self, transition_to_idle)) {
+                    NciState* idle = nci_sm_state_by_id(self, NCI_RFST_IDLE);
+
                     if (id == NCI_RFST_IDLE) {
                         nci_sm_set_next_state(self, idle);
                     } else {

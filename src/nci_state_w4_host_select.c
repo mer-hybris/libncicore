@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -247,6 +247,7 @@ nci_state_w4_host_select_generic_error_ntf(
         switch (pkt[0]) {
         case NCI_DISCOVERY_TARGET_ACTIVATION_FAILED:
             GDEBUG("CORE_GENERIC_ERROR_NTF (Activation Failed)");
+            nci_sm_switch_to(nci_state_sm(self), NCI_RFST_DISCOVERY);
             return TRUE;
         }
     }

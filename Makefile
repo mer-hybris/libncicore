@@ -229,7 +229,7 @@ $(DEBUG_BUILD_DIR)/$(LIB_SYMLINK2): $(DEBUG_LIB)
 $(RELEASE_BUILD_DIR)/$(LIB_SYMLINK2): $(RELEASE_LIB)
 	ln -sf $(LIB) $@
 
-$(PKGCONFIG): $(LIB_NAME).pc.in $(VERSION_FILE) $(BUILD_DIR)
+$(PKGCONFIG): $(LIB_NAME).pc.in $(VERSION_FILE)
 	sed -e 's/\[version\]/'$(PCVERSION)/g $< > $@
 
 #

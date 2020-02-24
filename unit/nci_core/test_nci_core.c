@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018-2019 Jolla Ltd.
- * Copyright (C) 2018-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2018-2020 Jolla Ltd.
+ * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -135,9 +135,6 @@ static const guint8 CORE_SET_CONFIG_RSP[] = {
 };
 static const guint8 CORE_SET_CONFIG_RSP_ERROR[] = {
     0x40, 0x02, 0x02, NCI_STATUS_REJECTED, 0x00
-};
-static const guint8 CORE_SET_CONFIG_RSP_INVALID_PARAM[] = {
-    0x40, 0x02, 0x03, NCI_STATUS_INVALID_PARAM, 0x01, 0x11
 };
 static const guint8 RF_SET_LISTEN_MODE_ROUTING_RSP[] = {
     0x41, 0x01, 0x01, 0x00
@@ -2107,7 +2104,6 @@ static const TestSmEntry test_nci_sm_discovery_ntf_isodep[] = {
     TEST_NCI_SM_QUEUE_NTF(NFCEE_IGNORED_NTF),                /* Ignored */
     TEST_NCI_SM_QUEUE_NTF(CORE_GENERIC_ERROR_NTF),           /* Ignored */
     TEST_NCI_SM_QUEUE_NTF(CORE_GENERIC_ERROR_NTF_BROKEN),    /* Ignored */
-    TEST_NCI_SM_QUEUE_NTF(CORE_GENERIC_TARGET_ACTIVATION_FAILED_ERROR_NTF),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_W4_HOST_SELECT),
 
     /* Select ISO-DEP interface */
@@ -2127,6 +2123,33 @@ static const TestSmEntry test_nci_sm_discovery_ntf_isodep[] = {
     /* But end up in IDLE */
     TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_IDLE),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_sm_discovery_ntf_isodep_fail[] = {
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP_1),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+
+    /* Switch state machine to DISCOVERY state */
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
+    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* Receive 2 discovery notifications (ISO-DEP, and Proprietary) */
+    TEST_NCI_SM_QUEUE_NTF(RF_DISCOVER_NTF_1_ISO_DEP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_W4_ALL_DISCOVERIES),
+    TEST_NCI_SM_QUEUE_NTF(RF_DISCOVER_NTF_2_PROPRIETARY_LAST),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_W4_HOST_SELECT),
+
+    /* Activation failure sends us back to DISCOVERY state */
+    TEST_NCI_SM_QUEUE_NTF(CORE_GENERIC_TARGET_ACTIVATION_FAILED_ERROR_NTF),
+    TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
     TEST_NCI_SM_END()
 };
 
@@ -2180,7 +2203,8 @@ static const TestNciSmData nci_sm_tests[] = {
     { "discovery-poll-deactivate-t4a-bad-act-param2",
        test_nci_sm_dscvr_poll_deact_t4a_badparam2 },
     { "discovery-ntf-t2t", test_nci_sm_discovery_ntf_t2t },
-    { "discovery-ntf-isodep", test_nci_sm_discovery_ntf_isodep }
+    { "discovery-ntf-isodep", test_nci_sm_discovery_ntf_isodep },
+    { "discovery-ntf-isodep-fail", test_nci_sm_discovery_ntf_isodep_fail }
 };
 
 /*==========================================================================*
