@@ -143,8 +143,33 @@ typedef struct nci_activation_param_iso_dep_poll_a {
     GUtilData t1;  /* T1 to Tk (otherwise called historical bytes) */
 } NciActivationParamIsoDepPollA;
 
+/* Table 82: Activation Parameters for NFC-DEP Poll Mode */
+typedef struct nci_activation_param_nfc_dep_poll {
+    /* ATR_RES starting from and including Byte 3 */
+    guint8 nfcid3[10];
+    guint8 did;
+    guint8 bs;
+    guint8 br;
+    guint8 to;
+    guint8 pp;
+    GUtilData g;
+} NciActivationParamNfcDepPoll; /* Since 1.0.8 */
+
+/* Table 83: Activation Parameters for NFC-DEP Listen Mode */
+typedef struct nci_activation_param_nfc_dep_listen {
+    /* ATR_REQ starting from and including Byte 3 */
+    guint8 nfcid3[10];
+    guint8 did;
+    guint8 bs;
+    guint8 br;
+    guint8 pp;
+    GUtilData g;
+} NciActivationParamNfcDepListen; /* Since 1.0.8 */
+
 typedef union nci_activation_param {
     NciActivationParamIsoDepPollA iso_dep_poll_a;
+    NciActivationParamNfcDepPoll nfc_dep_poll;     /* Since 1.0.8 */
+    NciActivationParamNfcDepListen nfc_dep_listen; /* Since 1.0.8 */
 } NciActivationParam;
 
 /* See Table 61: Notification for RF Interface activation */

@@ -309,6 +309,140 @@ nci_parse_iso_dep_poll_a_param(
 }
 
 static
+gboolean
+nci_parse_nfc_dep_poll_param(
+    NciActivationParamNfcDepPoll* param,
+    const guint8* bytes,
+    guint len)
+{
+    /* ATR_RES Length */
+    const guint8 atr_res_len = bytes[0];
+
+    /*
+     * NFCForum-TS-NCI-1.0
+     * Table 82: Activation Parameters for NFC-DEP Poll Mode
+     *
+     * +=========================================================+
+     * | Offset | Size | Description                             |
+     * +=========================================================+
+     * | 0      | 1    | Length of ATR_RES Command Parameter (n) |
+     * | 1      | n    | ATR_RES bytes from and including Byte 3 |
+     * +=========================================================+
+     */
+    if (atr_res_len >= 15 && len >= atr_res_len + 1) {
+        const guint8* atr_res = bytes + 1;
+
+        /*
+         * NFCForum-TS-DigitalProtocol-1.0
+         * 14.6.3 ATR_RES Response
+         */
+        memcpy(param->nfcid3, atr_res, sizeof(param->nfcid3));
+        param->did = atr_res[10];
+        param->bs = atr_res[11];
+        param->br = atr_res[12];
+        param->to = atr_res[13];
+        param->pp = atr_res[14];
+        if (atr_res_len > 15) {
+            param->g.bytes = atr_res + 15;
+            param->g.size = atr_res_len - 15;
+        }
+#if GUTIL_LOG_DEBUG
+        if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+            GString* buf = g_string_new(NULL);
+            guint i;
+
+            GDEBUG("NFC-DEP");
+            for (i = 0; i < sizeof(param->nfcid3); i++) {
+                g_string_append_printf(buf, " %02x", param->nfcid3[i]);
+            }
+            GDEBUG("  AtrRes.nfcid3 =%s", buf->str);
+            GDEBUG("  AtrRes.did = 0x%02x", param->did);
+            GDEBUG("  AtrRes.bs = 0x%02x", param->bs);
+            GDEBUG("  AtrRes.br = 0x%02x", param->br);
+            GDEBUG("  AtrRes.to = 0x%02x", param->to);
+            GDEBUG("  AtrRes.pp = 0x%02x", param->pp);
+            g_string_set_size(buf, 0);
+            if (param->g.size > 0) {
+                for (i = 0; i < param->g.size; i++) {
+                    g_string_append_printf(buf, " %02x", param->g.bytes[i]);
+                }
+            }
+            GDEBUG("  AtrRes.g =%s", buf->str);
+            g_string_free(buf, TRUE);
+        }
+#endif
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static
+gboolean
+nci_parse_nfc_dep_listen_param(
+    NciActivationParamNfcDepListen* param,
+    const guint8* bytes,
+    guint len)
+{
+    /* ATR_REQ Length */
+    const guint8 atr_req_len = bytes[0];
+
+    /*
+     * NFCForum-TS-NCI-1.0
+     * Table 83: Activation Parameters for NFC-DEP Listen Mode
+     *
+     * +=========================================================+
+     * | Offset | Size | Description                             |
+     * +=========================================================+
+     * | 0      | 1    | Length of ATR_REQ Command Parameter (n) |
+     * | 1      | n    | ATR_REQ bytes from and including Byte 3 |
+     * +=========================================================+
+     */
+    if (atr_req_len >= 14 && len >= atr_req_len + 1) {
+        const guint8* atr_req = bytes + 1;
+
+        /*
+         * NFCForum-TS-DigitalProtocol-1.0
+         * 14.6.2 ATR_REQ Command
+         */
+        memcpy(param->nfcid3, atr_req, sizeof(param->nfcid3));
+        param->did = atr_req[10];
+        param->bs = atr_req[11];
+        param->br = atr_req[12];
+        param->pp = atr_req[13];
+        if (atr_req_len > 14) {
+            param->g.bytes = atr_req + 14;
+            param->g.size = atr_req_len - 14;
+        }
+#if GUTIL_LOG_DEBUG
+        if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+            GString* buf = g_string_new(NULL);
+            guint i;
+
+            GDEBUG("NFC-DEP");
+            for (i = 0; i < sizeof(param->nfcid3); i++) {
+                g_string_append_printf(buf, " %02x", param->nfcid3[i]);
+            }
+            GDEBUG("  AtrReq.nfcid3 =%s", buf->str);
+            GDEBUG("  AtrReq.did = 0x%02x", param->did);
+            GDEBUG("  AtrReq.bs = 0x%02x", param->bs);
+            GDEBUG("  AtrReq.br = 0x%02x", param->br);
+            GDEBUG("  AtrReq.pp = 0x%02x", param->pp);
+            g_string_set_size(buf, 0);
+            if (param->g.size > 0) {
+                for (i = 0; i < param->g.size; i++) {
+                    g_string_append_printf(buf, " %02x", param->g.bytes[i]);
+                }
+            }
+            GDEBUG("  AtrReq.g =%s", buf->str);
+            g_string_free(buf, TRUE);
+        }
+#endif
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static
 const NciActivationParam*
 nci_parse_activation_param(
     NciActivationParam* param,
@@ -344,8 +478,36 @@ nci_parse_activation_param(
     case NCI_RF_INTERFACE_FRAME:
         /* There are no Activation Parameters for Frame RF interface */
         break;
-    case NCI_RF_INTERFACE_NFCEE_DIRECT:
     case NCI_RF_INTERFACE_NFC_DEP:
+        switch (mode) {
+        case NCI_MODE_PASSIVE_POLL_A:
+        case NCI_MODE_PASSIVE_POLL_F:
+            if (nci_parse_nfc_dep_poll_param(&param->nfc_dep_poll,
+                bytes, len)) {
+                return param;
+            }
+            GDEBUG("Failed to parse parameters for NFC-DEP poll mode");
+            break;
+        case NCI_MODE_PASSIVE_LISTEN_A:
+        case NCI_MODE_PASSIVE_LISTEN_F:
+            if (nci_parse_nfc_dep_listen_param(&param->nfc_dep_listen,
+                bytes, len)) {
+                return param;
+            }
+            GDEBUG("Failed to parse parameters for NFC-DEP listen mode");
+            break;
+        case NCI_MODE_PASSIVE_POLL_B:
+        case NCI_MODE_ACTIVE_POLL_A:
+        case NCI_MODE_ACTIVE_POLL_F:
+        case NCI_MODE_PASSIVE_POLL_15693:
+        case NCI_MODE_PASSIVE_LISTEN_B:
+        case NCI_MODE_ACTIVE_LISTEN_A:
+        case NCI_MODE_ACTIVE_LISTEN_F:
+        case NCI_MODE_PASSIVE_LISTEN_15693:
+            break;
+        }
+        break;
+    case NCI_RF_INTERFACE_NFCEE_DIRECT:
     case NCI_RF_INTERFACE_PROPRIETARY:
         GDEBUG("Unhandled interface type");
         break;
