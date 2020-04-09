@@ -103,7 +103,7 @@ nci_parse_mode_param(
          * | Offset | Size | Description                             |
          * +=========================================================+
          * | 0      | 1    | SENSB_RES Response Length n (11 or 12)  |
-         * | 1      | n    | Bytes 2-12 or 13 or SENSB_RES Response  |
+         * | 1      | n    | Bytes 2-12 or 13 of SENSB_RES Response  |
          * +=========================================================+
          *
          * NFCForum-TS-DigitalProtocol-1.0
@@ -159,10 +159,47 @@ nci_parse_mode_param(
         }
         GDEBUG("Failed to parse parameters for NFC-B poll mode");
         return NULL;
-    default:
-        GDEBUG("Unhandled activation mode %d", mode);
+    case NCI_MODE_ACTIVE_POLL_F:
+    case NCI_MODE_PASSIVE_POLL_F:
+        /*
+         * NFCForum-TS-NCI-1.0
+         * Table 58: Specific Parameters for NFC-F Poll Mode
+         *
+         * +=========================================================+
+         * | Offset | Size | Description                             |
+         * +=========================================================+
+         * | 0      | 1    | Bit Rate (1 = 212 kbps, 2 = 424 kbps)   |
+         * | 1      | 1    | SENSB_REF Response Length n (16 or 18)  |
+         * | 2      | n    | Bytes 2-17 of SENSF_RES                 |
+         * +=========================================================+
+         */
+        if (len > 1 && bytes[1] >= 8 && (bytes[1] + 2) <= len) {
+            NciModeParamPollF* pf = &param->poll_f;
+
+            pf->bitrate = bytes[0];
+            memcpy(pf->nfcid2, bytes + 2, 8);
+            GDEBUG("NFC-F");
+            GDEBUG("  PollF.bitrate = %u%s", pf->bitrate,
+                (pf->bitrate == 1) ? " (212 kbps)" :
+                (pf->bitrate == 2) ? " (424 kbps)" : "");
+            GDEBUG("  PollF.nfcid2 = %02x %02x %02x %02x %02x %02x %02x %02x",
+                pf->nfcid2[0], pf->nfcid2[1], pf->nfcid2[2], pf->nfcid2[3],
+                pf->nfcid2[4], pf->nfcid2[5], pf->nfcid2[6], pf->nfcid2[7]);
+            return param;
+        }
+        GDEBUG("Failed to parse parameters for NFC-F poll mode");
         return NULL;
+    case NCI_MODE_PASSIVE_POLL_15693:
+    case NCI_MODE_PASSIVE_LISTEN_A:
+    case NCI_MODE_PASSIVE_LISTEN_B:
+    case NCI_MODE_PASSIVE_LISTEN_F:
+    case NCI_MODE_ACTIVE_LISTEN_A:
+    case NCI_MODE_ACTIVE_LISTEN_F:
+    case NCI_MODE_PASSIVE_LISTEN_15693:
+        break;
     }
+    GDEBUG("Unhandled activation mode %d", mode);
+    return NULL;
 }
 
 gboolean
