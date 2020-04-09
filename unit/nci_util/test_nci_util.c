@@ -85,6 +85,15 @@ static const guint8 mode_param_success_data_poll_b[] =
     { 0x0b, 0x65, 0xe6, 0x70, 0x15, 0xe1, 0xf3, 0x5e, 0x11, 0x77, 0x87, 0x95 };
 static const guint8 mode_param_success_data_poll_b_rfu[] =
     { 0x0b, 0x65, 0xe6, 0x70, 0x15, 0xe1, 0xf3, 0x5e, 0x11, 0x77, 0x97, 0x95 };
+static const guint8 mode_param_success_data_poll_f_1[] =
+    { 0x01, 0x12, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0xc0, 0xc1,
+      0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f, 0xab };
+static const guint8 mode_param_success_data_poll_f_2[] =
+    { 0x02, 0x12, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0xc0, 0xc1,
+      0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f, 0xab };
+static const guint8 mode_param_success_data_poll_f_3[] =
+    { 0x03, 0x12, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0xc0, 0xc1,
+      0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f, 0xab };
 static const TestModeParamSuccessData mode_param_success_tests[] = {
     {
         .name = "minimal",
@@ -113,6 +122,24 @@ static const TestModeParamSuccessData mode_param_success_tests[] = {
         .mode = NCI_MODE_PASSIVE_POLL_B,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_poll_b_rfu) },
         .expected = { .poll_b = { {0x65, 0xe6, 0x70, 0x15}, 256 } }
+    },{
+        .name = "active_poll_f",
+        .mode = NCI_MODE_ACTIVE_POLL_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_poll_f_1) },
+        .expected = { .poll_f = { 1, {0x01, 0xfe, 0xc0, 0xf1,
+                                      0xc4, 0x41, 0x38, 0x21} } }
+    },{
+        .name = "passive_poll_f",
+        .mode = NCI_MODE_PASSIVE_POLL_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_poll_f_2) },
+        .expected = { .poll_f = { 2, {0x01, 0xfe, 0xc0, 0xf1,
+                                      0xc4, 0x41, 0x38, 0x21} } }
+    },{
+        .name = "passive_poll_f_3",
+        .mode = NCI_MODE_PASSIVE_POLL_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_poll_f_3) },
+        .expected = { .poll_f = { 3, {0x01, 0xfe, 0xc0, 0xf1,
+                                      0xc4, 0x41, 0x38, 0x21} } }
     }
 };
 
@@ -149,6 +176,11 @@ static const guint8 mode_param_fail_data_too_long[] =
       0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x01, 0x20 };
 static const guint8 mode_param_fail_pollb_data_too_short_1[] =
     { 0x0a, 0x65, 0xe6, 0x70, 0x15, 0xe1, 0xf3, 0x5e, 0x11, 0x77, 0x87 };
+static const guint8 mode_param_fail_pollf_data_too_short_1[] =
+    { 0x01, 0x12, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0xc0, 0xc1,
+      0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f };
+static const guint8 mode_param_fail_pollf_data_too_short_2[] =
+    { 0x01, 0x07, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38 };
 static const TestModeParamFailData mode_param_fail_tests[] = {
     {
         .name = "unhandled_mode",
@@ -170,6 +202,10 @@ static const TestModeParamFailData mode_param_fail_tests[] = {
         .mode = NCI_MODE_ACTIVE_POLL_A,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_data_too_short_1) }
     },{
+        .name = "too_short/poll_f",
+        .mode = NCI_MODE_ACTIVE_POLL_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_data_too_short_1) }
+    },{
         .name = "too_short/2",
         .mode = NCI_MODE_ACTIVE_POLL_A,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_data_too_short_2) }
@@ -189,6 +225,144 @@ static const TestModeParamFailData mode_param_fail_tests[] = {
         .name = "poll_b_too_short",
         .mode = NCI_MODE_PASSIVE_POLL_B,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_pollb_data_too_short_1) }
+    },{
+        .name = "poll_f_too_short_1",
+        .mode = NCI_MODE_PASSIVE_POLL_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_pollf_data_too_short_1) }
+    },{
+        .name = "poll_f_too_short_2",
+        .mode = NCI_MODE_PASSIVE_POLL_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_pollf_data_too_short_2) }
+    }
+};
+
+/*==========================================================================*
+ * intf_activated_success
+ *==========================================================================*/
+
+typedef struct test_intf_activated_success_data {
+    const char* name;
+    GUtilData data;
+    NciModeParam* mode_param;
+    NciActivationParam* activation_param;
+} TestIntfActivatedSuccessData;
+
+static
+void
+test_intf_activated_success(
+    gconstpointer user_data)
+{
+    const TestIntfActivatedSuccessData* test = user_data;
+    NciIntfActivationNtf ntf;
+    NciModeParam mode_param;
+    NciActivationParam activation_param;
+
+    memset(&mode_param, 0, sizeof(mode_param));
+    memset(&activation_param, 0, sizeof(activation_param));
+    g_assert(nci_parse_intf_activated_ntf(&ntf, &mode_param, &activation_param,
+        test->data.bytes, test->data.size));
+    g_assert(ntf.mode_param);
+    g_assert(!memcmp(ntf.mode_param, test->mode_param, sizeof(mode_param)));
+    g_assert(ntf.activation_param);
+    g_assert(!memcmp(ntf.activation_param, test->activation_param,
+             sizeof(activation_param)));
+}
+
+static guint8 test_intf_activated_ntf_nfc_dep_ini[] = {
+    0x01, 0x03, 0x05, 0x00, 0xfb, 0x01, 0x09, 0x08,
+    0x00, 0x04, 0x08, 0x50, 0xad, 0x0e, 0x01, 0x40,
+    0x02, 0x02, 0x02, 0x21, 0x20, 0xc2, 0x40, 0x83,
+    0x1b, 0xe1, 0x22, 0x5d, 0xfe, 0xb7, 0xe9, 0x00,
+    0x00, 0x00, 0x0e, 0x32, 0x46, 0x66, 0x6d, 0x01,
+    0x01, 0x11, 0x02, 0x02, 0x07, 0xff, 0x03, 0x02,
+    0x00, 0x03, 0x04, 0x01, 0xff
+};
+static NciModeParam test_intf_activated_ntf_poll_a_mp = {
+    .poll_a = {
+        .sens_res = { 0x08, 0x00 },
+        .nfcid1_len = 4,
+        .nfcid1 = { 0x08, 0x50, 0xad, 0x0e },
+        .sel_res_len = 1,
+        .sel_res = 0x40
+    }
+};
+static NciActivationParam test_intf_activated_ntf_nfc_dep_ap = {
+    .nfc_dep_poll = {
+        .nfcid3 = { 0xc2, 0x40, 0x83, 0x1b, 0xe1,
+                    0x22, 0x5d, 0xfe, 0xb7, 0xe9 },
+        .did = 0x00,
+        .bs = 0x00,
+        .br = 0x00,
+        .to = 0x0e,
+        .pp = 0x32,
+        .g = { test_intf_activated_ntf_nfc_dep_ini + 0x24, 17 },
+    }
+};
+
+static const TestIntfActivatedSuccessData intf_activated_success_tests[] = {
+    {
+        .name = "nfc_dep/ok",
+        .data = { TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_ini) },
+        .mode_param = &test_intf_activated_ntf_poll_a_mp,
+        .activation_param = &test_intf_activated_ntf_nfc_dep_ap
+    }
+};
+
+/*==========================================================================*
+ * intf_activated_fail
+ *==========================================================================*/
+
+typedef struct test_intf_activated_fail_data {
+    const char* name;
+    GUtilData data;
+    gboolean parse_ok;
+    gboolean mode_param_ok;
+    gboolean activation_param_ok;
+} TestIntfActivatedFailData;
+
+static
+void
+test_intf_activated_fail(
+    gconstpointer user_data)
+{
+    const TestIntfActivatedFailData* test = user_data;
+    NciIntfActivationNtf ntf;
+    NciModeParam mode_param;
+    NciActivationParam activation_param;
+
+    g_assert(nci_parse_intf_activated_ntf(&ntf, &mode_param, &activation_param,
+        test->data.bytes, test->data.size) == test->parse_ok);
+    g_assert(!ntf.mode_param == !test->mode_param_ok);
+    g_assert(!ntf.activation_param == !test->activation_param_ok);
+}
+
+static guint8 test_intf_activated_ntf_nfc_dep_fail_1[] = {
+    0x01, 0x03, 0x05, 0x00, 0xfb, 0x01, 0x09, 0x08,
+    0x00, 0x04, 0x08, 0x50, 0xad, 0x0e, 0x01, 0x40,
+    0x02, 0x02, 0x02, 0x21, 0x21, 0xc2, 0x40, 0x83,
+                           /* ^^ too large */
+    0x1b, 0xe1, 0x22, 0x5d, 0xfe, 0xb7, 0xe9, 0x00,
+    0x00, 0x00, 0x0e, 0x32, 0x46, 0x66, 0x6d, 0x01,
+    0x01, 0x11, 0x02, 0x02, 0x07, 0xff, 0x03, 0x02,
+    0x00, 0x03, 0x04, 0x01, 0xff
+};
+static guint8 test_intf_activated_ntf_nfc_dep_fail_2[] = {
+    0x01, 0x03, 0x05, 0x00, 0xfb, 0x01, 0x09, 0x08,
+    0x00, 0x04, 0x08, 0x50, 0xad, 0x0e, 0x01, 0x40,
+    0x02, 0x02, 0x02, 0x0c, 0x0b, 0xc2, 0x40, 0x83,
+                           /* ^^ too short */
+    0x1b, 0xe1, 0x22, 0x5d, 0xfe, 0xb7, 0xe9, 0x00
+};
+
+static const TestIntfActivatedFailData intf_activated_fail_tests[] = {
+    {
+        .name = "nfc_dep_1",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_fail_1)},
+        .parse_ok = TRUE, .mode_param_ok = TRUE, .activation_param_ok = FALSE
+    },{
+        .name = "nfc_dep_2",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_fail_2)},
+        .parse_ok = TRUE, .mode_param_ok = TRUE, .activation_param_ok = FALSE
     }
 };
 
@@ -200,6 +374,7 @@ typedef struct test_discover_success_data {
     const char* name;
     GUtilData data;
     NciDiscoveryNtf ntf;
+    
 } TestDiscoverSuccessData;
 
 static
@@ -403,6 +578,23 @@ int main(int argc, char* argv[])
         g_test_add_data_func(path2, test, test_discover_copy);
         g_free(path1);
         g_free(path2);
+    }
+    for (i = 0; i < G_N_ELEMENTS(intf_activated_success_tests); i++) {
+        const TestIntfActivatedSuccessData* test =
+            intf_activated_success_tests + i;
+        char* path = g_strconcat(TEST_("intf_activated/success/"),
+            test->name, NULL);
+
+        g_test_add_data_func(path, test, test_intf_activated_success);
+        g_free(path);
+    }
+    for (i = 0; i < G_N_ELEMENTS(intf_activated_fail_tests); i++) {
+        const TestIntfActivatedFailData* test = intf_activated_fail_tests + i;
+        char* path = g_strconcat(TEST_("intf_activated/fail/"),
+            test->name, NULL);
+
+        g_test_add_data_func(path, test, test_intf_activated_fail);
+        g_free(path);
     }
     for (i = 0; i < G_N_ELEMENTS(discover_fail_tests); i++) {
         const TestDiscoverFailData* test = discover_fail_tests + i;
