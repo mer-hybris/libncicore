@@ -85,6 +85,15 @@ static const guint8 mode_param_success_data_poll_b[] =
     { 0x0b, 0x65, 0xe6, 0x70, 0x15, 0xe1, 0xf3, 0x5e, 0x11, 0x77, 0x87, 0x95 };
 static const guint8 mode_param_success_data_poll_b_rfu[] =
     { 0x0b, 0x65, 0xe6, 0x70, 0x15, 0xe1, 0xf3, 0x5e, 0x11, 0x77, 0x97, 0x95 };
+static const guint8 mode_param_success_data_poll_f_1[] =
+    { 0x01, 0x12, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0xc0, 0xc1,
+      0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f, 0xab };
+static const guint8 mode_param_success_data_poll_f_2[] =
+    { 0x02, 0x12, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0xc0, 0xc1,
+      0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f, 0xab };
+static const guint8 mode_param_success_data_poll_f_3[] =
+    { 0x03, 0x12, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0xc0, 0xc1,
+      0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f, 0xab };
 static const TestModeParamSuccessData mode_param_success_tests[] = {
     {
         .name = "minimal",
@@ -113,6 +122,24 @@ static const TestModeParamSuccessData mode_param_success_tests[] = {
         .mode = NCI_MODE_PASSIVE_POLL_B,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_poll_b_rfu) },
         .expected = { .poll_b = { {0x65, 0xe6, 0x70, 0x15}, 256 } }
+    },{
+        .name = "active_poll_f",
+        .mode = NCI_MODE_ACTIVE_POLL_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_poll_f_1) },
+        .expected = { .poll_f = { 1, {0x01, 0xfe, 0xc0, 0xf1,
+                                      0xc4, 0x41, 0x38, 0x21} } }
+    },{
+        .name = "passive_poll_f",
+        .mode = NCI_MODE_PASSIVE_POLL_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_poll_f_2) },
+        .expected = { .poll_f = { 2, {0x01, 0xfe, 0xc0, 0xf1,
+                                      0xc4, 0x41, 0x38, 0x21} } }
+    },{
+        .name = "passive_poll_f_3",
+        .mode = NCI_MODE_PASSIVE_POLL_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_poll_f_3) },
+        .expected = { .poll_f = { 3, {0x01, 0xfe, 0xc0, 0xf1,
+                                      0xc4, 0x41, 0x38, 0x21} } }
     }
 };
 
@@ -149,6 +176,11 @@ static const guint8 mode_param_fail_data_too_long[] =
       0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x01, 0x20 };
 static const guint8 mode_param_fail_pollb_data_too_short_1[] =
     { 0x0a, 0x65, 0xe6, 0x70, 0x15, 0xe1, 0xf3, 0x5e, 0x11, 0x77, 0x87 };
+static const guint8 mode_param_fail_pollf_data_too_short_1[] =
+    { 0x01, 0x12, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0xc0, 0xc1,
+      0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f };
+static const guint8 mode_param_fail_pollf_data_too_short_2[] =
+    { 0x01, 0x07, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38 };
 static const TestModeParamFailData mode_param_fail_tests[] = {
     {
         .name = "unhandled_mode",
@@ -170,6 +202,10 @@ static const TestModeParamFailData mode_param_fail_tests[] = {
         .mode = NCI_MODE_ACTIVE_POLL_A,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_data_too_short_1) }
     },{
+        .name = "too_short/poll_f",
+        .mode = NCI_MODE_ACTIVE_POLL_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_data_too_short_1) }
+    },{
         .name = "too_short/2",
         .mode = NCI_MODE_ACTIVE_POLL_A,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_data_too_short_2) }
@@ -189,6 +225,14 @@ static const TestModeParamFailData mode_param_fail_tests[] = {
         .name = "poll_b_too_short",
         .mode = NCI_MODE_PASSIVE_POLL_B,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_pollb_data_too_short_1) }
+    },{
+        .name = "poll_f_too_short_1",
+        .mode = NCI_MODE_PASSIVE_POLL_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_pollf_data_too_short_1) }
+    },{
+        .name = "poll_f_too_short_2",
+        .mode = NCI_MODE_PASSIVE_POLL_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_pollf_data_too_short_2) }
     }
 };
 
