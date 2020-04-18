@@ -176,6 +176,10 @@ nci_state_w4_host_select_entered(
                 payload, nci_state_w4_host_select_rsp, self);
             g_bytes_unref(payload);
             g_slist_free(selected);
+        } else {
+            /* We haven't found anything suitable */
+            GDEBUG("Nothing to select");
+            nci_sm_switch_to(sm, NCI_RFST_DISCOVERY);
         }
     }
 }
