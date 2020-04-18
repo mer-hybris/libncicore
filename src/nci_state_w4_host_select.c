@@ -66,7 +66,8 @@ nci_state_w4_host_select_sort(
     if (ntf_a->protocol != ntf_b->protocol) {
         static const NCI_PROTOCOL protocol_order[] = {
             NCI_PROTOCOL_T2T,
-            NCI_PROTOCOL_ISO_DEP
+            NCI_PROTOCOL_ISO_DEP,
+            NCI_PROTOCOL_NFC_DEP
         };
         guint i;
 

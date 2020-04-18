@@ -813,11 +813,11 @@ nci_sm_supports_protocol(
     switch (protocol) {
     case NCI_PROTOCOL_T2T:
     case NCI_PROTOCOL_ISO_DEP:
+    case NCI_PROTOCOL_NFC_DEP:
         return TRUE;
     case NCI_PROTOCOL_UNDETERMINED:
     case NCI_PROTOCOL_T1T:
     case NCI_PROTOCOL_T3T:
-    case NCI_PROTOCOL_NFC_DEP:
     case NCI_PROTOCOL_PROPRIETARY:
         break;
     }
