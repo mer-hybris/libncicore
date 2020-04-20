@@ -67,8 +67,15 @@ typedef struct nci_sm_object {
     NciTransition* next_transition;
     NciTransition* active_transition;
     NciState* active_state;
+    gint entering_state;
+    guint pending_switch_id;
     guint32 pending_signals;
 } NciSmObject;
+
+typedef struct nci_sm_switch {
+    NciSmObject* obj;
+    NciState* state;
+} NciSmSwitch;
 
 G_DEFINE_TYPE(NciSmObject, nci_sm_object, G_TYPE_OBJECT)
 #define NCI_TYPE_SM (nci_sm_object_get_type())
@@ -299,6 +306,12 @@ nci_sm_enter_state_internal(
 {
     NciTransition* next_transition;
 
+    /*
+     * Protect against nci_sm_switch_to() being invoked by
+     * nci_state_enter() or nci_state_reenter()
+     */
+    self->entering_state++;
+
     /* Entering any state terminates the transition */
     nci_sm_finish_active_transition(self);
 
@@ -331,6 +344,9 @@ nci_sm_enter_state_internal(
         nci_sm_set_next_state(self, state);
     }
     nci_sm_emit_pending_signals(self);
+
+    /* Allow direct nci_sm_switch_to() calls */
+    self->entering_state--;
 }
 
 /*
@@ -417,16 +433,15 @@ nci_sm_enter_state(
     return NULL;
 }
 
+static
 void
-nci_sm_switch_to(
-    NciSm* sm,
-    NCI_STATE id)
+nci_sm_switch_internal(
+    NciSmObject* self,
+    NciState* next)
 {
-    NciState* next = nci_sm_get_state(sm, id);
+    NciSm* sm = &self->sm;
 
-    if (G_LIKELY(next) && sm->next_state != next) {
-        NciSmObject* self = nci_sm_object(sm);
-
+    if (sm->next_state != next) {
         if (self->next_transition) {
             nci_transition_unref(self->next_transition);
             self->next_transition = NULL;
@@ -435,11 +450,12 @@ nci_sm_switch_to(
             NciState* dest = self->active_transition->dest;
 
             if (dest != next) {
-                self->next_transition = nci_state_get_transition(dest, id);
+                self->next_transition =
+                    nci_state_get_transition(dest, next->state);
                 if (self->next_transition) {
                     nci_transition_ref(self->next_transition);
                     nci_sm_set_next_state(self, next);
-                } else if (NCI_IS_INTERNAL_STATE(id)) {
+                } else if (NCI_IS_INTERNAL_STATE(next->state)) {
                     /* Internal states are entered without transition
                      * and take no parameters */
                     nci_sm_enter_state_internal(self, next, NULL);
@@ -450,7 +466,7 @@ nci_sm_switch_to(
             }
         } else {
             NciTransition* direct_transition =
-                nci_state_get_transition(sm->last_state, id);
+                nci_state_get_transition(sm->last_state, next->state);
 
             if (direct_transition) {
                 /* Found direct transition */
@@ -459,7 +475,7 @@ nci_sm_switch_to(
                 } else {
                     nci_sm_stall_internal(self, NCI_STALL_ERROR);
                 }
-            } else if (NCI_IS_INTERNAL_STATE(id)) {
+            } else if (NCI_IS_INTERNAL_STATE(next->state)) {
                 /* Internal states are entered without transition and
                  * take no parameters. */
                 nci_sm_enter_state_internal(self, next, NULL);
@@ -475,11 +491,11 @@ nci_sm_switch_to(
                 if (nci_sm_start_transition(self, transition_to_idle)) {
                     NciState* idle = nci_sm_state_by_id(self, NCI_RFST_IDLE);
 
-                    if (id == NCI_RFST_IDLE) {
+                    if (next->state == NCI_RFST_IDLE) {
                         nci_sm_set_next_state(self, idle);
                     } else {
                         self->next_transition =
-                            nci_state_get_transition(idle, id);
+                            nci_state_get_transition(idle, next->state);
                         if (self->next_transition) {
                             nci_transition_ref(self->next_transition);
                             nci_sm_set_next_state(self, next);
@@ -495,6 +511,62 @@ nci_sm_switch_to(
             }
         }
         nci_sm_emit_pending_signals(self);
+    }
+}
+
+static
+void
+nci_sm_switch_destroy(
+    gpointer user_data)
+{
+    NciSmSwitch* data = user_data;
+
+    nci_state_unref(data->state);
+    g_slice_free1(sizeof(*data), data);
+}
+
+static
+gboolean
+nci_sm_switch_proc(
+    gpointer user_data)
+{
+    NciSmSwitch* data = user_data;
+    NciSmObject* self = data->obj;
+
+    self->pending_switch_id = 0;
+    nci_sm_switch_internal(self, data->state);
+    return G_SOURCE_REMOVE;
+}
+
+void
+nci_sm_switch_to(
+    NciSm* sm,
+    NCI_STATE id)
+{
+    NciSmObject* self = nci_sm_object(sm);
+
+    if (G_LIKELY(self)) {
+        NciState* state = nci_sm_state_by_id(self, id);
+
+        if (G_LIKELY(state)) {
+            if (self->pending_switch_id) {
+                /* Cancel previously scheduled switch */
+                g_source_remove(self->pending_switch_id);
+                self->pending_switch_id = 0;
+            }
+            if (self->entering_state) {
+                /* Will do it later on a fresh stack */
+                NciSmSwitch* data = g_slice_new(NciSmSwitch);
+
+                data->obj = self;
+                data->state = nci_state_ref(state);
+                self->pending_switch_id =
+                    g_idle_add_full(G_PRIORITY_DEFAULT_IDLE,
+                        nci_sm_switch_proc, data, nci_sm_switch_destroy);
+            } else {
+                nci_sm_switch_internal(self, state);
+            }
+        }
     }
 }
 
@@ -741,11 +813,11 @@ nci_sm_supports_protocol(
     switch (protocol) {
     case NCI_PROTOCOL_T2T:
     case NCI_PROTOCOL_ISO_DEP:
+    case NCI_PROTOCOL_NFC_DEP:
         return TRUE;
     case NCI_PROTOCOL_UNDETERMINED:
     case NCI_PROTOCOL_T1T:
     case NCI_PROTOCOL_T3T:
-    case NCI_PROTOCOL_NFC_DEP:
     case NCI_PROTOCOL_PROPRIETARY:
         break;
     }
@@ -954,6 +1026,10 @@ nci_sm_object_finalize(
     NciSmObject* self = NCI_SM(object);
     NciSm* sm = &self->sm;
 
+    if (self->pending_switch_id) {
+        g_source_remove(self->pending_switch_id);
+        self->pending_switch_id = 0;
+    }
     nci_sm_finish_active_transition(self);
     nci_state_leave(self->active_state);
     if (sm->rf_interfaces) {

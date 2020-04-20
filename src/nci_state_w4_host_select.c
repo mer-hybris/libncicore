@@ -66,7 +66,8 @@ nci_state_w4_host_select_sort(
     if (ntf_a->protocol != ntf_b->protocol) {
         static const NCI_PROTOCOL protocol_order[] = {
             NCI_PROTOCOL_T2T,
-            NCI_PROTOCOL_ISO_DEP
+            NCI_PROTOCOL_ISO_DEP,
+            NCI_PROTOCOL_NFC_DEP
         };
         guint i;
 
@@ -176,6 +177,10 @@ nci_state_w4_host_select_entered(
                 payload, nci_state_w4_host_select_rsp, self);
             g_bytes_unref(payload);
             g_slist_free(selected);
+        } else {
+            /* We haven't found anything suitable */
+            GDEBUG("Nothing to select");
+            nci_sm_switch_to(sm, NCI_RFST_DISCOVERY);
         }
     }
 }

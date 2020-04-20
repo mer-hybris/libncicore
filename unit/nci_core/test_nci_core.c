@@ -287,6 +287,11 @@ static const guint8 RF_DISCOVER_NTF_2_T2T[] = {
     0x00, 0x04, 0x4f, 0x01, 0x74, 0x01, 0x01, 0x08,
     0x02
 };
+static const guint8 RF_DISCOVER_NTF_PROPRIETARY_MORE[] = {
+    0x61, 0x03, 0x0e, 0x02, 0x80, 0x00, 0x09, 0x04,
+    0x00, 0x04, 0x4f, 0x01, 0x74, 0x01, 0x01, 0x08,
+    0x02
+};
 static const guint8 RF_DISCOVER_NTF_2_PROPRIETARY_LAST[] = {
     0x61, 0x03, 0x0e, 0x02, 0x80, 0x00, 0x09, 0x04,
     0x00, 0x04, 0x4f, 0x01, 0x74, 0x01, 0x01, 0x08,
@@ -392,6 +397,7 @@ typedef struct test_hal_io {
     NciHalClient* sar;
     void* test_data;
     guint fail_write;
+    guint rsp_expected;
 } TestHalIo;
 
 typedef struct test_hal_io_read {
@@ -493,7 +499,8 @@ test_hal_io_read_cb(
 
     hal->read_id = 0;
     test_hal_io_flush_ntf(hal);
-    if (test_hal_io_next_rsp(hal)) {
+    if (hal->rsp_expected && test_hal_io_next_rsp(hal)) {
+        hal->rsp_expected--;
         test_hal_io_read_one(hal);
         test_hal_io_flush_ntf(hal);
     }
@@ -510,6 +517,7 @@ test_hal_io_write_cb(
 
     g_assert(hal->write_id);
     hal->write_id = 0;
+    hal->rsp_expected++;
     g_ptr_array_add(hal->written, g_bytes_ref(write->bytes));
     if (write->complete) {
         write->complete(hal->sar, TRUE);
@@ -2153,6 +2161,34 @@ static const TestSmEntry test_nci_sm_discovery_ntf_isodep_fail[] = {
     TEST_NCI_SM_END()
 };
 
+static const TestSmEntry test_nci_sm_discovery_ntf_noselect[] = {
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP_1),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+
+    /* Switch state machine to DISCOVERY state */
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
+    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* Receive 2 discovery notifications (both Proprietary) */
+    TEST_NCI_SM_QUEUE_NTF(RF_DISCOVER_NTF_PROPRIETARY_MORE),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_W4_ALL_DISCOVERIES),
+    TEST_NCI_SM_QUEUE_NTF(RF_DISCOVER_NTF_2_PROPRIETARY_LAST),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_W4_HOST_SELECT),
+
+    /* State machine will deactivate to DISCOVERY via IDLE */
+    TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_END()
+};
+
 static const TestNciSmData nci_sm_tests[] = {
     { "init-ok", test_nci_sm_init_ok },
     { "init-timeout", test_nci_sm_init_timeout },
@@ -2204,7 +2240,8 @@ static const TestNciSmData nci_sm_tests[] = {
        test_nci_sm_dscvr_poll_deact_t4a_badparam2 },
     { "discovery-ntf-t2t", test_nci_sm_discovery_ntf_t2t },
     { "discovery-ntf-isodep", test_nci_sm_discovery_ntf_isodep },
-    { "discovery-ntf-isodep-fail", test_nci_sm_discovery_ntf_isodep_fail }
+    { "discovery-ntf-isodep-fail", test_nci_sm_discovery_ntf_isodep_fail },
+    { "discovery-ntf-noselect", test_nci_sm_discovery_ntf_noselect }
 };
 
 /*==========================================================================*
