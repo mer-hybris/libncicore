@@ -1,7 +1,14 @@
+libncicore (1.0.9) unstable; urgency=low
+
+  * Prevent state machine from getting stuck in RFST_W4_HOST_SELECT state
+  * Consider NFC-DEP a supported protocol
+
+ -- Slava Monich <slava.monich@jolla.com>  Tue, 21 Apr 2020 00:14:56 +0300
+
 libncicore (1.0.8) unstable; urgency=low
 
-  * Parse NFC-DEP activation parameters.
-  * Parse NFC-F Poll Mode parameters.
+  * Parse NFC-DEP activation parameters
+  * Parse NFC-F Poll Mode parameters
 
  -- Slava Monich <slava.monich@jolla.com>  Thu, 09 Apr 2020 13:26:53 +0300
 
