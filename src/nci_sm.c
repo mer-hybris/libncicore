@@ -954,41 +954,37 @@ nci_sm_handle_rf_deactivate_ntf(
     NciSm* sm,
     const GUtilData* payload)
 {
-    NciSar* sar = (sm && sm->io) ? sm->io->sar : NULL;
+    /*
+     * Table 62: Control Messages for RF Interface Deactivation
+     *
+     * RF_DEACTIVATE_NTF
+     *
+     * +=========================================================+
+     * | Offset | Size | Description                             |
+     * +=========================================================+
+     * | 0      | 1    | Deactivation Type                       |
+     * | 1      | 1    | Deactivation Reason                     |
+     * +=========================================================+
+     */
+    if (payload->size >= 2) {
+        const guint8 type = payload->bytes[0];
 
-    if (sar) {
-        /*
-         * Table 62: Control Messages for RF Interface Deactivation
-         *
-         * RF_DEACTIVATE_NTF
-         *
-         * +=========================================================+
-         * | Offset | Size | Description                             |
-         * +=========================================================+
-         * | 0      | 1    | Deactivation Type                       |
-         * | 1      | 1    | Deactivation Reason                     |
-         * +=========================================================+
-         */
-        if (payload->size >= 2) {
-            const guint8 type = payload->bytes[0];
-
-            switch (type) {
-            case NCI_DEACTIVATE_TYPE_IDLE:
-                GDEBUG("RF_DEACTIVATE_NTF Idle (%u)", payload->bytes[1]);
-                nci_sm_enter_state(sm, NCI_RFST_IDLE, NULL);
-                return;
-            case NCI_DEACTIVATE_TYPE_DISCOVERY:
-                GDEBUG("RF_DEACTIVATE_NTF Discovery (%u)", payload->bytes[1]);
-                nci_sm_enter_state(sm, NCI_RFST_DISCOVERY, NULL);
-                return;
-            default:
-                GDEBUG("RF_DEACTIVATE_NTF %u (%u)", type, payload->bytes[1]);
-                break;
-            }
+        switch (type) {
+        case NCI_DEACTIVATE_TYPE_IDLE:
+            GDEBUG("RF_DEACTIVATE_NTF Idle (%u)", payload->bytes[1]);
+            nci_sm_enter_state(sm, NCI_RFST_IDLE, NULL);
+            return;
+        case NCI_DEACTIVATE_TYPE_DISCOVERY:
+            GDEBUG("RF_DEACTIVATE_NTF Discovery (%u)", payload->bytes[1]);
+            nci_sm_enter_state(sm, NCI_RFST_DISCOVERY, NULL);
+            return;
+        default:
+            GDEBUG("RF_DEACTIVATE_NTF %u (%u)", type, payload->bytes[1]);
+            break;
         }
-        GWARN("Failed to parse CORE_CONN_CREDITS_NTF");
-        nci_sm_stall(sm, NCI_STALL_ERROR);
     }
+    GWARN("Failed to parse RF_DEACTIVATE_NTF");
+    nci_sm_stall(sm, NCI_STALL_ERROR);
 }
 
 /*==========================================================================*
