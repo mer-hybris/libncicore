@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -41,7 +41,7 @@ typedef struct nci_param_w4_host_select {
     guint count;
 } NciParamW4HostSelect;
 
-GType nci_param_w4_host_select_get_type(void);
+GType nci_param_w4_host_select_get_type(void) NCI_INTERNAL;
 #define NCI_TYPE_PARAM_W4_HOST_SELECT \
         nci_param_w4_host_select_get_type()
 #define NCI_IS_PARAM_W4_HOST_SELECT(obj) G_TYPE_CHECK_INSTANCE_TYPE((obj),\
@@ -52,7 +52,8 @@ GType nci_param_w4_host_select_get_type(void);
 NciParamW4HostSelect*
 nci_param_w4_host_select_new(
     const NciDiscoveryNtf* const* ntfs,
-    guint count);
+    guint count)
+    NCI_INTERNAL;
 
 #endif /* NCI_PARAM_W4_HOST_SELECT_H */
 

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -40,14 +40,16 @@ nci_parse_mode_param(
     NciModeParam* param,
     NCI_MODE mode,
     const guint8* bytes,
-    guint len);
+    guint len)
+    NCI_INTERNAL;
 
 gboolean
 nci_parse_discover_ntf(
     NciDiscoveryNtf* ntf,
     NciModeParam* param,
     const guint8* bytes,
-    guint len);
+    guint len)
+    NCI_INTERNAL;
 
 gboolean
 nci_parse_intf_activated_ntf(
@@ -55,16 +57,19 @@ nci_parse_intf_activated_ntf(
     NciModeParam* mode_param,
     NciActivationParam* activation_param,
     const guint8* pkt,
-    guint len);
+    guint len)
+    NCI_INTERNAL;
 
 NciDiscoveryNtf*
 nci_discovery_ntf_copy_array(
     const NciDiscoveryNtf* const* ntfs,
-    guint count);
+    guint count)
+    NCI_INTERNAL;
 
 NciDiscoveryNtf*
 nci_discovery_ntf_copy(
-    const NciDiscoveryNtf* ntf);
+    const NciDiscoveryNtf* ntf)
+    NCI_INTERNAL;
 
 #endif /* NCI_UTIL_H */
 

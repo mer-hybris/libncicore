@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -55,7 +55,8 @@ nci_state_init_base(
     NciState* state,
     NciSm* sm,
     NCI_STATE id,
-    const char* name);
+    const char* name)
+    NCI_INTERNAL;
 
 gboolean
 nci_state_send_command(
@@ -64,15 +65,18 @@ nci_state_send_command(
     guint8 oid,
     GBytes* payload,
     NciSmResponseFunc resp,
-    gpointer user_data);
+    gpointer user_data)
+    NCI_INTERNAL;
 
 void
 nci_state_error(
-    NciState* state);
+    NciState* state)
+    NCI_INTERNAL;
 
 NciSm*
 nci_state_sm(
-    NciState* state);
+    NciState* state)
+    NCI_INTERNAL;
 
 #endif /* NCI_STATE_IMPL_H */
 

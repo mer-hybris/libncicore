@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018-2019 Jolla Ltd.
- * Copyright (C) 2018-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2018-2020 Jolla Ltd.
+ * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -34,6 +34,8 @@
 #define NCI_TYPES_PRIVATE_H
 
 #include <nci_types.h>
+
+#define NCI_INTERNAL G_GNUC_INTERNAL
 
 typedef struct nci_param NciParam;
 typedef struct nci_sar NciSar;

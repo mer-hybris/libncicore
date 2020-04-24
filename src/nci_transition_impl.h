@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -57,54 +57,63 @@ void
 
 void
 nci_transition_init_base(
-    NciTransition* self,
+    NciTransition* transition,
     NciSm* sm,
-    NciState* dest);
+    NciState* dest)
+    NCI_INTERNAL;
 
 NciSm*
 nci_transition_sm(
-    NciTransition* self);
+    NciTransition* transition)
+    NCI_INTERNAL;
 
 void
 nci_transition_finish(
-    NciTransition* self,
-    void* param);
+    NciTransition* transition,
+    void* param)
+    NCI_INTERNAL;
 
 void
 nci_transition_stall(
-    NciTransition* self,
-    NCI_STALL stall);
+    NciTransition* transition,
+    NCI_STALL stall)
+    NCI_INTERNAL;
 
 gboolean
 nci_transition_active(
-    NciTransition* self);
+    NciTransition* transition)
+    NCI_INTERNAL;
 
 gboolean
 nci_transition_send_command(
-    NciTransition* self,
+    NciTransition* transition,
     guint8 gid,
     guint8 oid,
     GBytes* payload,
-    NciTransitionResponseFunc resp);
+    NciTransitionResponseFunc resp)
+    NCI_INTERNAL;
 
 gboolean
 nci_transition_send_command_static(
-    NciTransition* self,
+    NciTransition* transition,
     guint8 gid,
     guint8 oid,
     const void* payload,
     gsize payload_len,
-    NciTransitionResponseFunc resp);
+    NciTransitionResponseFunc resp)
+    NCI_INTERNAL;
 
 gboolean
 nci_transition_deactivate_to_idle(
-    NciTransition* self,
-    NciTransitionResponseFunc resp);
+    NciTransition* transition,
+    NciTransitionResponseFunc resp)
+    NCI_INTERNAL;
 
 gboolean
 nci_transition_deactivate_to_discovery(
-    NciTransition* self,
-    NciTransitionResponseFunc resp);
+    NciTransition* transition,
+    NciTransitionResponseFunc resp)
+    NCI_INTERNAL;
 
 #endif /* NCI_TRANSITION_IMPL_H */
 

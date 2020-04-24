@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -47,83 +47,99 @@ struct nci_state {
     gboolean active;
 };
 
-GType nci_state_get_type(void);
+GType nci_state_get_type(void) NCI_INTERNAL;
 #define NCI_TYPE_STATE (nci_state_get_type())
 #define NCI_STATE(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), \
         NCI_TYPE_STATE, NciState))
 
 NciState*
 nci_state_ref(
-    NciState* state);
+    NciState* state)
+    NCI_INTERNAL;
 
 void
 nci_state_unref(
-    NciState* state);
+    NciState* state)
+    NCI_INTERNAL;
 
 NciTransition*
 nci_state_get_transition(
     NciState* state,
-    NCI_STATE dest);
+    NCI_STATE dest)
+    NCI_INTERNAL;
 
 void
 nci_state_add_transition(
     NciState* state,
-    NciTransition* transition);
+    NciTransition* transition)
+    NCI_INTERNAL;
 
 void
 nci_state_enter(
     NciState* state,
-    void* param);
+    void* param)
+    NCI_INTERNAL;
 
 void
 nci_state_reenter(
     NciState* state,
-    void* param);
+    void* param)
+    NCI_INTERNAL;
 
 void
 nci_state_leave(
-    NciState* state);
+    NciState* state)
+    NCI_INTERNAL;
 
 void
 nci_state_handle_ntf(
     NciState* state,
     guint8 gid,
     guint8 oid,
-    const GUtilData* payload);
+    const GUtilData* payload)
+    NCI_INTERNAL;
 
 /* Specific states */
 
 NciState* /* NCI_STATE_INIT */
 nci_state_init_new(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 NciState* /* NCI_STATE_ERROR */
 nci_state_error_new(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 NciState* /* NCI_STATE_STOP */
 nci_state_stop_new(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 NciState* /* NCI_RFST_IDLE */
 nci_state_idle_new(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 NciState* /* NCI_RFST_DISCOVERY */
 nci_state_discovery_new(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 NciState* /* NCI_RFST_POLL_ACTIVE */
 nci_state_poll_active_new(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 NciState* /* NCI_RFST_W4_ALL_DISCOVERIES */
 nci_state_w4_all_discoveries_new(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 NciState* /* NCI_RFST_W4_HOST_SELECT */
 nci_state_w4_host_select_new(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 #endif /* NCI_STATE_PRIVATE_H */
 

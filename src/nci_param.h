@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -41,7 +41,7 @@ struct nci_param {
     GObject object;
 };
 
-GType nci_param_get_type(void);
+GType nci_param_get_type(void) NCI_INTERNAL;
 #define NCI_TYPE_PARAM nci_param_get_type()
 #define NCI_IS_PARAM(obj) G_TYPE_CHECK_INSTANCE_TYPE((obj), NCI_TYPE_PARAM)
 #define NCI_PARAM(obj) G_TYPE_CHECK_INSTANCE_CAST((obj), NCI_TYPE_PARAM, \
@@ -49,11 +49,13 @@ GType nci_param_get_type(void);
 
 NciParam*
 nci_param_ref(
-    NciParam* param);
+    NciParam* param)
+    NCI_INTERNAL;
 
 void
 nci_param_unref(
-    NciParam* param);
+    NciParam* param)
+    NCI_INTERNAL;
 
 #endif /* NCI_PARAM_H */
 

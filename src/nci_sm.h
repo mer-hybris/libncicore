@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -277,74 +277,87 @@ NciState*
 nci_sm_enter_state(
     NciSm* sm,
     NCI_STATE state,
-    NciParam* param);
+    NciParam* param)
+    NCI_INTERNAL;
 
 void
 nci_sm_switch_to(
     NciSm* sm,
-    NCI_STATE id);
+    NCI_STATE id)
+    NCI_INTERNAL;
 
 void
 nci_sm_stall(
     NciSm* sm,
-    NCI_STALL type);
+    NCI_STALL type)
+    NCI_INTERNAL;
 
 /* Interface for NciCore */
 
 NciSm*
 nci_sm_new(
-    NciSmIo* io);
+    NciSmIo* io)
+    NCI_INTERNAL;
 
 void
 nci_sm_free(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 void
 nci_sm_handle_ntf(
     NciSm* sm,
     guint8 gid,
     guint8 oid,
-    const GUtilData* payload);
+    const GUtilData* payload)
+    NCI_INTERNAL;
 
 void
 nci_sm_add_state(
     NciSm* sm,
-    NciState* state);
+    NciState* state)
+    NCI_INTERNAL;
 
 void
 nci_sm_add_transition(
     NciSm* sm,
     NCI_STATE state,
-    NciTransition* transition);
+    NciTransition* transition)
+    NCI_INTERNAL;
 
 gulong
 nci_sm_add_last_state_handler(
     NciSm* sm,
     NciSmFunc func,
-    void* user_data);
+    void* user_data)
+    NCI_INTERNAL;
 
 gulong
 nci_sm_add_next_state_handler(
     NciSm* sm,
     NciSmFunc func,
-    void* user_data);
+    void* user_data)
+    NCI_INTERNAL;
 
 gulong
 nci_sm_add_intf_activated_handler(
     NciSm* sm,
     NciSmIntfActivationFunc func,
-    void* user_data);
+    void* user_data)
+    NCI_INTERNAL;
 
 void
 nci_sm_remove_handler(
     NciSm* sm,
-    gulong id);
+    gulong id)
+    NCI_INTERNAL;
 
 void
 nci_sm_remove_handlers(
     NciSm* sm,
     gulong* ids,
-    guint count);
+    guint count)
+    NCI_INTERNAL;
 
 #define nci_sm_remove_all_handlers(sm,ids) \
     nci_sm_remove_handlers(sm, ids, G_N_ELEMENTS(ids))
@@ -353,30 +366,36 @@ nci_sm_remove_handlers(
 
 void
 nci_sm_add_weak_pointer(
-    NciSm** ptr);
+    NciSm** ptr)
+    NCI_INTERNAL;
 
 void
 nci_sm_remove_weak_pointer(
-    NciSm** ptr);
+    NciSm** ptr)
+    NCI_INTERNAL;
 
 NciState*
 nci_sm_get_state(
     NciSm* sm,
-    NCI_STATE state);
+    NCI_STATE state)
+    NCI_INTERNAL;
 
 NciSar*
 nci_sm_sar(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 gboolean
 nci_sm_supports_protocol(
     NciSm* sm,
-    NCI_PROTOCOL protocol);
+    NCI_PROTOCOL protocol)
+    NCI_INTERNAL;
 
 gboolean
 nci_sm_active_transition(
     NciSm* sm,
-    NciTransition* transition);
+    NciTransition* transition)
+    NCI_INTERNAL;
 
 gboolean
 nci_sm_send_command(
@@ -385,7 +404,8 @@ nci_sm_send_command(
     guint8 oid,
     GBytes* payload,
     NciSmResponseFunc resp,
-    gpointer user_data);
+    gpointer user_data)
+    NCI_INTERNAL;
 
 gboolean
 nci_sm_send_command_static(
@@ -395,22 +415,26 @@ nci_sm_send_command_static(
     const void* payload,
     gsize payload_len,
     NciSmResponseFunc resp,
-    gpointer user_data);
+    gpointer user_data)
+    NCI_INTERNAL;
 
 void
 nci_sm_intf_activated(
     NciSm* sm,
-    const NciIntfActivationNtf* ntf);
+    const NciIntfActivationNtf* ntf)
+    NCI_INTERNAL;
 
 void
 nci_sm_handle_conn_credits_ntf(
     NciSm* sm,
-    const GUtilData* payload);
+    const GUtilData* payload)
+    NCI_INTERNAL;
 
 void
 nci_sm_handle_rf_deactivate_ntf(
     NciSm* sm,
-    const GUtilData* payload);
+    const GUtilData* payload)
+    NCI_INTERNAL;
 
 #endif /* NCI_STATE_MACHINE_H */
 

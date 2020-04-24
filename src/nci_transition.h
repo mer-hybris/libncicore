@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -47,7 +47,7 @@ struct nci_transition {
     NciState* dest;
 };
 
-GType nci_transition_get_type(void);
+GType nci_transition_get_type(void) NCI_INTERNAL;
 #define NCI_TYPE_TRANSITION (nci_transition_get_type())
 #define NCI_TRANSITION(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), \
         NCI_TYPE_TRANSITION, NciTransition))
@@ -60,48 +60,58 @@ void
 
 NciTransition*
 nci_transition_ref(
-    NciTransition* transition);
+    NciTransition* transition)
+    NCI_INTERNAL;
 
 void
 nci_transition_unref(
-    NciTransition* transition);
+    NciTransition* transition)
+    NCI_INTERNAL;
 
 gboolean
 nci_transition_start(
-    NciTransition* self);
+    NciTransition* transition)
+    NCI_INTERNAL;
 
 void
 nci_transition_finished(
-    NciTransition* self);
+    NciTransition* transition)
+    NCI_INTERNAL;
 
 void
 nci_transition_handle_ntf(
     NciTransition* transition,
     guint8 gid,
     guint8 oid,
-    const GUtilData* payload);
+    const GUtilData* payload)
+    NCI_INTERNAL;
 
 /* Specific transitions */
 
 NciTransition* 
 nci_transition_reset_new(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 NciTransition* 
 nci_transition_idle_to_discovery_new(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 NciTransition* 
 nci_transition_deactivate_to_idle_new(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 NciTransition* 
 nci_transition_poll_active_to_discovery_new(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 NciTransition* 
 nci_transition_poll_active_to_idle_new(
-    NciSm* sm);
+    NciSm* sm)
+    NCI_INTERNAL;
 
 #endif /* NCI_TRANSITION_H */
 

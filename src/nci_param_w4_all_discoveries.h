@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -40,7 +40,7 @@ typedef struct nci_param_w4_all_discoveries {
     NciDiscoveryNtf* ntf;
 } NciParamW4AllDiscoveries;
 
-GType nci_param_w4_all_discoveries_get_type(void);
+GType nci_param_w4_all_discoveries_get_type(void) NCI_INTERNAL;
 #define NCI_TYPE_PARAM_W4_ALL_DISCOVERIES \
         nci_param_w4_all_discoveries_get_type()
 #define NCI_IS_PARAM_W4_ALL_DISCOVERIES(obj) G_TYPE_CHECK_INSTANCE_TYPE((obj),\
@@ -50,7 +50,8 @@ GType nci_param_w4_all_discoveries_get_type(void);
 
 NciParamW4AllDiscoveries*
 nci_param_w4_all_discoveries_new(
-    const NciDiscoveryNtf* ntf);
+    const NciDiscoveryNtf* ntf)
+    NCI_INTERNAL;
 
 #endif /* NCI_PARAM_W4_ALL_DISCOVERIES_H */
 

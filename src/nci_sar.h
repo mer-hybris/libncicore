@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018-2019 Jolla Ltd.
- * Copyright (C) 2018-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2018-2020 Jolla Ltd.
+ * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -63,41 +63,49 @@ void
 NciSar*
 nci_sar_new(
     NciHalIo* io,
-    NciSarClient* client);
+    NciSarClient* client)
+    NCI_INTERNAL;
 
 void
 nci_sar_free(
-    NciSar* sar);
+    NciSar* sar)
+    NCI_INTERNAL;
 
 gboolean
 nci_sar_start(
-    NciSar* sar);
+    NciSar* sar)
+    NCI_INTERNAL;
 
 void
 nci_sar_reset(
-    NciSar* sar);
+    NciSar* sar)
+    NCI_INTERNAL;
 
 void
 nci_sar_set_max_logical_connections(
     NciSar* sar,
-    guint8 max);
+    guint8 max)
+    NCI_INTERNAL;
 
 void
 nci_sar_set_max_control_packet_size(
     NciSar* sar,
-    guint8 max);
+    guint8 max)
+    NCI_INTERNAL;
 
 void
 nci_sar_set_initial_credits(
     NciSar* sar,
     guint8 cid,
-    guint8 credits);
+    guint8 credits)
+    NCI_INTERNAL;
 
 void
 nci_sar_add_credits(
     NciSar* sar,
     guint8 cid,
-    guint8 credits);
+    guint8 credits)
+    NCI_INTERNAL;
 
 guint
 nci_sar_send_command(
@@ -107,7 +115,8 @@ nci_sar_send_command(
     GBytes* payload,
     NciSarCompletionFunc complete,
     GDestroyNotify destroy,
-    gpointer user_data);
+    gpointer user_data)
+    NCI_INTERNAL;
 
 guint
 nci_sar_send_data_packet(
@@ -116,12 +125,14 @@ nci_sar_send_data_packet(
     GBytes* payload,
     NciSarCompletionFunc complete,
     GDestroyNotify destroy,
-    gpointer user_data);
+    gpointer user_data)
+    NCI_INTERNAL;
 
 void
 nci_sar_cancel(
     NciSar* sar,
-    guint id);
+    guint id)
+    NCI_INTERNAL;
 
 #endif /* NFC_SAR_H */
 
