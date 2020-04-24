@@ -37,7 +37,6 @@
 #include "nci_transition.h"
 #include "nci_log.h"
 
-#include <gutil_idlepool.h>
 #include <gutil_macros.h>
 #include <gutil_misc.h>
 
@@ -60,7 +59,6 @@ typedef struct nci_sm_intf_activated_closure {
 typedef struct nci_sm_object {
     GObject object;
     NciSm sm;
-    GUtilIdlePool* pool;
     GPtrArray* states;
     GPtrArray* transitions;
     NciTransition* reset_transition;
@@ -998,7 +996,6 @@ nci_sm_object_init(
 {
     NciSm* sm = &self->sm;
 
-    self->pool = gutil_idle_pool_new();
     self->transitions = g_ptr_array_new_with_free_func((GDestroyNotify)
         nci_transition_unref);
     self->states = g_ptr_array_new_full(NCI_CORE_STATES, (GDestroyNotify)
@@ -1035,7 +1032,6 @@ nci_sm_object_finalize(
     g_ptr_array_free(self->transitions, TRUE);
     g_ptr_array_free(self->states, TRUE);
     nci_transition_unref(self->reset_transition);
-    gutil_idle_pool_destroy(self->pool);
     G_OBJECT_CLASS(nci_sm_object_parent_class)->finalize(object);
 }
 
