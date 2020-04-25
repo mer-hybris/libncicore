@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018-2019 Jolla Ltd.
- * Copyright (C) 2018-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2018-2020 Jolla Ltd.
+ * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -537,6 +537,18 @@ nci_core_set_state(
 
     if (G_LIKELY(self)) {
         nci_sm_switch_to(self->sm, state);
+    }
+}
+
+void
+nci_core_set_op_mode(
+    NciCore* core,
+    NCI_OP_MODE op_mode) /* Since 1.1.0 */
+{
+    NciCoreObject* self = nci_core_object(core);
+
+    if (G_LIKELY(self)) {
+        nci_sm_set_op_mode(self->sm, op_mode);
     }
 }
 

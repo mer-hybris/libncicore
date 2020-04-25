@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018-2019 Jolla Ltd.
- * Copyright (C) 2018-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2018-2020 Jolla Ltd.
+ * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -93,6 +93,11 @@ void
 nci_core_set_state(
     NciCore* nci,
     NCI_STATE state);
+
+void
+nci_core_set_op_mode(
+    NciCore* nci,
+    NCI_OP_MODE op_mode); /* Since 1.1.0 */
 
 guint
 nci_core_send_data_msg(

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -42,14 +42,32 @@
 typedef NciTransition NciTransitionIdleToDiscovery;
 typedef NciTransitionClass NciTransitionIdleToDiscoveryClass;
 
-G_DEFINE_TYPE(NciTransitionIdleToDiscovery, nci_transition_idle_to_discovery,
-    NCI_TYPE_TRANSITION)
+GType nci_transition_idle_to_discovery_get_type(void) NCI_INTERNAL;
 #define THIS_TYPE (nci_transition_idle_to_discovery_get_type())
 #define PARENT_CLASS (nci_transition_idle_to_discovery_parent_class)
+
+G_DEFINE_TYPE(NciTransitionIdleToDiscovery, nci_transition_idle_to_discovery,
+    NCI_TYPE_TRANSITION)
 
 /*==========================================================================*
  * Implementation
  *==========================================================================*/
+
+static
+gboolean
+nci_transition_idle_to_discovery_send_byte_array(
+    NciTransition* self,
+    guint8 gid,
+    guint8 oid,
+    GByteArray* cmd,
+    NciTransitionResponseFunc resp)
+{
+    GBytes* bytes = g_byte_array_free_to_bytes(cmd);
+    gboolean ret = nci_transition_send_command(self, gid, oid, bytes, resp);
+
+    g_bytes_unref(bytes);
+    return ret;
+}
 
 static
 void
@@ -97,6 +115,9 @@ void
 nci_transition_idle_to_discovery_discover(
     NciTransition* self)
 {
+    NciSm* sm = nci_transition_sm(self);
+    GByteArray* cmd = g_byte_array_sized_new(7);
+
     /*
      * Table 52: Control Messages to Start Discovery
      *
@@ -112,17 +133,54 @@ nci_transition_idle_to_discovery_discover(
      * |        |      | 1 | Frequency (1 = every period)        |
      * +=========================================================+
      */
-    static const guint8 cmd[] = {
-        0x04,
-        NCI_MODE_PASSIVE_POLL_A, 1,
-        NCI_MODE_PASSIVE_POLL_B, 1,
-        NCI_MODE_PASSIVE_POLL_F, 1,
-        NCI_MODE_PASSIVE_POLL_15693, 1
+    static const guint8 cmd_header[] = {
+        0x00, /* Number of Configurations */
     };
 
     GDEBUG("%c RF_DISCOVER_CMD", DIR_OUT);
-    nci_transition_send_command_static(self, NCI_GID_RF, NCI_OID_RF_DISCOVER,
-        cmd, sizeof(cmd), nci_transition_idle_to_discovery_discover_rsp);
+    g_byte_array_append(cmd, cmd_header, sizeof(cmd_header));
+
+    if ((sm->op_mode & NFC_OP_MODE_RW) ||
+        (sm->op_mode & (NFC_OP_MODE_PEER|NFC_OP_MODE_POLL)) ==
+                       (NFC_OP_MODE_PEER|NFC_OP_MODE_POLL)) {
+        static const guint8 entries[] = {
+            NCI_MODE_PASSIVE_POLL_A, 1,
+            NCI_MODE_ACTIVE_POLL_A, 1
+        };
+
+        GDEBUG("  PassivePollA");
+        GDEBUG("  ActivePollA");
+        g_byte_array_append(cmd, entries, sizeof(entries));
+        cmd->data[0] += sizeof(entries)/2;
+    }
+    if (sm->op_mode & NFC_OP_MODE_RW) {
+        static const guint8 entries[] = {
+            NCI_MODE_PASSIVE_POLL_B, 1,
+            NCI_MODE_PASSIVE_POLL_15693, 1
+        };
+
+        GDEBUG("  PassivePollB");
+        GDEBUG("  PassivePollV");
+        g_byte_array_append(cmd, entries, sizeof(entries));
+        cmd->data[0] += sizeof(entries)/2;
+    }
+    if ((sm->op_mode & NFC_OP_MODE_CE) ||
+        (sm->op_mode & (NFC_OP_MODE_PEER|NFC_OP_MODE_LISTEN)) ==
+                       (NFC_OP_MODE_PEER|NFC_OP_MODE_LISTEN)) {
+        static const guint8 entries[] = {
+            NCI_MODE_PASSIVE_LISTEN_A, 1,
+            NCI_MODE_ACTIVE_LISTEN_A, 1
+        };
+
+        GDEBUG("  PassiveListenA");
+        GDEBUG("  ActiveListenA");
+        g_byte_array_append(cmd, entries, sizeof(entries));
+        cmd->data[0] += sizeof(entries)/2;
+    }
+
+    nci_transition_idle_to_discovery_send_byte_array(self,
+        NCI_GID_RF, NCI_OID_RF_DISCOVER, cmd,
+        nci_transition_idle_to_discovery_discover_rsp);
 }
 
 static
@@ -171,6 +229,9 @@ gboolean
 nci_transition_idle_to_discover_map(
     NciTransition* self)
 {
+    NciSm* sm = nci_transition_sm(self);
+    GByteArray* cmd = g_byte_array_sized_new(22);
+
     /*
      * Table 42: Control Messages for RF Interface Mapping Configuration
      *
@@ -187,62 +248,79 @@ nci_transition_idle_to_discover_map(
      * |        |      | 2 | RF Interface                        |
      * +=========================================================+
      */
-    static const guint8 cmd[] = {
-        0x05,
-
-        NCI_PROTOCOL_T1T,
-        NCI_DISCOVER_MAP_MODE_POLL,
-        NCI_RF_INTERFACE_FRAME,
-
-        NCI_PROTOCOL_T2T,
-        NCI_DISCOVER_MAP_MODE_POLL,
-        NCI_RF_INTERFACE_FRAME,
-
-        NCI_PROTOCOL_T3T,
-        NCI_DISCOVER_MAP_MODE_POLL,
-        NCI_RF_INTERFACE_FRAME,
-
-        NCI_PROTOCOL_ISO_DEP,
-        NCI_DISCOVER_MAP_MODE_POLL,
-        NCI_RF_INTERFACE_ISO_DEP,
-
-        NCI_PROTOCOL_NFC_DEP,
-        NCI_DISCOVER_MAP_MODE_POLL,
-        NCI_RF_INTERFACE_NFC_DEP
+    static const guint8 cmd_header[] = {
+        0x00, /* Number of Mapping Configurations */
     };
 
     GDEBUG("%c RF_DISCOVER_MAP_CMD", DIR_OUT);
-    return nci_transition_send_command_static(self, NCI_GID_RF,
-        NCI_OID_RF_DISCOVER_MAP, cmd, sizeof(cmd),
-        nci_transition_idle_to_discover_map_rsp);
-}
+    g_byte_array_append(cmd, cmd_header, sizeof(cmd_header));
+    if (sm->op_mode & NFC_OP_MODE_RW) {
+        static const guint8 entries[] = {
+            NCI_PROTOCOL_T1T,
+            NCI_DISCOVER_MAP_MODE_POLL,
+            NCI_RF_INTERFACE_FRAME,
 
-/*
- * Table 44: Control Messages to Configure Listen Mode Routing
- *
- * RF_SET_LISTEN_MODE_ROUTING_CMD
- *
- * +=========================================================+
- * | Offset | Size | Description                             |
- * +=========================================================+
- * | 0      | 1    | More   | 0 | Last Message               |
- * |        |      |        | 1 | More Message(s) to follow  |
- * |        |      +-----------------------------------------+
- * | 1      | 1    | The number of Routing Entries (n)       |
- * | 2      | n*x  | Routing Entries                         |
- * +=========================================================+
- */
-static
-inline
-gboolean
-nci_transition_idle_to_discovery_set_routing(
-    NciTransition* self,
-    const void* cmd,
-    gsize cmd_len,
-    NciTransitionResponseFunc resp)
-{
-    return nci_transition_send_command_static(self, NCI_GID_RF,
-        NCI_OID_RF_SET_LISTEN_MODE_ROUTING, cmd, cmd_len, resp);
+            NCI_PROTOCOL_T2T,
+            NCI_DISCOVER_MAP_MODE_POLL,
+            NCI_RF_INTERFACE_FRAME,
+
+            NCI_PROTOCOL_T3T,
+            NCI_DISCOVER_MAP_MODE_POLL,
+            NCI_RF_INTERFACE_FRAME,
+
+            NCI_PROTOCOL_ISO_DEP,
+            NCI_DISCOVER_MAP_MODE_POLL,
+            NCI_RF_INTERFACE_ISO_DEP
+        };
+
+        GDEBUG("  T1T/Poll/Frame");
+        GDEBUG("  T2T/Poll/Frame");
+        GDEBUG("  T3T/Poll/Frame");
+        GDEBUG("  IsoDep/Poll/IsoDep");
+        g_byte_array_append(cmd, entries, sizeof(entries));
+        cmd->data[0] += sizeof(entries)/3;
+    }
+
+    if (sm->op_mode & NFC_OP_MODE_PEER) {
+        if (sm->op_mode & NFC_OP_MODE_POLL) {
+            static const guint8 entries[] = {
+                NCI_PROTOCOL_NFC_DEP,
+                NCI_DISCOVER_MAP_MODE_POLL,
+                NCI_RF_INTERFACE_NFC_DEP
+            };
+
+            GDEBUG("  NfcDep/Poll/NfcDep");
+            g_byte_array_append(cmd, entries, sizeof(entries));
+            cmd->data[0] += sizeof(entries)/3;
+        }
+        if (sm->op_mode & NFC_OP_MODE_LISTEN) {
+            static const guint8 entries[] = {
+                NCI_PROTOCOL_NFC_DEP,
+                NCI_DISCOVER_MAP_MODE_LISTEN,
+                NCI_RF_INTERFACE_NFC_DEP
+            };
+
+            GDEBUG("  NfcDep/Listen/NfcDep");
+            g_byte_array_append(cmd, entries, sizeof(entries));
+            cmd->data[0] += sizeof(entries)/3;
+        }
+    }
+
+    if (sm->op_mode & NFC_OP_MODE_CE) {
+        static const guint8 entries[] = {
+            NCI_PROTOCOL_ISO_DEP,
+            NCI_DISCOVER_MAP_MODE_LISTEN,
+            NCI_RF_INTERFACE_ISO_DEP
+        };
+
+        GDEBUG("  IsoDep/Listen/IsoDep");
+        g_byte_array_append(cmd, entries, sizeof(entries));
+        cmd->data[0] += sizeof(entries)/3;
+    }
+
+    return nci_transition_idle_to_discovery_send_byte_array(self,
+        NCI_GID_RF, NCI_OID_RF_DISCOVER_MAP, cmd,
+        nci_transition_idle_to_discover_map_rsp);
 }
 
 static
@@ -281,6 +359,21 @@ gboolean
 nci_transition_idle_to_discovery_set_technology_routing(
     NciTransition* self)
 {
+    /*
+     * Table 44: Control Messages to Configure Listen Mode Routing
+     *
+     * RF_SET_LISTEN_MODE_ROUTING_CMD
+     *
+     * +=========================================================+
+     * | Offset | Size | Description                             |
+     * +=========================================================+
+     * | 0      | 1    | More   | 0 | Last Message               |
+     * |        |      |        | 1 | More Message(s) to follow  |
+     * |        |      +-----------------------------------------+
+     * | 1      | 1    | The number of Routing Entries (n)       |
+     * | 2      | n*x  | Routing Entries                         |
+     * +=========================================================+
+     */
     static const guint8 cmd[] = {
         0x00, /* Last message */
         0x04, /* Number of Routing Entries */
@@ -311,7 +404,8 @@ nci_transition_idle_to_discovery_set_technology_routing(
     };
 
     GDEBUG("%c RF_SET_LISTEN_MODE_ROUTING_CMD (Technology)", DIR_OUT);
-    return nci_transition_idle_to_discovery_set_routing(self, cmd, sizeof(cmd),
+    return nci_transition_send_command_static(self, NCI_GID_RF,
+        NCI_OID_RF_SET_LISTEN_MODE_ROUTING, cmd ,sizeof(cmd),
         nci_transition_idle_to_discovery_set_technology_routing_rsp);
 }
 
@@ -358,43 +452,88 @@ gboolean
 nci_transition_idle_to_discovery_set_protocol_routing(
     NciTransition* self)
 {
-    static const guint8 cmd[] = {
+    NciSm* sm = nci_transition_sm(self);
+    GByteArray* cmd = g_byte_array_sized_new(26);
+
+    /*
+     * Table 44: Control Messages to Configure Listen Mode Routing
+     *
+     * RF_SET_LISTEN_MODE_ROUTING_CMD
+     *
+     * +=========================================================+
+     * | Offset | Size | Description                             |
+     * +=========================================================+
+     * | 0      | 1    | More   | 0 | Last Message               |
+     * |        |      |        | 1 | More Message(s) to follow  |
+     * |        |      +-----------------------------------------+
+     * | 1      | 1    | The number of Routing Entries (n)       |
+     * | 2      | n*x  | Routing Entries                         |
+     * +=========================================================+
+     */
+    static const guint8 cmd_header[] = {
         0x00, /* Last message */
-        0x05, /* Number of Routing Entries */
-
-        NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
-        3,
-        NCI_NFCEE_ID_DH,
-        NCI_ROUTING_ENTRY_POWER_ON,
-        NCI_PROTOCOL_T1T,
-
-        NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
-        3,
-        NCI_NFCEE_ID_DH,
-        NCI_ROUTING_ENTRY_POWER_ON,
-        NCI_PROTOCOL_T2T,
-
-        NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
-        3,
-        NCI_NFCEE_ID_DH,
-        NCI_ROUTING_ENTRY_POWER_ON,
-        NCI_PROTOCOL_T3T,
-
-        NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
-        3,
-        NCI_NFCEE_ID_DH,
-        NCI_ROUTING_ENTRY_POWER_ON,
-        NCI_PROTOCOL_ISO_DEP,
-
-        NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
-        3,
-        NCI_NFCEE_ID_DH,
-        NCI_ROUTING_ENTRY_POWER_ON,
-        NCI_PROTOCOL_NFC_DEP,
+        0x00  /* Number of Routing Entries */
     };
 
+    g_byte_array_append(cmd, cmd_header, sizeof(cmd_header));
+    if (sm->op_mode & NFC_OP_MODE_RW) {
+        static const guint8 entries[] = {
+            NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
+            3,
+            NCI_NFCEE_ID_DH,
+            NCI_ROUTING_ENTRY_POWER_ON,
+            NCI_PROTOCOL_T1T,
+
+            NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
+            3,
+            NCI_NFCEE_ID_DH,
+            NCI_ROUTING_ENTRY_POWER_ON,
+            NCI_PROTOCOL_T2T,
+
+            NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
+            3,
+            NCI_NFCEE_ID_DH,
+            NCI_ROUTING_ENTRY_POWER_ON,
+            NCI_PROTOCOL_T3T,
+
+            NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
+            3,
+            NCI_NFCEE_ID_DH,
+            NCI_ROUTING_ENTRY_POWER_ON,
+            NCI_PROTOCOL_ISO_DEP
+        };
+
+        g_byte_array_append(cmd, entries, sizeof(entries));
+        cmd->data[1] += 4;
+    } else if (sm->op_mode & NFC_OP_MODE_CE) {
+        static const guint8 entries[] = {
+            NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
+            3,
+            NCI_NFCEE_ID_DH,
+            NCI_ROUTING_ENTRY_POWER_ON,
+            NCI_PROTOCOL_ISO_DEP
+        };
+
+        g_byte_array_append(cmd, entries, sizeof(entries));
+        cmd->data[1] += 1;
+    }
+
+    if (sm->op_mode & NFC_OP_MODE_PEER) {
+        static const guint8 entries[] = {
+            NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
+            3,
+            NCI_NFCEE_ID_DH,
+            NCI_ROUTING_ENTRY_POWER_ON,
+            NCI_PROTOCOL_NFC_DEP
+        };
+
+        g_byte_array_append(cmd, entries, sizeof(entries));
+        cmd->data[1] += 1;
+    }
+
     GDEBUG("%c RF_SET_LISTEN_MODE_ROUTING_CMD (Protocol)", DIR_OUT);
-    return nci_transition_idle_to_discovery_set_routing(self, cmd, sizeof(cmd),
+    return nci_transition_idle_to_discovery_send_byte_array(self,
+        NCI_GID_RF, NCI_OID_RF_SET_LISTEN_MODE_ROUTING, cmd,
         nci_transition_idle_to_discovery_set_protocol_routing_rsp);
 }
 

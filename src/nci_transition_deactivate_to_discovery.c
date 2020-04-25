@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -46,15 +46,23 @@
  * where the NFCC SHALL either restart or continue the Polling discovery
  * activity.
  *
+ * 5.2.6 State RFST_LISTEN_ACTIVE
+ *
+ * ...
+ * DH SHALL send RF_DEACTIVATE_CMD (Discovery) to the NFCC, which SHALL
+ * answer RF_DEACTIVATE_RSP followed by RF_DEACTIVATE_NTF (Discovery,
+ * DH Request). The state will then change to RFST_DISCOVERY.
  *==========================================================================*/
 
-typedef NciTransition NciTransitionPollActiveToDiscovery;
-typedef NciTransitionClass NciTransitionPollActiveToDiscoveryClass;
+typedef NciTransition NciTransitionDeactivateToDiscovery;
+typedef NciTransitionClass NciTransitionDeactivateToDiscoveryClass;
 
-G_DEFINE_TYPE(NciTransitionPollActiveToDiscovery,
-    nci_transition_poll_active_to_discovery, NCI_TYPE_TRANSITION)
-#define THIS_TYPE (nci_transition_poll_active_to_discovery_get_type())
-#define PARENT_CLASS (nci_transition_poll_active_to_discovery_parent_class)
+GType nci_transition_deactivate_to_discovery_get_type(void) NCI_INTERNAL;
+#define THIS_TYPE (nci_transition_deactivate_to_discovery_get_type())
+#define PARENT_CLASS (nci_transition_deactivate_to_discovery_parent_class)
+
+G_DEFINE_TYPE(NciTransitionDeactivateToDiscovery,
+    nci_transition_deactivate_to_discovery, NCI_TYPE_TRANSITION)
 
 /*==========================================================================*
  * Implementation
@@ -62,7 +70,7 @@ G_DEFINE_TYPE(NciTransitionPollActiveToDiscovery,
 
 static
 void
-nci_transition_poll_active_to_discovery_idle_rsp(
+nci_transition_deactivate_to_discovery_idle_rsp(
     NCI_REQUEST_STATUS status,
     const GUtilData* payload,
     NciTransition* self)
@@ -91,7 +99,7 @@ nci_transition_poll_active_to_discovery_idle_rsp(
 
 static
 void
-nci_transition_poll_active_to_discovery_rsp(
+nci_transition_deactivate_to_discovery_rsp(
     NCI_REQUEST_STATUS status,
     const GUtilData* payload,
     NciTransition* self)
@@ -112,7 +120,7 @@ nci_transition_poll_active_to_discovery_rsp(
             /* Try to deactivate to IDLE */
             GWARN("RF_DEACTIVATE_CMD (Discovery) failed");
             nci_transition_deactivate_to_idle(self,
-                nci_transition_poll_active_to_discovery_idle_rsp);
+                nci_transition_deactivate_to_discovery_idle_rsp);
         }
     } else {
         nci_transition_stall(self, NCI_STALL_ERROR);
@@ -123,8 +131,8 @@ nci_transition_poll_active_to_discovery_rsp(
  * Interface
  *==========================================================================*/
 
-NciTransition* 
-nci_transition_poll_active_to_discovery_new(
+NciTransition*
+nci_transition_deactivate_to_discovery_new(
     NciSm* sm)
 {
     NciState* dest = nci_sm_get_state(sm, NCI_RFST_DISCOVERY);
@@ -144,16 +152,16 @@ nci_transition_poll_active_to_discovery_new(
 
 static
 gboolean
-nci_transition_poll_active_to_discovery_start(
+nci_transition_deactivate_to_discovery_start(
     NciTransition* self)
 {
     return nci_transition_deactivate_to_discovery(self,
-        nci_transition_poll_active_to_discovery_rsp);
+        nci_transition_deactivate_to_discovery_rsp);
 }
 
 static
 void
-nci_transition_poll_active_to_discovery_handle_ntf(
+nci_transition_deactivate_to_discovery_handle_ntf(
     NciTransition* self,
     guint8 gid,
     guint8 oid,
@@ -177,18 +185,18 @@ nci_transition_poll_active_to_discovery_handle_ntf(
 
 static
 void
-nci_transition_poll_active_to_discovery_init(
-    NciTransitionPollActiveToDiscovery* self)
+nci_transition_deactivate_to_discovery_init(
+    NciTransitionDeactivateToDiscovery* self)
 {
 }
 
 static
 void
-nci_transition_poll_active_to_discovery_class_init(
-    NciTransitionPollActiveToDiscoveryClass* klass)
+nci_transition_deactivate_to_discovery_class_init(
+    NciTransitionDeactivateToDiscoveryClass* klass)
 {
-    klass->start = nci_transition_poll_active_to_discovery_start;
-    klass->handle_ntf = nci_transition_poll_active_to_discovery_handle_ntf;
+    klass->start = nci_transition_deactivate_to_discovery_start;
+    klass->handle_ntf = nci_transition_deactivate_to_discovery_handle_ntf;
 }
 
 /*

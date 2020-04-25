@@ -126,6 +126,16 @@ nci_state_discovery_new(
     NciSm* sm)
     NCI_INTERNAL;
 
+NciState* /* NCI_RFST_LISTEN_ACTIVE */
+nci_state_listen_active_new(
+    NciSm* sm)
+    NCI_INTERNAL;
+
+NciState* /* NCI_RFST_LISTEN_SLEEP */
+nci_state_listen_sleep_new(
+    NciSm* sm)
+    NCI_INTERNAL;
+
 NciState* /* NCI_RFST_POLL_ACTIVE */
 nci_state_poll_active_new(
     NciSm* sm)
