@@ -217,6 +217,19 @@ static const guint8 RF_INTF_ACTIVATED_NTF_T4A_BROKEN_ACT_PARAM2[] = {
     0x01, 0x09, 0x04, 0x00, 0x04, 0x37, 0xf4, 0x95,
     0x95, 0x01, 0x20, 0x00, 0x00, 0x00, 0x01, 0x00 /* Missing params */,
 };
+static const guint8 RF_INTF_ACTIVATED_NTF_NFC_DEP_LISTEN_A[] = {
+    0x61, 0x05, 0x2e, 0x01, 0x03, 0x05, 0x83, 0xfb,
+    0x01, 0x00, 0x85, 0x02, 0x02, 0x23, 0x22, 0x10,
+    0x5a, 0x37, 0xa5, 0x7b, 0x88, 0x6e, 0x6e, 0xef,
+    0x45, 0x00, 0x00, 0x00, 0x32, 0x46, 0x66, 0x6d,
+    0x01, 0x01, 0x12, 0x02, 0x02, 0x07, 0xff, 0x03,
+    0x02, 0x00, 0x13, 0x04, 0x01, 0x64, 0x07, 0x01,
+    0x03
+};
+static const guint8 RF_INTF_ACTIVATED_NTF_CE_A[] = {
+    0x61, 0x05, 0x0c, 0x01, 0x02, 0x04, 0x80, 0xff,
+    0x01, 0x00, 0x80, 0x00, 0x00, 0x01, 0x80
+};
 static const guint8 RF_DEACTIVATE_RSP[] = {
     0x41, 0x06, 0x01, 0x00
 };
@@ -232,6 +245,15 @@ static const guint8 RF_DEACTIVATE_NTF_IDLE[] = {
 static const guint8 RF_DEACTIVATE_NTF_DISCOVERY[] = {
     0x61, 0x06, 0x02, 0x03, 0x00
 };
+static const guint8 RF_DEACTIVATE_NTF_DISCOVERY_EP_REQUEST[] = {
+    0x61, 0x06, 0x02, 0x03, 0x01
+};
+static const guint8 RF_DEACTIVATE_NTF_SLEEP_EP_REQUEST[] = {
+    0x61, 0x06, 0x02, 0x01, 0x01
+};
+static const guint8 RF_DEACTIVATE_NTF_SLEEP_AF_EP_REQUEST[] = {
+    0x61, 0x06, 0x02, 0x02, 0x01
+};
 static const guint8 RF_DEACTIVATE_NTF_BROKEN[] = {
     0x61, 0x06, 0x00
 };
@@ -240,6 +262,9 @@ static const guint8 CORE_GENERIC_ERROR_NTF[] = {
 };
 static const guint8 CORE_GENERIC_TARGET_ACTIVATION_FAILED_ERROR_NTF[] = {
     0x60, 0x07, 0x01, NCI_DISCOVERY_TARGET_ACTIVATION_FAILED
+};
+static const guint8 CORE_GENERIC_TEAR_DOWN_ERROR_NTF[] = {
+    0x60, 0x07, 0x01, NCI_DISCOVERY_TEAR_DOWN
 };
 static const guint8 CORE_GENERIC_ERROR_NTF_BROKEN[] = {
     0x60, 0x07, 0x00
@@ -333,6 +358,18 @@ test_bytes_unref(
     gpointer bytes)
 {
     g_bytes_unref(bytes);
+}
+
+static
+void
+test_data_packet_handler_not_reached(
+    NciCore* nci,
+    guint8 cid,
+    const void* payload,
+    guint len,
+    void* user_data)
+{
+    g_assert_not_reached();
 }
 
 /*==========================================================================*
@@ -709,6 +746,7 @@ test_null(
     nci_core_remove_handler(nci, 0);
 
     nci_core_set_state(NULL, NCI_STATE_INIT);
+    nci_core_set_op_mode(NULL, NFC_OP_MODE_NONE);
     nci_core_cancel(NULL, 0);
     nci_core_remove_handler(NULL, 0);
     nci_core_restart(NULL);
@@ -793,7 +831,7 @@ test_init_ok(
     NciCore* nci = nci_core_new(&hal->io);
     GMainLoop* loop = g_main_loop_new(NULL, TRUE);
     guint timeout_id;
-    gulong id;
+    gulong id[2];
 
     /* Second time does nothing */
     nci_core_set_state(nci, NCI_RFST_IDLE);
@@ -819,8 +857,14 @@ test_init_ok(
     test_hal_io_queue_ntf(hal, CORE_GENERIC_ERROR_NTF_BROKEN);
     test_hal_io_queue_ntf(hal, CORE_GENERIC_ERROR_NTF);
 
-    id = nci_core_add_current_state_changed_handler(nci,
+    nci_core_set_op_mode(nci, NFC_OP_MODE_RW | NFC_OP_MODE_POLL);
+    id[0] = nci_core_add_current_state_changed_handler(nci,
         test_init_ok_done, loop);
+    id[1] = nci_core_add_data_packet_handler(nci,
+        test_data_packet_handler_not_reached, NULL);
+
+    g_assert(id[0]);
+    g_assert(id[1]);
 
     timeout_id = test_setup_timeout(loop);
     g_main_loop_run(loop);
@@ -830,8 +874,9 @@ test_init_ok(
 
     g_assert(nci->current_state == NCI_RFST_IDLE);
     g_assert(nci->next_state == NCI_RFST_IDLE);
-    nci_core_remove_handlers(nci, &id, 1);
-    g_assert(!id);
+    nci_core_remove_all_handlers(nci, id);
+    g_assert(!id[0]);
+    g_assert(!id[1]);
     nci_core_free(nci);
     test_hal_io_free(hal);
     g_main_loop_unref(loop);
@@ -929,7 +974,7 @@ test_init_failed2(
  *==========================================================================*/
 
 typedef struct test_nci_sm_entry TestSmEntry;
-typedef struct test_nci_sm_entry_set_timeout TestSmEntrySetTimeout;
+typedef struct test_nci_sm_entry_timeout TestSmEntryTimeout;
 typedef struct test_nci_sm_entry_send_data TestSmEntrySendData;
 typedef struct test_nci_sm_entry_queue_read TestSmEntryQueueRead;
 typedef struct test_nci_sm_entry_assert_states TestSmEntryAssertStates;
@@ -952,9 +997,9 @@ typedef struct test_nci_sm {
 struct test_nci_sm_entry {
     void (*func)(TestNciSm* test);
     union {
-        struct test_nci_sm_entry_set_timeout {
+        struct test_nci_sm_entry_timeout {
             guint ms;
-        } set_timeout;
+        } timeout;
         struct test_nci_sm_entry_send_data {
             const void* data;
             guint len;
@@ -972,6 +1017,9 @@ struct test_nci_sm_entry {
         struct test_nci_sm_entry_state {
             NCI_STATE state;
         } state;
+        struct test_nci_sm_entry_op_mode {
+            NCI_OP_MODE op_mode;
+        } op_mode;
         struct test_nci_sm_entry_activation {
             NCI_RF_INTERFACE rf_intf;
             NCI_PROTOCOL protocol;
@@ -982,7 +1030,7 @@ struct test_nci_sm_entry {
 
 #define TEST_NCI_SM_SET_TIMEOUT(millis) { \
     .func = test_nci_sm_set_timeout, \
-    .data.set_timeout = { .ms = millis } }
+    .data.timeout = { .ms = millis } }
 #define TEST_NCI_SM_RF_SEND(bytes) { \
     .func = test_nci_sm_send_data, \
     .data.send_data = { .data = bytes, .len = sizeof(bytes), \
@@ -1002,6 +1050,9 @@ struct test_nci_sm_entry {
 #define TEST_NCI_SM_SET_STATE(next_state) { \
     .func = test_nci_sm_set_state, \
     .data.state = { .state = next_state } }
+#define TEST_NCI_SM_SET_OP_MODE(mode) { \
+    .func = test_nci_sm_set_op_mode, \
+    .data.op_mode = { .op_mode = mode } }
 #define TEST_NCI_SM_WAIT_STATE(wait_state) { \
     .func = test_nci_sm_wait_state, \
     .data.state = { .state = wait_state } }
@@ -1016,10 +1067,21 @@ test_nci_sm_set_timeout(
     TestNciSm* test)
 {
     NciCore* nci = test->nci;
-    const TestSmEntrySetTimeout* timeout = &test->entry->data.set_timeout;
+    const TestSmEntryTimeout* timeout = &test->entry->data.timeout;
 
     GDEBUG("Timeout %u ms", timeout->ms);
     nci->cmd_timeout = timeout->ms;
+}
+
+static
+void
+test_nci_sm_set_op_mode(
+    TestNciSm* test)
+{
+    const NCI_OP_MODE op_mode = test->entry->data.op_mode.op_mode;
+
+    GDEBUG("OpMode 0x%02x", op_mode);
+    nci_core_set_op_mode(test->nci, op_mode);
 }
 
 static
@@ -1064,8 +1126,8 @@ test_nci_sm_assert_states(
     const TestSmEntryAssertStates* assert_states =
         &test->entry->data.assert_states;
 
-    g_assert(assert_states->current_state == nci->current_state);
-    g_assert(assert_states->next_state == nci->next_state);
+    g_assert_cmpint(assert_states->current_state, == ,nci->current_state);
+    g_assert_cmpint(assert_states->next_state, == ,nci->next_state);
 }
 
 static
@@ -1508,6 +1570,8 @@ static const TestSmEntry test_nci_sm_discover_map_broken[] = {
 };
 
 static const TestSmEntry test_nci_sm_discovery_idle_discovery[] = {
+    TEST_NCI_SM_SET_OP_MODE(NFC_OP_MODE_RW|NFC_OP_MODE_PEER|NFC_OP_MODE_CE|
+                            NFC_OP_MODE_POLL|NFC_OP_MODE_LISTEN),
     TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
     TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP),
     TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP),
@@ -1540,6 +1604,42 @@ static const TestSmEntry test_nci_sm_discovery_idle_discovery[] = {
     TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
     TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_sm_discovery_idle_discovery2[] = {
+    TEST_NCI_SM_SET_OP_MODE(NFC_OP_MODE_RW|NFC_OP_MODE_PEER|NFC_OP_MODE_CE|
+                            NFC_OP_MODE_POLL|NFC_OP_MODE_LISTEN),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
+    TEST_NCI_SM_QUEUE_NTF(CORE_GENERIC_ERROR_NTF),  /* Ignored */
+    TEST_NCI_SM_QUEUE_NTF(CORE_IGNORED_NTF),        /* Ignored */
+    TEST_NCI_SM_QUEUE_NTF(CORE_CONN_CREDITS_NTF),
+
+    /* Switch state machine to DISCOVERY state */
+    TEST_NCI_SM_SET_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_ASSERT_STATES(NCI_STATE_INIT, NCI_RFST_IDLE),
+    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_ASSERT_STATES(NCI_STATE_INIT, NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_QUEUE_NTF(RF_IGNORED_NTF),          /* Ignored */
+    TEST_NCI_SM_QUEUE_NTF(NFCEE_IGNORED_NTF),       /* Ignored */
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* Setting the same mode has no effect */
+    TEST_NCI_SM_SET_OP_MODE(NFC_OP_MODE_RW|NFC_OP_MODE_PEER|NFC_OP_MODE_CE|
+                            NFC_OP_MODE_POLL|NFC_OP_MODE_LISTEN),
+    TEST_NCI_SM_ASSERT_STATES(NCI_RFST_DISCOVERY, NCI_RFST_DISCOVERY),
+
+    /* But changing the mode switches SM back to IDLE */
+    TEST_NCI_SM_SET_OP_MODE(NFC_OP_MODE_PEER|NFC_OP_MODE_POLL),
+    TEST_NCI_SM_ASSERT_STATES(NCI_RFST_DISCOVERY, NCI_RFST_IDLE),
+    TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
+    TEST_NCI_SM_QUEUE_NTF(CORE_IGNORED_NTF),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
     TEST_NCI_SM_END()
 };
 
@@ -1714,6 +1814,13 @@ static const TestSmEntry test_nci_sm_discovery_poll_discovery[] = {
     /* Switch state machine to DISCOVERY state */
     TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
     TEST_NCI_SM_ASSERT_STATES(NCI_STATE_INIT, NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* These notification don't switch the state */
+    TEST_NCI_SM_QUEUE_NTF(CORE_GENERIC_TARGET_ACTIVATION_FAILED_ERROR_NTF),
+    TEST_NCI_SM_QUEUE_NTF(CORE_GENERIC_TEAR_DOWN_ERROR_NTF),
+    TEST_NCI_SM_QUEUE_NTF(CORE_GENERIC_ERROR_NTF),
+    TEST_NCI_SM_QUEUE_NTF(CORE_GENERIC_ERROR_NTF_BROKEN),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
 
     /* Simulate activation */
@@ -1905,7 +2012,7 @@ static const TestSmEntry test_nci_sm_dscvr_poll_deact_t4a[] = {
     TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
 
-    /* Activation */
+    /* Activation 1 */
     TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_T4A),
     TEST_NCI_SM_WAIT_ACTIVATION(NCI_RF_INTERFACE_ISO_DEP,
         NCI_PROTOCOL_ISO_DEP, NCI_MODE_PASSIVE_POLL_A),
@@ -1915,9 +2022,42 @@ static const TestSmEntry test_nci_sm_dscvr_poll_deact_t4a[] = {
     TEST_NCI_SM_QUEUE_NTF(RF_IGNORED_NTF),                   /* Ignored */
     TEST_NCI_SM_QUEUE_NTF(CORE_INTERFACE_ERROR_NTF_BROKEN),  /* Ignored */
     TEST_NCI_SM_QUEUE_NTF(CORE_INTERFACE_GENERIC_ERROR_NTF), /* Ignored */
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_POLL_ACTIVE),
+
+    /* This one does */
     TEST_NCI_SM_QUEUE_NTF(CORE_INTERFACE_TRANSMISSION_ERROR_NTF),
+    TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
+    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* Activation 2 */
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_T4A),
+    TEST_NCI_SM_WAIT_ACTIVATION(NCI_RF_INTERFACE_ISO_DEP,
+        NCI_PROTOCOL_ISO_DEP, NCI_MODE_PASSIVE_POLL_A),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_POLL_ACTIVE),
+
+    /* Back to DISCOVERY */
     TEST_NCI_SM_QUEUE_NTF(CORE_INTERFACE_PROTOCOL_ERROR_NTF),
+    TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
+    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* Activation 3 */
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_T4A),
+    TEST_NCI_SM_WAIT_ACTIVATION(NCI_RF_INTERFACE_ISO_DEP,
+        NCI_PROTOCOL_ISO_DEP, NCI_MODE_PASSIVE_POLL_A),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_POLL_ACTIVE),
+
+    /* Back to DISCOVERY */
     TEST_NCI_SM_QUEUE_NTF(CORE_INTERFACE_TIMEOUT_ERROR_NTF),
+    TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
+    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* Activation 4 */
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_T4A),
+    TEST_NCI_SM_WAIT_ACTIVATION(NCI_RF_INTERFACE_ISO_DEP,
+        NCI_PROTOCOL_ISO_DEP, NCI_MODE_PASSIVE_POLL_A),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_POLL_ACTIVE),
 
     /* Deactivate to IDLE */
@@ -2075,6 +2215,8 @@ static const TestSmEntry test_nci_sm_discovery_ntf_t2t[] = {
     /* Receive 3 discovery notifications (T2T, ISO-DEP, Proprietary) */
     TEST_NCI_SM_QUEUE_NTF(RF_DISCOVER_NTF_1_ISO_DEP),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_W4_ALL_DISCOVERIES),
+    TEST_NCI_SM_QUEUE_NTF(CORE_IGNORED_NTF),        /* Ignored */
+    TEST_NCI_SM_QUEUE_NTF(RF_IGNORED_NTF),          /* Ignored */
     TEST_NCI_SM_QUEUE_NTF(RF_DISCOVER_NTF_2_T2T),
     TEST_NCI_SM_QUEUE_NTF(RF_DISCOVER_NTF_3_PROPRIETARY_LAST),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_W4_HOST_SELECT),
@@ -2189,6 +2331,158 @@ static const TestSmEntry test_nci_sm_discovery_ntf_noselect[] = {
     TEST_NCI_SM_END()
 };
 
+static const TestSmEntry test_nci_sm_nfc_dep_listen_disappear[] = {
+    TEST_NCI_SM_SET_OP_MODE(NFC_OP_MODE_PEER|NFC_OP_MODE_LISTEN),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP_1),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+
+    /* Switch state machine to DISCOVERY state */
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
+    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* NFC-DEP peer appears and disappears */
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_NFC_DEP_LISTEN_A),
+    TEST_NCI_SM_WAIT_ACTIVATION(NCI_RF_INTERFACE_NFC_DEP,
+        NCI_PROTOCOL_NFC_DEP, NCI_MODE_ACTIVE_LISTEN_A),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_LISTEN_ACTIVE),
+    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY_EP_REQUEST),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_sm_nfc_dep_listen_timeout[] = {
+    TEST_NCI_SM_SET_OP_MODE(NFC_OP_MODE_PEER|NFC_OP_MODE_LISTEN),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP_1),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+
+    /* Switch state machine to DISCOVERY state */
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
+    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* NFC-DEP peer appears */
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_NFC_DEP_LISTEN_A),
+    TEST_NCI_SM_WAIT_ACTIVATION(NCI_RF_INTERFACE_NFC_DEP,
+        NCI_PROTOCOL_NFC_DEP, NCI_MODE_ACTIVE_LISTEN_A),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_LISTEN_ACTIVE),
+
+    /* Notifications unsupported by this state are ignored */
+    TEST_NCI_SM_QUEUE_NTF(NFCEE_IGNORED_NTF),
+    TEST_NCI_SM_QUEUE_NTF(CORE_IGNORED_NTF),
+    TEST_NCI_SM_QUEUE_NTF(RF_IGNORED_NTF),
+    TEST_NCI_SM_QUEUE_NTF(CORE_INTERFACE_GENERIC_ERROR_NTF),
+    TEST_NCI_SM_QUEUE_NTF(CORE_INTERFACE_ERROR_NTF_BROKEN),
+    TEST_NCI_SM_ASSERT_STATE(NCI_RFST_LISTEN_ACTIVE),
+
+    /* Error notification moves state machine back to DISCOVERY */
+    TEST_NCI_SM_QUEUE_NTF(CORE_INTERFACE_TIMEOUT_ERROR_NTF),
+    TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
+    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* The same with other errors */
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_NFC_DEP_LISTEN_A),
+    TEST_NCI_SM_WAIT_ACTIVATION(NCI_RF_INTERFACE_NFC_DEP,
+        NCI_PROTOCOL_NFC_DEP, NCI_MODE_ACTIVE_LISTEN_A),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_LISTEN_ACTIVE),
+    TEST_NCI_SM_QUEUE_NTF(CORE_INTERFACE_PROTOCOL_ERROR_NTF),
+    TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_LISTEN_ACTIVE),
+    TEST_NCI_SM_ASSERT_STATES(NCI_RFST_LISTEN_ACTIVE, NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_NFC_DEP_LISTEN_A),
+    TEST_NCI_SM_WAIT_ACTIVATION(NCI_RF_INTERFACE_NFC_DEP,
+        NCI_PROTOCOL_NFC_DEP, NCI_MODE_ACTIVE_LISTEN_A),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_LISTEN_ACTIVE),
+    TEST_NCI_SM_QUEUE_NTF(CORE_INTERFACE_TRANSMISSION_ERROR_NTF),
+    TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
+    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_sm_nfc_dep_listen_sleep[] = {
+    TEST_NCI_SM_SET_OP_MODE(NFC_OP_MODE_PEER|NFC_OP_MODE_LISTEN),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP_1),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+
+    /* Switch state machine to DISCOVERY state */
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
+    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* NFC-DEP peer appears */
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_NFC_DEP_LISTEN_A),
+    TEST_NCI_SM_WAIT_ACTIVATION(NCI_RF_INTERFACE_NFC_DEP,
+        NCI_PROTOCOL_NFC_DEP, NCI_MODE_ACTIVE_LISTEN_A),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_LISTEN_ACTIVE),
+
+    /* Sleep, EP Request */
+    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_SLEEP_EP_REQUEST),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_LISTEN_SLEEP),
+    TEST_NCI_SM_QUEUE_NTF(CORE_IGNORED_NTF), /* Ignored */
+    TEST_NCI_SM_QUEUE_NTF(RF_IGNORED_NTF),   /* Ignored */
+    TEST_NCI_SM_ASSERT_STATE(NCI_RFST_LISTEN_SLEEP),
+
+    /* NFC-DEP re-appears */
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_NFC_DEP_LISTEN_A),
+    TEST_NCI_SM_WAIT_ACTIVATION(NCI_RF_INTERFACE_NFC_DEP,
+        NCI_PROTOCOL_NFC_DEP, NCI_MODE_ACTIVE_LISTEN_A),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_LISTEN_ACTIVE),
+
+    /* Sleep_AF, EP Request */
+    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_SLEEP_AF_EP_REQUEST),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_LISTEN_SLEEP),
+
+    /* Deactivate to discovery */
+    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_sm_iso_dep_ce[] = {
+    TEST_NCI_SM_SET_OP_MODE(NFC_OP_MODE_CE|NFC_OP_MODE_LISTEN),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_V2_RSP),
+    TEST_NCI_SM_QUEUE_NTF(CORE_RESET_V2_NTF),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_V2_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
+
+    /* Switch state machine to DISCOVERY state */
+    TEST_NCI_SM_QUEUE_RSP(RF_SET_LISTEN_MODE_ROUTING_RSP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
+    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* NFC-A/ISO-DEP Listen Mode activation */
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_CE_A),
+    TEST_NCI_SM_WAIT_ACTIVATION(NCI_RF_INTERFACE_ISO_DEP,
+        NCI_PROTOCOL_ISO_DEP, NCI_MODE_PASSIVE_LISTEN_A),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_LISTEN_ACTIVE),
+
+    /* Error moves state machine back to DISCOVERY */
+    TEST_NCI_SM_QUEUE_NTF(CORE_INTERFACE_TIMEOUT_ERROR_NTF),
+    TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
+    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_END()
+};
+
 static const TestNciSmData nci_sm_tests[] = {
     { "init-ok", test_nci_sm_init_ok },
     { "init-timeout", test_nci_sm_init_timeout },
@@ -2217,6 +2511,7 @@ static const TestNciSmData nci_sm_tests[] = {
     { "discovery-discover-map-error", test_nci_sm_discover_map_error },
     { "discovery-discover-map-broken", test_nci_sm_discover_map_broken },
     { "discovery-idle-discovery", test_nci_sm_discovery_idle_discovery },
+    { "discovery-idle-discovery2", test_nci_sm_discovery_idle_discovery2 },
     { "discovery-idle-failed", test_nci_sm_discovery_idle_failed },
     { "discovery-idle-broken", test_nci_sm_discovery_idle_broken },
     { "discovery-poll-idle", test_nci_sm_discovery_poll_idle },
@@ -2241,7 +2536,11 @@ static const TestNciSmData nci_sm_tests[] = {
     { "discovery-ntf-t2t", test_nci_sm_discovery_ntf_t2t },
     { "discovery-ntf-isodep", test_nci_sm_discovery_ntf_isodep },
     { "discovery-ntf-isodep-fail", test_nci_sm_discovery_ntf_isodep_fail },
-    { "discovery-ntf-noselect", test_nci_sm_discovery_ntf_noselect }
+    { "discovery-ntf-noselect", test_nci_sm_discovery_ntf_noselect },
+    { "nfcdep-listen-disappear", test_nci_sm_nfc_dep_listen_disappear },
+    { "nfcdep-listen-timeout", test_nci_sm_nfc_dep_listen_timeout },
+    { "nfcdep-listen-sleep", test_nci_sm_nfc_dep_listen_sleep },
+    { "ce-poll_a", test_nci_sm_iso_dep_ce }
 };
 
 /*==========================================================================*

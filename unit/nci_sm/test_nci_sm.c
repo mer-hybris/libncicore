@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -229,9 +229,8 @@ test_null(
     NciSm* null = NULL;
     gulong zero = 0;
 
-    g_assert(!nci_param_w4_all_discoveries_new(NULL));
-
     nci_sm_free(null);
+    nci_sm_set_op_mode(null, NFC_OP_MODE_NONE);
     nci_sm_handle_ntf(null, 0, 0, NULL);
     nci_sm_add_state(null, NULL);
     nci_sm_add_state(sm, NULL);
@@ -263,6 +262,7 @@ test_null(
     g_assert(!nci_sm_send_command(sm, 0, 0, NULL, NULL, NULL));
     g_assert(!nci_sm_send_command_static(null, 0, 0, NULL, 0, NULL, NULL));
     g_assert(!nci_sm_send_command_static(sm, 0, 0, NULL, 0, NULL, NULL));
+    nci_sm_handle_conn_credits_ntf(null, NULL);
     nci_sm_intf_activated(null, NULL);
     nci_sm_stall(null, NCI_STALL_ERROR);
     nci_sm_switch_to(null, NCI_STATE_INIT);
@@ -307,8 +307,25 @@ void
 test_transition(
     void)
 {
+    NciSm* sm = nci_sm_new(NULL);
     NciTransition* null = NULL;
+    NciTransition* reset = nci_transition_reset_new(sm);
+    NciTransition* idle_to_discovery =
+        nci_transition_idle_to_discovery_new(sm);
+    NciTransition* deactivate_to_discovery =
+        nci_transition_deactivate_to_discovery_new(sm);
+    NciTransition* deactivate_to_idle =
+        nci_transition_deactivate_to_idle_new(sm);
+    NciTransition* poll_active_to_idle =
+        nci_transition_poll_active_to_idle_new(sm);
 
+    g_assert(!nci_param_w4_all_discoveries_new(NULL));
+
+    g_assert(!nci_transition_reset_new(NULL));
+    g_assert(!nci_transition_idle_to_discovery_new(NULL));
+    g_assert(!nci_transition_deactivate_to_discovery_new(NULL));
+    g_assert(!nci_transition_deactivate_to_idle_new(NULL));
+    g_assert(!nci_transition_poll_active_to_idle_new(NULL));
     g_assert(!nci_transition_sm(null));
     g_assert(!nci_transition_ref(null));
     nci_transition_unref(null);
@@ -320,6 +337,70 @@ test_transition(
     nci_transition_handle_ntf(null, 0, 0, NULL);
     g_assert(!nci_transition_send_command(null, 0, 0, NULL, NULL));
     g_assert(!nci_transition_send_command_static(null, 0, 0, NULL, 0, NULL));
+
+    /* No transition is ongoing */
+    g_assert(!nci_sm_active_transition(sm, reset));
+
+    /* Transitions keep weak pointer to NciSm. Once NciSm gets deallocated,
+     * nci_transition_start() must fail. */
+    nci_sm_free(sm);
+
+    g_assert(!nci_transition_start(reset));
+    g_assert(!nci_transition_start(idle_to_discovery));
+    g_assert(!nci_transition_start(deactivate_to_discovery));
+    g_assert(!nci_transition_start(deactivate_to_idle));
+    g_assert(!nci_transition_start(poll_active_to_idle));
+
+    nci_transition_unref(reset);
+    nci_transition_unref(idle_to_discovery);
+    nci_transition_unref(deactivate_to_discovery);
+    nci_transition_unref(deactivate_to_idle);
+    nci_transition_unref(poll_active_to_idle);
+}
+
+/*==========================================================================*
+ * protocol
+ *==========================================================================*/
+
+static
+void
+test_protocol(
+    void)
+{
+    NciSm* sm = nci_sm_new(NULL);
+    NciSm* null = NULL;
+
+    g_assert(!nci_sm_supports_protocol(null, NCI_PROTOCOL_T1T));
+    g_assert(!nci_sm_supports_protocol(null, NCI_PROTOCOL_T2T));
+    g_assert(!nci_sm_supports_protocol(null, NCI_PROTOCOL_T3T));
+    g_assert(!nci_sm_supports_protocol(null, NCI_PROTOCOL_ISO_DEP));
+    g_assert(!nci_sm_supports_protocol(null, NCI_PROTOCOL_NFC_DEP));
+    g_assert(!nci_sm_supports_protocol(null, NCI_PROTOCOL_UNDETERMINED));
+    g_assert(!nci_sm_supports_protocol(null, NCI_PROTOCOL_PROPRIETARY));
+
+    nci_sm_set_op_mode(sm, NFC_OP_MODE_NONE);
+    g_assert(!nci_sm_supports_protocol(sm, NCI_PROTOCOL_T1T));
+    g_assert(!nci_sm_supports_protocol(sm, NCI_PROTOCOL_T2T));
+    g_assert(!nci_sm_supports_protocol(sm, NCI_PROTOCOL_T3T));
+    g_assert(!nci_sm_supports_protocol(sm, NCI_PROTOCOL_ISO_DEP));
+    g_assert(!nci_sm_supports_protocol(sm, NCI_PROTOCOL_NFC_DEP));
+
+    nci_sm_set_op_mode(sm, NFC_OP_MODE_RW);
+    g_assert(nci_sm_supports_protocol(sm, NCI_PROTOCOL_T2T));
+    g_assert(nci_sm_supports_protocol(sm, NCI_PROTOCOL_ISO_DEP));
+    g_assert(!nci_sm_supports_protocol(sm, NCI_PROTOCOL_NFC_DEP));
+
+    nci_sm_set_op_mode(sm, NFC_OP_MODE_PEER);
+    g_assert(!nci_sm_supports_protocol(sm, NCI_PROTOCOL_T2T));
+    g_assert(!nci_sm_supports_protocol(sm, NCI_PROTOCOL_ISO_DEP));
+    g_assert(nci_sm_supports_protocol(sm, NCI_PROTOCOL_NFC_DEP));
+
+    nci_sm_set_op_mode(sm, NFC_OP_MODE_CE);
+    g_assert(!nci_sm_supports_protocol(sm, NCI_PROTOCOL_T2T));
+    g_assert(nci_sm_supports_protocol(sm, NCI_PROTOCOL_ISO_DEP));
+    g_assert(!nci_sm_supports_protocol(sm, NCI_PROTOCOL_NFC_DEP));
+
+    nci_sm_free(sm);
 }
 
 /*==========================================================================*
@@ -564,6 +645,7 @@ int main(int argc, char* argv[])
     g_test_add_func(TEST_("null"), test_null);
     g_test_add_func(TEST_("state"), test_state);
     g_test_add_func(TEST_("transition"), test_transition);
+    g_test_add_func(TEST_("protocol"), test_protocol);
     g_test_add_func(TEST_("weak_ptr"), test_weak_ptr);
     g_test_add_func(TEST_("add_state"), test_add_state);
     g_test_add_func(TEST_("last_state"), test_last_state);
