@@ -35,6 +35,11 @@
 
 #include "nci_types_p.h"
 
+gboolean
+nci_listen_mode(
+    NCI_MODE mode)
+    NCI_INTERNAL;
+
 const NciModeParam*
 nci_parse_mode_param(
     NciModeParam* param,

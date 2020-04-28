@@ -1,13 +1,15 @@
-NFC NCI state machine implementatiton
-=====================================
+NFC NCI state machine implementation
+====================================
 
-The following states are implemented according to NCI 1.0 spec:
+Implements all the states defined in NCI 1.0 spec:
 
   RFST_IDLE
   RFST_DISCOVERY
   RFST_W4_ALL_DISCOVERIES
   RFST_W4_HOST_SELECT
   RFST_POLL_ACTIVE
+  RFST_LISTEN_ACTIVE
+  RFST_LISTEN_SLEEP
 
 as well as a limited subset of NCI 2.0 features.
 

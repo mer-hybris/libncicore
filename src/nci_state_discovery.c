@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -40,9 +40,11 @@
 typedef NciState NciStateDiscovery;
 typedef NciStateClass NciStateDiscoveryClass;
 
-G_DEFINE_TYPE(NciStateDiscovery, nci_state_discovery, NCI_TYPE_STATE)
+GType nci_state_discovery_get_type(void) NCI_INTERNAL;
 #define THIS_TYPE (nci_state_discovery_get_type())
 #define PARENT_CLASS (nci_state_discovery_parent_class)
+
+G_DEFINE_TYPE(NciStateDiscovery, nci_state_discovery, NCI_TYPE_STATE)
 
 /*==========================================================================*
  * Implementation
@@ -74,7 +76,11 @@ nci_state_discovery_intf_activated_ntf(
     if (nci_parse_intf_activated_ntf(&ntf, &mode_param, &activation_param,
         payload->bytes, payload->size)) {
         nci_sm_intf_activated(sm, &ntf);
-        nci_sm_enter_state(sm, NCI_RFST_POLL_ACTIVE, NULL);
+        if (nci_listen_mode(ntf.mode)) {
+            nci_sm_enter_state(sm, NCI_RFST_LISTEN_ACTIVE, NULL);
+        } else {
+            nci_sm_enter_state(sm, NCI_RFST_POLL_ACTIVE, NULL);
+        }
     } else {
         /* Deactivate this target */
         nci_sm_enter_state(sm, NCI_RFST_POLL_ACTIVE, NULL);
@@ -153,7 +159,7 @@ nci_state_discovery_generic_error_ntf(
             return TRUE;
         }
     }
-    /* Unrecornized notification */
+    /* Unrecognized notification */
     return FALSE;
 }
 
@@ -199,9 +205,6 @@ nci_state_discovery_handle_ntf(
             return;
         case NCI_OID_RF_INTF_ACTIVATED:
             nci_state_discovery_intf_activated_ntf(self, payload);
-            return;
-        case NCI_OID_RF_DEACTIVATE:
-            nci_sm_handle_rf_deactivate_ntf(nci_state_sm(self), payload);
             return;
         }
         break;

@@ -591,12 +591,15 @@ nci_sm_new(
     NciSmObject* self = g_object_new(NCI_TYPE_SM, NULL);
     NciSm* sm = &self->sm;
     NciTransition* deactivate_to_idle;
+    NciTransition* deactivate_to_discovery;
 
     sm->io = io;
 
     /* Default setup */
     nci_sm_add_new_state(sm, nci_state_idle_new);
     nci_sm_add_new_state(sm, nci_state_discovery_new);
+    nci_sm_add_new_state(sm, nci_state_listen_active_new);
+    nci_sm_add_new_state(sm, nci_state_listen_sleep_new);
     nci_sm_add_new_state(sm, nci_state_poll_active_new);
     nci_sm_add_new_state(sm, nci_state_w4_all_discoveries_new);
     nci_sm_add_new_state(sm, nci_state_w4_host_select_new);
@@ -613,18 +616,27 @@ nci_sm_new(
     self->reset_transition = nci_transition_reset_new(sm);
 
     /* Set up the transitions */
+
+    /* Reusable deactivate_to_idle */
     deactivate_to_idle = nci_transition_deactivate_to_idle_new(sm);
     nci_sm_add_transition(sm, NCI_RFST_DISCOVERY, deactivate_to_idle);
     nci_sm_add_transition(sm, NCI_RFST_W4_ALL_DISCOVERIES, deactivate_to_idle);
     nci_sm_add_transition(sm, NCI_RFST_W4_HOST_SELECT, deactivate_to_idle);
+    nci_sm_add_transition(sm, NCI_RFST_LISTEN_ACTIVE, deactivate_to_idle);
+    nci_sm_add_transition(sm, NCI_RFST_LISTEN_SLEEP, deactivate_to_idle);
     nci_transition_unref(deactivate_to_idle);
 
-    nci_sm_add_new_transition(sm,
-        NCI_RFST_IDLE, nci_transition_idle_to_discovery_new);
-    nci_sm_add_new_transition(sm,
-        NCI_RFST_POLL_ACTIVE, nci_transition_poll_active_to_discovery_new);
-    nci_sm_add_new_transition(sm,
-        NCI_RFST_POLL_ACTIVE, nci_transition_poll_active_to_idle_new);
+    /* Reusable deactivate_to_discovery */
+    deactivate_to_discovery = nci_transition_deactivate_to_discovery_new(sm);
+    nci_sm_add_transition(sm, NCI_RFST_POLL_ACTIVE, deactivate_to_discovery);
+    nci_sm_add_transition(sm, NCI_RFST_LISTEN_ACTIVE, deactivate_to_discovery);
+    nci_transition_unref(deactivate_to_discovery);
+
+    /* And these are not reusable */
+    nci_sm_add_new_transition(sm, NCI_RFST_IDLE,
+        nci_transition_idle_to_discovery_new);
+    nci_sm_add_new_transition(sm, NCI_RFST_POLL_ACTIVE,
+        nci_transition_poll_active_to_idle_new);
     return sm;
 }
 
@@ -636,6 +648,23 @@ nci_sm_free(
 
     if (G_LIKELY(self)) {
         g_object_unref(self);
+    }
+}
+
+void
+nci_sm_set_op_mode(
+    NciSm* sm,
+    NCI_OP_MODE op_mode)
+{
+    if (G_LIKELY(sm) && sm->op_mode != op_mode) {
+        /*
+         * If we are really changing the mode, we need to reconfigure NFCC
+         * with RF_DISCOVER_MAP_CMD and RF_SET_LISTEN_MODE_ROUTING_CMD, which
+         * must be done in RFST_IDLE state. Therefore, we need to switch to
+         * RFST_IDLE if we are not there yet.
+         */
+        sm->op_mode = op_mode;
+        nci_sm_switch_to(sm, NCI_RFST_IDLE);
     }
 }
 
@@ -810,9 +839,11 @@ nci_sm_supports_protocol(
 {
     switch (protocol) {
     case NCI_PROTOCOL_T2T:
+        return sm && (sm->op_mode & NFC_OP_MODE_RW);
     case NCI_PROTOCOL_ISO_DEP:
+        return sm && (sm->op_mode & (NFC_OP_MODE_RW | NFC_OP_MODE_CE));
     case NCI_PROTOCOL_NFC_DEP:
-        return TRUE;
+        return sm && (sm->op_mode & NFC_OP_MODE_PEER);
     case NCI_PROTOCOL_UNDETERMINED:
     case NCI_PROTOCOL_T1T:
     case NCI_PROTOCOL_T3T:
@@ -996,6 +1027,8 @@ nci_sm_object_init(
 {
     NciSm* sm = &self->sm;
 
+    /* Only poll modes by default */
+    sm->op_mode = NFC_OP_MODE_RW | NFC_OP_MODE_PEER | NFC_OP_MODE_POLL;
     self->transitions = g_ptr_array_new_with_free_func((GDestroyNotify)
         nci_transition_unref);
     self->states = g_ptr_array_new_full(NCI_CORE_STATES, (GDestroyNotify)

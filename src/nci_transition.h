@@ -88,27 +88,27 @@ nci_transition_handle_ntf(
 
 /* Specific transitions */
 
-NciTransition* 
+NciTransition*
 nci_transition_reset_new(
     NciSm* sm)
     NCI_INTERNAL;
 
-NciTransition* 
+NciTransition*
 nci_transition_idle_to_discovery_new(
     NciSm* sm)
     NCI_INTERNAL;
 
-NciTransition* 
+NciTransition*
+nci_transition_deactivate_to_discovery_new(
+    NciSm* sm)
+    NCI_INTERNAL;
+
+NciTransition*
 nci_transition_deactivate_to_idle_new(
     NciSm* sm)
     NCI_INTERNAL;
 
-NciTransition* 
-nci_transition_poll_active_to_discovery_new(
-    NciSm* sm)
-    NCI_INTERNAL;
-
-NciTransition* 
+NciTransition*
 nci_transition_poll_active_to_idle_new(
     NciSm* sm)
     NCI_INTERNAL;

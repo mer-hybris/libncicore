@@ -256,6 +256,7 @@ struct nci_sm {
     NCI_NFCC_DISCOVERY nfcc_discovery;
     NCI_NFCC_ROUTING nfcc_routing;
     NCI_NFCC_POWER nfcc_power;
+    NCI_OP_MODE op_mode;
 };
 
 typedef
@@ -302,6 +303,12 @@ nci_sm_new(
 void
 nci_sm_free(
     NciSm* sm)
+    NCI_INTERNAL;
+
+void
+nci_sm_set_op_mode(
+    NciSm* sm,
+    NCI_OP_MODE op_mode)
     NCI_INTERNAL;
 
 void

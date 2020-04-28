@@ -35,6 +35,30 @@
 
 #include <gutil_macros.h>
 
+gboolean
+nci_listen_mode(
+    NCI_MODE mode)
+{
+    switch (mode) {
+    case NCI_MODE_PASSIVE_LISTEN_A:
+    case NCI_MODE_PASSIVE_LISTEN_B:
+    case NCI_MODE_PASSIVE_LISTEN_F:
+    case NCI_MODE_ACTIVE_LISTEN_A:
+    case NCI_MODE_ACTIVE_LISTEN_F:
+    case NCI_MODE_PASSIVE_LISTEN_15693:
+        return TRUE;
+    case NCI_MODE_PASSIVE_POLL_A:
+    case NCI_MODE_PASSIVE_POLL_B:
+    case NCI_MODE_PASSIVE_POLL_F:
+    case NCI_MODE_ACTIVE_POLL_A:
+    case NCI_MODE_ACTIVE_POLL_F:
+    case NCI_MODE_PASSIVE_POLL_15693:
+        break;
+    }
+    /* Assume Poll by default */
+    return FALSE;
+}
+
 const NciModeParam*
 nci_parse_mode_param(
     NciModeParam* param,
@@ -44,6 +68,10 @@ nci_parse_mode_param(
 {
     switch (mode) {
     case NCI_MODE_ACTIVE_POLL_A:
+        if (!len) {
+            return NULL;
+        }
+        /* fallthrough */
     case NCI_MODE_PASSIVE_POLL_A:
         /*
          * NFCForum-TS-NCI-1.0
@@ -190,15 +218,17 @@ nci_parse_mode_param(
         GDEBUG("Failed to parse parameters for NFC-F poll mode");
         return NULL;
     case NCI_MODE_PASSIVE_POLL_15693:
+    case NCI_MODE_PASSIVE_LISTEN_15693:
+        break;
     case NCI_MODE_PASSIVE_LISTEN_A:
     case NCI_MODE_PASSIVE_LISTEN_B:
     case NCI_MODE_PASSIVE_LISTEN_F:
     case NCI_MODE_ACTIVE_LISTEN_A:
     case NCI_MODE_ACTIVE_LISTEN_F:
-    case NCI_MODE_PASSIVE_LISTEN_15693:
-        break;
+        /* NCI 1.0 defines no parameters for A/B/F Listen modes */
+        return NULL;
     }
-    GDEBUG("Unhandled activation mode %d", mode);
+    GDEBUG("Unhandled activation mode 0x%x02", mode);
     return NULL;
 }
 
@@ -517,6 +547,8 @@ nci_parse_activation_param(
         break;
     case NCI_RF_INTERFACE_NFC_DEP:
         switch (mode) {
+        case NCI_MODE_ACTIVE_POLL_A:
+        case NCI_MODE_ACTIVE_POLL_F:
         case NCI_MODE_PASSIVE_POLL_A:
         case NCI_MODE_PASSIVE_POLL_F:
             if (nci_parse_nfc_dep_poll_param(&param->nfc_dep_poll,
@@ -525,6 +557,8 @@ nci_parse_activation_param(
             }
             GDEBUG("Failed to parse parameters for NFC-DEP poll mode");
             break;
+        case NCI_MODE_ACTIVE_LISTEN_A:
+        case NCI_MODE_ACTIVE_LISTEN_F:
         case NCI_MODE_PASSIVE_LISTEN_A:
         case NCI_MODE_PASSIVE_LISTEN_F:
             if (nci_parse_nfc_dep_listen_param(&param->nfc_dep_listen,
@@ -534,12 +568,8 @@ nci_parse_activation_param(
             GDEBUG("Failed to parse parameters for NFC-DEP listen mode");
             break;
         case NCI_MODE_PASSIVE_POLL_B:
-        case NCI_MODE_ACTIVE_POLL_A:
-        case NCI_MODE_ACTIVE_POLL_F:
         case NCI_MODE_PASSIVE_POLL_15693:
         case NCI_MODE_PASSIVE_LISTEN_B:
-        case NCI_MODE_ACTIVE_LISTEN_A:
-        case NCI_MODE_ACTIVE_LISTEN_F:
         case NCI_MODE_PASSIVE_LISTEN_15693:
             break;
         }
@@ -592,6 +622,8 @@ nci_parse_intf_activated_ntf(
 
         if (len >= 11 + n + m) {
             const guint8* act_param_bytes = m ? (pkt + (11 + n)) : NULL;
+            gboolean listen_mode = FALSE;
+            gboolean active_mode = FALSE;
 
             ntf->discovery_id = pkt[0];
             ntf->rf_intf = pkt[1];
@@ -647,19 +679,44 @@ nci_parse_intf_activated_ntf(
             }
 #endif /* GUTIL_LOG_DEBUG */
 
-            /* Require RF Tech Parameters */
-            if (ntf->mode_param_bytes) {
+            /* NCI 1.0 defines no parameters for A/B/F Listen modes */
+            switch (ntf->mode) {
+            case NCI_MODE_ACTIVE_LISTEN_A:
+            case NCI_MODE_ACTIVE_LISTEN_F:
+                active_mode = TRUE;
+                /* fallthrough */
+            case NCI_MODE_PASSIVE_LISTEN_A:
+            case NCI_MODE_PASSIVE_LISTEN_B:
+            case NCI_MODE_PASSIVE_LISTEN_F:
+                listen_mode = TRUE;
+                break;
+            case NCI_MODE_ACTIVE_POLL_A:
+            case NCI_MODE_ACTIVE_POLL_F:
+                active_mode = TRUE;
+                break;
+            case NCI_MODE_PASSIVE_LISTEN_15693:
+            case NCI_MODE_PASSIVE_POLL_A:
+            case NCI_MODE_PASSIVE_POLL_B:
+            case NCI_MODE_PASSIVE_POLL_F:
+            case NCI_MODE_PASSIVE_POLL_15693:
+                break;
+            }
+
+            /* Require RF Tech Parameters for Passive Poll modes */
+            if (ntf->mode_param_bytes || listen_mode || active_mode) {
                 ntf->mode_param = nci_parse_mode_param(mode_param, ntf->mode,
                     ntf->mode_param_bytes, n);
-                if (act_param_bytes) {
-                    memset(activation_param, 0, sizeof(*activation_param));
-                    ntf->activation_param_len = m;
-                    ntf->activation_param_bytes = act_param_bytes;
-                    ntf->activation_param =
-                        nci_parse_activation_param(activation_param,
-                            ntf->rf_intf, ntf->mode, act_param_bytes, m);
+                if (ntf->mode_param || !ntf->mode_param_bytes) {
+                    if (act_param_bytes) {
+                        memset(activation_param, 0, sizeof(*activation_param));
+                        ntf->activation_param_len = m;
+                        ntf->activation_param_bytes = act_param_bytes;
+                        ntf->activation_param =
+                            nci_parse_activation_param(activation_param,
+                                ntf->rf_intf, ntf->mode, act_param_bytes, m);
+                    }
+                    return TRUE;
                 }
-                return TRUE;
             }
             GDEBUG("Missing RF Tech Parameters");
         }

@@ -226,6 +226,37 @@ typedef enum nci_state_id {
     NCI_CORE_STATES
 } NCI_STATE;
 
+/*
+ * Operation modes
+ *
+ * The relationship between op mode bits goes like this:
+ *
+ * +----------------+---------------------+----------------+
+ * | NFC R/W Modes  |   NFC Peer Modes    | NFC CE Mode    |
+ * | NFC_OP_MODE_RW |   NFC_OP_MODE_PEER  | NFC_OP_MODE_CE |
+ * +------+---------+-----------+---------+----------------+
+ * | Tags | ISO-DEP | NFC-DEP   | NFC-DEP | ISO-DEP        |
+ * | 1-3  |         | Initiator | Target  |                |
+ * +------+---------+-----------+---------+----------------+
+ * |      Poll side             |     Listen side          |
+ * |      NFC_OP_MODE_POLL      |     NFC_OP_MODE_LISTEN   |
+ * +----------------------------+--------------------------+
+ *
+ * That hopefully explains why certain combinations don't make
+ * sense, specifically (NFC_OP_MODE_RW | NFC_OP_MODE_LISTEN)
+ * and (NFC_OP_MODE_CE | NFC_OP_MODE_POLL).
+ */
+
+typedef enum nci_op_mode {
+    NFC_OP_MODE_NONE = 0x00,
+    NFC_OP_MODE_RW = 0x01,      /* Reader/Writer (requires POLL) */
+    NFC_OP_MODE_PEER = 0x02,    /* Peer NFC-DEP (POLL and/or LISTEN) */
+    NFC_OP_MODE_CE = 0x04,      /* Card Emulation (requires LISTEN) */
+    /* The next two are kind of orthogonal, see the diagram above */
+    NFC_OP_MODE_POLL = 0x08,    /* Poll side/Initiator */
+    NFC_OP_MODE_LISTEN = 0x10   /* Listen side/Target */
+} NCI_OP_MODE; /* Since 1.1.0 */
+
 /* Logging */
 
 #define NCI_LOG_MODULE nci_log

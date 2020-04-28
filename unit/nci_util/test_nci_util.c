@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -47,6 +47,35 @@ test_null(
 {
     g_assert(!nci_discovery_ntf_copy_array(NULL, 0));
     g_assert(!nci_discovery_ntf_copy(NULL));
+}
+
+/*==========================================================================*
+ * listen_mode
+ *==========================================================================*/
+
+static
+void
+test_listen_mode(
+    void)
+{
+    /* Listen modes */
+    g_assert(nci_listen_mode(NCI_MODE_PASSIVE_LISTEN_A));
+    g_assert(nci_listen_mode(NCI_MODE_PASSIVE_LISTEN_B));
+    g_assert(nci_listen_mode(NCI_MODE_PASSIVE_LISTEN_F));
+    g_assert(nci_listen_mode(NCI_MODE_ACTIVE_LISTEN_A));
+    g_assert(nci_listen_mode(NCI_MODE_ACTIVE_LISTEN_F));
+    g_assert(nci_listen_mode(NCI_MODE_PASSIVE_LISTEN_15693));
+
+    /* Poll modes */
+    g_assert(!nci_listen_mode(NCI_MODE_PASSIVE_POLL_A));
+    g_assert(!nci_listen_mode(NCI_MODE_PASSIVE_POLL_B));
+    g_assert(!nci_listen_mode(NCI_MODE_PASSIVE_POLL_F));
+    g_assert(!nci_listen_mode(NCI_MODE_ACTIVE_POLL_A));
+    g_assert(!nci_listen_mode(NCI_MODE_ACTIVE_POLL_F));
+    g_assert(!nci_listen_mode(NCI_MODE_PASSIVE_POLL_15693));
+
+    /* Invalid mode */
+    g_assert(!nci_listen_mode((NCI_MODE)(-1)));
 }
 
 /*==========================================================================*
@@ -183,8 +212,14 @@ static const guint8 mode_param_fail_pollf_data_too_short_2[] =
     { 0x01, 0x07, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38 };
 static const TestModeParamFailData mode_param_fail_tests[] = {
     {
+        .name = "invalid_mode",
+        .mode = (NCI_MODE)(-1)
+    },{
         .name = "unhandled_mode",
         .mode = NCI_MODE_PASSIVE_LISTEN_15693
+    },{
+        .name = "listen_mode",
+        .mode = NCI_MODE_PASSIVE_LISTEN_A
     },{
         .name = "passive_poll_a_empty",
         .mode = NCI_MODE_PASSIVE_POLL_A,
@@ -243,8 +278,8 @@ static const TestModeParamFailData mode_param_fail_tests[] = {
 typedef struct test_intf_activated_success_data {
     const char* name;
     GUtilData data;
-    NciModeParam* mode_param;
-    NciActivationParam* activation_param;
+    const NciModeParam* mode_param;
+    const NciActivationParam* activation_param;
 } TestIntfActivatedSuccessData;
 
 static
@@ -261,23 +296,55 @@ test_intf_activated_success(
     memset(&activation_param, 0, sizeof(activation_param));
     g_assert(nci_parse_intf_activated_ntf(&ntf, &mode_param, &activation_param,
         test->data.bytes, test->data.size));
-    g_assert(ntf.mode_param);
-    g_assert(!memcmp(ntf.mode_param, test->mode_param, sizeof(mode_param)));
+    g_assert(!ntf.mode_param == !test->mode_param);
+    g_assert(!ntf.mode_param || !memcmp(ntf.mode_param,
+        test->mode_param, sizeof(mode_param)));
     g_assert(ntf.activation_param);
     g_assert(!memcmp(ntf.activation_param, test->activation_param,
              sizeof(activation_param)));
 }
 
-static guint8 test_intf_activated_ntf_nfc_dep_ini[] = {
+static const guint8 test_intf_activated_ntf_nfc_dep_poll_1[] = {
     0x01, 0x03, 0x05, 0x00, 0xfb, 0x01, 0x09, 0x08,
     0x00, 0x04, 0x08, 0x50, 0xad, 0x0e, 0x01, 0x40,
-    0x02, 0x02, 0x02, 0x21, 0x20, 0xc2, 0x40, 0x83,
+    0x00, 0x02, 0x02, 0x21, 0x20, 0xc2, 0x40, 0x83,
     0x1b, 0xe1, 0x22, 0x5d, 0xfe, 0xb7, 0xe9, 0x00,
     0x00, 0x00, 0x0e, 0x32, 0x46, 0x66, 0x6d, 0x01,
     0x01, 0x11, 0x02, 0x02, 0x07, 0xff, 0x03, 0x02,
     0x00, 0x03, 0x04, 0x01, 0xff
 };
-static NciModeParam test_intf_activated_ntf_poll_a_mp = {
+static const guint8 test_intf_activated_ntf_nfc_dep_poll_2[] = {
+    0x01, 0x03, 0x05, 0x03, 0xfb, 0x01, 0x00, 0x03,
+    0x02, 0x02, 0x21, 0x20, 0xc2, 0x40, 0x83, 0x1b,
+    0xe1, 0x22, 0x5d, 0xfe, 0xb7, 0xe9, 0x00, 0x00,
+    0x00, 0x0e, 0x32, 0x46, 0x66, 0x6d, 0x01, 0x01,
+    0x11, 0x02, 0x02, 0x07, 0xff, 0x03, 0x02, 0x00,
+    0x03, 0x04, 0x01, 0xff
+};
+static const guint8 test_intf_activated_ntf_nfc_dep_poll_3[] = {
+    0x01, 0x03, 0x05, 0x00, 0xfb, 0x01, 0x09, 0x08,
+    0x00, 0x04, 0x08, 0x50, 0xad, 0x0e, 0x01, 0x40,
+    0x02, 0x02, 0x02, 0x10, 0x0f, 0xc2, 0x40, 0x83,
+    0x1b, 0xe1, 0x22, 0x5d, 0xfe, 0xb7, 0xe9, 0x00,
+    0x00, 0x00, 0x0e, 0x32
+};
+static const guint8 test_intf_activated_ntf_nfc_dep_listen_1[] = {
+    0x01, 0x03, 0x05, 0x83, 0xfb, 0x01, 0x00, 0x83,
+    0x00, 0x00, 0x20, 0x1f, 0xc5, 0x47, 0xe4, 0x98,
+    0x4d, 0x88, 0x04, 0xb4, 0x92, 0xe5, 0x00, 0x00,
+    0x00, 0x32, 0x46, 0x66, 0x6d, 0x01, 0x01, 0x11,
+    0x02, 0x02, 0x07, 0xff, 0x03, 0x02, 0x00, 0x13,
+    0x04, 0x01, 0xff
+};
+
+static const guint8 test_intf_activated_ntf_nfc_dep_listen_2[] = {
+    0x01, 0x03, 0x05, 0x83, 0xfb, 0x01, 0x00, 0x83,
+    0x00, 0x00, 0x0f, 0x0e, 0xc5, 0x47, 0xe4, 0x98,
+    0x4d, 0x88, 0x04, 0xb4, 0x92, 0xe5, 0x00, 0x00,
+    0x00, 0x32
+};
+
+static const NciModeParam test_intf_activated_ntf_poll_a_mp = {
     .poll_a = {
         .sens_res = { 0x08, 0x00 },
         .nfcid1_len = 4,
@@ -286,7 +353,7 @@ static NciModeParam test_intf_activated_ntf_poll_a_mp = {
         .sel_res = 0x40
     }
 };
-static NciActivationParam test_intf_activated_ntf_nfc_dep_ap = {
+static const NciActivationParam test_intf_activated_ntf_nfc_dep_poll_ap_1 = {
     .nfc_dep_poll = {
         .nfcid3 = { 0xc2, 0x40, 0x83, 0x1b, 0xe1,
                     0x22, 0x5d, 0xfe, 0xb7, 0xe9 },
@@ -295,16 +362,77 @@ static NciActivationParam test_intf_activated_ntf_nfc_dep_ap = {
         .br = 0x00,
         .to = 0x0e,
         .pp = 0x32,
-        .g = { test_intf_activated_ntf_nfc_dep_ini + 0x24, 17 },
+        .g = { test_intf_activated_ntf_nfc_dep_poll_1 + 0x24, 17 },
+    }
+};
+static const NciActivationParam test_intf_activated_ntf_nfc_dep_poll_ap_2 = {
+    .nfc_dep_poll = {
+        .nfcid3 = { 0xc2, 0x40, 0x83, 0x1b, 0xe1,
+                    0x22, 0x5d, 0xfe, 0xb7, 0xe9 },
+        .did = 0x00,
+        .bs = 0x00,
+        .br = 0x00,
+        .to = 0x0e,
+        .pp = 0x32,
+        .g = { test_intf_activated_ntf_nfc_dep_poll_2 + 0x1b, 17 },
+    }
+};
+static const NciActivationParam test_intf_activated_ntf_nfc_dep_poll_ap_3 = {
+    .nfc_dep_poll = {
+        .nfcid3 = { 0xc2, 0x40, 0x83, 0x1b, 0xe1,
+                    0x22, 0x5d, 0xfe, 0xb7, 0xe9 },
+        .did = 0x00,
+        .bs = 0x00,
+        .br = 0x00,
+        .to = 0x0e,
+        .pp = 0x32,
+    }
+};
+static const NciActivationParam test_intf_activated_ntf_nfc_dep_listen_ap_1 = {
+    .nfc_dep_listen = {
+        .nfcid3 = { 0xc5, 0x47, 0xe4, 0x98, 0x4d,
+                    0x88, 0x04, 0xb4, 0x92, 0xe5 },
+        .did = 0x00,
+        .bs = 0x00,
+        .br = 0x00,
+        .pp = 0x32,
+        .g = { test_intf_activated_ntf_nfc_dep_listen_1 + 0x1a, 17 },
+    }
+};
+static const NciActivationParam test_intf_activated_ntf_nfc_dep_listen_ap_2 = {
+    .nfc_dep_listen = {
+        .nfcid3 = { 0xc5, 0x47, 0xe4, 0x98, 0x4d,
+                    0x88, 0x04, 0xb4, 0x92, 0xe5 },
+        .did = 0x00,
+        .bs = 0x00,
+        .br = 0x00,
+        .pp = 0x32
     }
 };
 
 static const TestIntfActivatedSuccessData intf_activated_success_tests[] = {
     {
-        .name = "nfc_dep/ok",
-        .data = { TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_ini) },
+        .name = "nfc_dep_poll/ok/1",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_poll_1)},
         .mode_param = &test_intf_activated_ntf_poll_a_mp,
-        .activation_param = &test_intf_activated_ntf_nfc_dep_ap
+        .activation_param = &test_intf_activated_ntf_nfc_dep_poll_ap_1
+    },{
+        .name = "nfc_dep_poll/ok/2",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_poll_2)},
+        .activation_param = &test_intf_activated_ntf_nfc_dep_poll_ap_2
+    },{
+        .name = "nfc_dep_poll/ok/3",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_poll_3)},
+        .mode_param = &test_intf_activated_ntf_poll_a_mp,
+        .activation_param = &test_intf_activated_ntf_nfc_dep_poll_ap_3
+    },{
+        .name = "nfc_dep_listen/ok/1",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_listen_1)},
+        .activation_param = &test_intf_activated_ntf_nfc_dep_listen_ap_1
+    },{
+        .name = "nfc_dep_listen/ok/2",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_listen_2)},
+        .activation_param = &test_intf_activated_ntf_nfc_dep_listen_ap_2
     }
 };
 
@@ -336,7 +464,7 @@ test_intf_activated_fail(
     g_assert(!ntf.activation_param == !test->activation_param_ok);
 }
 
-static guint8 test_intf_activated_ntf_nfc_dep_fail_1[] = {
+static const guint8 test_intf_activated_ntf_nfc_dep_fail_1[] = {
     0x01, 0x03, 0x05, 0x00, 0xfb, 0x01, 0x09, 0x08,
     0x00, 0x04, 0x08, 0x50, 0xad, 0x0e, 0x01, 0x40,
     0x02, 0x02, 0x02, 0x21, 0x21, 0xc2, 0x40, 0x83,
@@ -346,12 +474,27 @@ static guint8 test_intf_activated_ntf_nfc_dep_fail_1[] = {
     0x01, 0x11, 0x02, 0x02, 0x07, 0xff, 0x03, 0x02,
     0x00, 0x03, 0x04, 0x01, 0xff
 };
-static guint8 test_intf_activated_ntf_nfc_dep_fail_2[] = {
+static const guint8 test_intf_activated_ntf_nfc_dep_fail_2[] = {
     0x01, 0x03, 0x05, 0x00, 0xfb, 0x01, 0x09, 0x08,
     0x00, 0x04, 0x08, 0x50, 0xad, 0x0e, 0x01, 0x40,
     0x02, 0x02, 0x02, 0x0c, 0x0b, 0xc2, 0x40, 0x83,
                            /* ^^ too short */
     0x1b, 0xe1, 0x22, 0x5d, 0xfe, 0xb7, 0xe9, 0x00
+};
+static const guint8 test_intf_activated_ntf_nfc_dep_fail_3[] = {
+    0x01, 0x03, 0x05, 0x83, 0xfb, 0x01, 0x00, 0x83,
+    0x00, 0x00, 0x20, 0x20, 0xc5, 0x47, 0xe4, 0x98,
+    /* ATR_REQ too long ^^ */
+    0x4d, 0x88, 0x04, 0xb4, 0x92, 0xe5, 0x00, 0x00,
+    0x00, 0x32, 0x46, 0x66, 0x6d, 0x01, 0x01, 0x11,
+    0x02, 0x02, 0x07, 0xff, 0x03, 0x02, 0x00, 0x13,
+    0x04, 0x01, 0xff
+};
+
+static const guint8 test_intf_activated_ntf_nfc_dep_fail_4[] = {
+    0x01, 0x03, 0x05, 0x83, 0xfb, 0x01, 0x00, 0x83,
+    0x00, 0x00, 0x05, 0x04, 0xc5, 0x47, 0xe4, 0x98
+               /* ^^    ^^ ATR_REQ too short */
 };
 
 static const TestIntfActivatedFailData intf_activated_fail_tests[] = {
@@ -363,6 +506,14 @@ static const TestIntfActivatedFailData intf_activated_fail_tests[] = {
         .name = "nfc_dep_2",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_fail_2)},
         .parse_ok = TRUE, .mode_param_ok = TRUE, .activation_param_ok = FALSE
+    },{
+        .name = "nfc_dep_3",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_fail_3)},
+        .parse_ok = TRUE, .mode_param_ok = FALSE, .activation_param_ok = FALSE
+    },{
+        .name = "nfc_dep_4",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_fail_4)},
+        .parse_ok = TRUE, .mode_param_ok = FALSE, .activation_param_ok = FALSE
     }
 };
 
@@ -555,6 +706,7 @@ int main(int argc, char* argv[])
     g_test_init(&argc, &argv, NULL);
     test_init(&test_opt, argc, argv);
     g_test_add_func(TEST_("null"), test_null);
+    g_test_add_func(TEST_("listen_mode"), test_listen_mode);
     for (i = 0; i < G_N_ELEMENTS(mode_param_success_tests); i++) {
         const TestModeParamSuccessData* test = mode_param_success_tests + i;
         char* path = g_strconcat(TEST_("mode_param/ok/"), test->name, NULL);
