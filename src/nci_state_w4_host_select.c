@@ -256,7 +256,7 @@ nci_state_w4_host_select_generic_error_ntf(
             return TRUE;
         }
     }
-    /* Unrecornized notification */
+    /* Unrecognized notification */
     return FALSE;
 }
 

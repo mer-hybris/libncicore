@@ -91,7 +91,7 @@ nci_state_poll_active_interface_error_ntf(
             return TRUE;
         }
     }
-    /* Unrecornized notification */
+    /* Unrecognized notification */
     return FALSE;
 }
 
