@@ -1,8 +1,7 @@
 Name: libncicore
-Version: 1.0.9
+Version: 1.1.0
 Release: 0
 Summary: NCI state machine
-Group: Development/Libraries
 License: BSD
 URL: https://github.com/mer-hybris/libncicore
 Source: %{name}-%{version}.tar.bz2

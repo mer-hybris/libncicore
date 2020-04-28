@@ -1,3 +1,10 @@
+libncicore (1.1.0) unstable; urgency=low
+
+  * Implement listen part of the state machine
+  * Stop exporting internal functions
+
+ -- Slava Monich <slava.monich@jolla.com>  Tue, 28 Apr 2020 18:25:52 +0300
+
 libncicore (1.0.9) unstable; urgency=low
 
   * Prevent state machine from getting stuck in RFST_W4_HOST_SELECT state

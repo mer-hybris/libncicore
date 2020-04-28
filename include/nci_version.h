@@ -37,8 +37,8 @@
 
 /* libncicore version */
 #define NCI_CORE_VERSION_MAJOR 1
-#define NCI_CORE_VERSION_MINOR 0
-#define NCI_CORE_VERSION_NANO  9
+#define NCI_CORE_VERSION_MINOR 1
+#define NCI_CORE_VERSION_NANO  0
 
 #define NCI_CORE_VERSION_WORD(v1,v2,v3) \
     ((((v1) & 0x7f) << 24) | \
