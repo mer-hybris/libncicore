@@ -77,19 +77,25 @@ nci_state_poll_active_interface_error_ntf(
      */
     if (len == 2) {
         switch (pkt[0]) {
+        case NCI_STATUS_SYNTAX_ERROR:
+            GDEBUG("CORE_INTERFACE_ERROR_NTF (Syntax Error)");
+            break;
         case NCI_RF_TRANSMISSION_ERROR:
             GDEBUG("CORE_INTERFACE_ERROR_NTF (Transmission Error)");
-            nci_sm_switch_to(nci_state_sm(self), NCI_RFST_DISCOVERY);
-            return TRUE;
+            break;
         case NCI_RF_PROTOCOL_ERROR:
             GDEBUG("CORE_INTERFACE_ERROR_NTF (Protocol Error)");
-            nci_sm_switch_to(nci_state_sm(self), NCI_RFST_DISCOVERY);
-            return TRUE;
+            break;;
         case NCI_RF_TIMEOUT_ERROR:
             GDEBUG("CORE_INTERFACE_ERROR_NTF (Timeout)");
-            nci_sm_switch_to(nci_state_sm(self), NCI_RFST_DISCOVERY);
-            return TRUE;
+            break;
+        default:
+            /* Unrecognized notification */
+            return FALSE;
         }
+        /* Deactivate the link */
+        nci_sm_switch_to(nci_state_sm(self), NCI_RFST_DISCOVERY);
+        return TRUE;
     }
     /* Unrecognized notification */
     return FALSE;
