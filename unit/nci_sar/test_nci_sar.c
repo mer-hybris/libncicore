@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018-2019 Jolla Ltd.
- * Copyright (C) 2018-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2018-2020 Jolla Ltd.
+ * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -398,7 +398,7 @@ test_null(
     void)
 {
     nci_sar_set_max_logical_connections(NULL, 0);
-    nci_sar_set_max_control_packet_size(NULL, 0);
+    nci_sar_set_max_control_payload_size(NULL, 0);
     g_assert(!nci_sar_send_command(NULL, 0, 0, NULL, NULL, NULL, NULL));
     g_assert(!nci_sar_send_data_packet(NULL, 0, NULL, NULL, NULL, NULL));
     g_assert(!nci_sar_start(NULL));
@@ -520,8 +520,8 @@ test_basic(
     nci_sar_set_max_logical_connections(sar, 1);
     nci_sar_set_max_logical_connections(sar, 3);
     nci_sar_set_max_logical_connections(sar, 2);
-    nci_sar_set_max_control_packet_size(sar, 0);
-    nci_sar_set_max_control_packet_size(sar, 0xff);
+    nci_sar_set_max_control_payload_size(sar, 0);
+    nci_sar_set_max_control_payload_size(sar, 0xff);
     nci_sar_set_initial_credits(sar, 42, 1); /* Invalid cid */
     nci_sar_set_initial_credits(sar, 0, 0xfe);
     nci_sar_add_credits(sar, 0, 1);
@@ -613,8 +613,17 @@ test_send_seg(
         .cancel_write = test_hal_io_cancel_write
     };
 
-    /* Set MTU to minimum and send one byte of payload per packet */
-    static const guint8 payload[] = { 0x01, 0x02 };
+    /* Set MTU to minimum and send 32 bytes of payload per packet */
+    static const guint8 payload[] = {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+        0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+        0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
+        0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
+        0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f
+    };
     GBytes* payload_bytes = g_bytes_new_static(payload, sizeof(payload));
     TestHalIo* test_io = test_hal_io_new_with_functions(&hal_io_fn);
     TestSendSegData test;
@@ -625,7 +634,7 @@ test_send_seg(
     test_io->test_data = &test;
 
     test.sar = nci_sar_new(&test_io->io, &test.client);
-    nci_sar_set_max_control_packet_size(test.sar, 3); /* Actually sets 4 */
+    nci_sar_set_max_control_payload_size(test.sar, 1); /* Actually 32 */
     test.send_id = nci_sar_send_command(test.sar, TEST_GID, TEST_OID,
         payload_bytes, test_client_unexpected_completion, NULL, NULL);
     g_assert(test.send_id);
@@ -637,14 +646,14 @@ test_send_seg(
     g_main_loop_run(test.loop);
 
     /* The same data have been sent twice */
-    g_assert(test_io->written->len == 2*sizeof(payload));
+    g_assert_cmpuint(test_io->written->len, == ,4);
     for (i = 0; i < test_io->written->len; i++) {
         GBytes* packet = test_io->written->pdata[i];
         gsize packet_size;
         const guint8* packet_data = g_bytes_get_data(packet, &packet_size);
 
-        g_assert(packet_size == 4);
-        g_assert(packet_data[3] == payload[i % sizeof(payload)]);
+        g_assert_cmpuint(packet_size, == , 35 /* Minimum size + header */);
+        g_assert(!memcmp(packet_data + 3, payload + (i % 2) * 32, 32));
 
     }
     if (timeout_id) {
