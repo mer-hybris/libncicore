@@ -315,6 +315,7 @@ nci_transition_reset_init_v1_rsp(
 
             nci_sar_set_max_logical_connections(sar, max_logical_conns);
             nci_sar_set_max_control_payload_size(sar, max_control_payload);
+            nci_sar_set_max_data_payload_size(sar, 0 /* Reset to default */);
             nci_transition_reset_get_config(self);
             return;
         }
@@ -403,6 +404,7 @@ nci_transition_reset_init_v2_rsp(
 
             nci_sar_set_max_logical_connections(sar, max_logical_conns);
             nci_sar_set_max_control_payload_size(sar, max_control_payload);
+            nci_sar_set_max_data_payload_size(sar, 0 /* Reset to default */);
             nci_transition_reset_get_config(self);
             return;
         }

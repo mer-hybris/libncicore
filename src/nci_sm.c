@@ -926,7 +926,10 @@ nci_sm_intf_activated(
     NciSmObject* self = nci_sm_object(sm);
 
     if (G_LIKELY(self)) {
-        nci_sar_set_initial_credits(nci_sm_sar(sm), NCI_STATIC_RF_CONN_ID,
+        NciSar* sar = nci_sm_sar(sm);
+
+        nci_sar_set_max_data_payload_size(sar, ntf->max_data_packet_size);
+        nci_sar_set_initial_credits(sar, NCI_STATIC_RF_CONN_ID,
             ntf->num_credits);
         g_signal_emit(self, nci_sm_signals[SIGNAL_INTF_ACTIVATED], 0, ntf);
     }

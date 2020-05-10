@@ -40,7 +40,7 @@
 
 #define SAR_DEFAULT_MAX_LOGICAL_CONNECTIONS (1)
 #define SAR_MIN_CONTROL_PAYLOAD_LIMIT (0x20) /* Valid range is 32 to 255 */
-#define SAR_DEFAULT_DATA_PAYLOAD_LIMIT (0xff)
+#define SAR_MIN_DATA_PAYLOAD_LIMIT (0x01) /* Valid range is 1 to 255 */
 #define SAR_UNLIMITED_CREDITS (0xff)
 
 #define NCI_HDR_SIZE (3)
@@ -654,7 +654,7 @@ nci_sar_new(
     self->io = io;
     self->max_logical_conns = SAR_DEFAULT_MAX_LOGICAL_CONNECTIONS;
     self->control_payload_limit = SAR_MIN_CONTROL_PAYLOAD_LIMIT;
-    self->data_payload_limit = SAR_DEFAULT_DATA_PAYLOAD_LIMIT;
+    self->data_payload_limit = SAR_MIN_DATA_PAYLOAD_LIMIT;
     self->conn = g_new0(NciSarLogicalConnection, self->max_logical_conns);
     return self;
 }
@@ -785,6 +785,20 @@ nci_sar_set_max_control_payload_size(
             self->control_payload_limit = SAR_MIN_CONTROL_PAYLOAD_LIMIT;
         } else  {
             self->control_payload_limit = max;
+        }
+    }
+}
+
+void
+nci_sar_set_max_data_payload_size(
+    NciSar* self,
+    guint8 max)
+{
+    if (G_LIKELY(self)) {
+        if (max < SAR_MIN_DATA_PAYLOAD_LIMIT) {
+            self->data_payload_limit = SAR_MIN_DATA_PAYLOAD_LIMIT;
+        } else  {
+            self->data_payload_limit = max;
         }
     }
 }
