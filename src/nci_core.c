@@ -159,9 +159,10 @@ nci_core_command_completion(
     gboolean success,
     gpointer user_data)
 {
-    if (!success) {
-        NciCoreObject* self = NCI_CORE(user_data);
+    NciCoreObject* self = NCI_CORE(user_data);
 
+    self->cmd_id = 0;
+    if (!success) {
         GWARN("Failed to send command %02x/%02x", self->rsp_gid, self->rsp_oid);
         nci_sm_stall(self->sm, NCI_STALL_ERROR);
     }
