@@ -399,6 +399,7 @@ test_null(
 {
     nci_sar_set_max_logical_connections(NULL, 0);
     nci_sar_set_max_control_payload_size(NULL, 0);
+    nci_sar_set_max_data_payload_size(NULL, 0);
     g_assert(!nci_sar_send_command(NULL, 0, 0, NULL, NULL, NULL, NULL));
     g_assert(!nci_sar_send_data_packet(NULL, 0, NULL, NULL, NULL, NULL));
     g_assert(!nci_sar_start(NULL));
@@ -663,6 +664,78 @@ test_send_seg(
     nci_sar_free(test.sar);
     test_hal_io_free(test_io);
     g_main_loop_unref(test.loop);
+    g_bytes_unref(payload_bytes);
+}
+
+/*==========================================================================*
+ * send_data_seg
+ *==========================================================================*/
+
+static
+void
+test_send_data_seg_expect_success_and_quit(
+    NciSarClient* client,
+    gboolean success,
+    gpointer user_data)
+{
+    g_assert(success);
+    g_main_loop_quit(user_data);
+}
+
+static
+void
+test_send_data_seg(
+    void)
+{
+    /* Set MTU to minimum and send one byte of payload per data packet */
+    static const guint8 payload[] = { 0x01, 0x02 };
+    GBytes* payload_bytes = g_bytes_new_static(payload, sizeof(payload));
+    NciSarClient client;
+    TestHalIo* test_io = test_hal_io_new();
+    NciSar* sar = nci_sar_new(&test_io->io, &client);
+    GMainLoop* loop = g_main_loop_new(NULL, TRUE);
+    guint i, timeout_id = test_setup_timeout(loop);
+    gsize packet_size;
+    const guint8* packet_data;
+
+    client.fn = &test_dummy_sar_client_fn;
+    nci_sar_set_max_data_payload_size(sar, 0 /* Default is 1 byte */);
+    g_assert(nci_sar_send_data_packet(sar, NCI_STATIC_RF_CONN_ID,
+        payload_bytes, test_send_data_seg_expect_success_and_quit,
+        NULL, loop));
+    nci_sar_add_credits(sar, NCI_STATIC_RF_CONN_ID, 3);
+
+    g_main_loop_run(loop);
+
+    /* One byte per packet with minimum MTU */
+    g_assert_cmpuint(test_io->written->len, == ,sizeof(payload));
+    for (i = 0; i < test_io->written->len; i++) {
+        packet_data = g_bytes_get_data(test_io->written->pdata[i],
+            &packet_size);
+        g_assert_cmpuint(packet_size, == ,4);
+        g_assert_cmpuint(packet_data[3], == ,payload[i % sizeof(payload)]);
+    }
+
+    /* Set the max packet size */
+    nci_sar_set_max_data_payload_size(sar, 0xff);
+    g_ptr_array_set_size(test_io->written, 0);
+
+    /* This time packet gets delivered in one piece */
+    g_assert(nci_sar_send_data_packet(sar, NCI_STATIC_RF_CONN_ID,
+        payload_bytes, test_send_data_seg_expect_success_and_quit,
+        NULL, loop));
+    g_main_loop_run(loop);
+    g_assert_cmpuint(test_io->written->len, == ,1);
+    packet_data = g_bytes_get_data(test_io->written->pdata[0], &packet_size);
+    g_assert_cmpuint(packet_size, == ,3 + sizeof(payload));
+    g_assert(!memcmp(packet_data + 3, payload, sizeof(payload)));
+
+    if (timeout_id) {
+        g_source_remove(timeout_id);
+    }
+    nci_sar_free(sar);
+    test_hal_io_free(test_io);
+    g_main_loop_unref(loop);
     g_bytes_unref(payload_bytes);
 }
 
@@ -1471,6 +1544,7 @@ int main(int argc, char* argv[])
     g_test_add_func(TEST_("fail"), test_fail);
     g_test_add_func(TEST_("basic"), test_basic);
     g_test_add_func(TEST_("send_seg"), test_send_seg);
+    g_test_add_func(TEST_("send_data_seg"), test_send_data_seg);
     g_test_add_func(TEST_("send_err"), test_send_err);
     g_test_add_func(TEST_("recv_ntf"), test_recv_ntf);
     g_test_add_func(TEST_("recv_ntf_data"), test_recv_ntf_data);
