@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -276,7 +276,7 @@ nci_transition_reset_init_v1_rsp(
             len == ((n = pkt[5]) + 17)) {
             const guint8* rf_interfaces = pkt + 6;
             guint8 max_logical_conns = pkt[6 + n];
-            guint8 max_control_packet = pkt[9 + n];
+            guint8 max_control_payload = pkt[9 + n];
 
             if (sm->rf_interfaces) {
                 g_bytes_unref(sm->rf_interfaces);
@@ -308,13 +308,14 @@ nci_transition_reset_init_v1_rsp(
 #endif
             GDEBUG("  Max Logical Connections = %u", max_logical_conns);
             GDEBUG("  Max Routing Table Size = %u", sm->max_routing_table_size);
-            GDEBUG("  Max Control Packet Size = %u", max_control_packet);
+            GDEBUG("  Max Control Packet Size = %u", max_control_payload);
             GDEBUG("  Manufacturer = 0x%02x", pkt[12 + n]);
             GDEBUG("  Manufacturer Info = %02x %02x %02x %02x",
                 pkt[13 + n], pkt[14 + n], pkt[15 + n], pkt[16 + n]);
 
             nci_sar_set_max_logical_connections(sar, max_logical_conns);
-            nci_sar_set_max_control_packet_size(sar, max_control_packet);
+            nci_sar_set_max_control_payload_size(sar, max_control_payload);
+            nci_sar_set_max_data_payload_size(sar, 0 /* Reset to default */);
             nci_transition_reset_get_config(self);
             return;
         }
@@ -367,7 +368,7 @@ nci_transition_reset_init_v2_rsp(
             len == (2 * (n = pkt[13]) + 14)) {
             const guint8* rf_interfaces = pkt + 14;
             guint8 max_logical_conns = pkt[5];
-            guint8 max_control_packet = pkt[8];
+            guint8 max_control_payload = pkt[8];
 
             if (sm->rf_interfaces) {
                 g_bytes_unref(sm->rf_interfaces);
@@ -399,10 +400,11 @@ nci_transition_reset_init_v2_rsp(
 #endif
             GDEBUG("  Max Logical Connections = %u", max_logical_conns);
             GDEBUG("  Max Routing Table Size = %u", sm->max_routing_table_size);
-            GDEBUG("  Max Control Packet Size = %u", max_control_packet);
+            GDEBUG("  Max Control Packet Size = %u", max_control_payload);
 
             nci_sar_set_max_logical_connections(sar, max_logical_conns);
-            nci_sar_set_max_control_packet_size(sar, max_control_packet);
+            nci_sar_set_max_control_payload_size(sar, max_control_payload);
+            nci_sar_set_max_data_payload_size(sar, 0 /* Reset to default */);
             nci_transition_reset_get_config(self);
             return;
         }

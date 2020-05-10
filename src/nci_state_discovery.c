@@ -163,6 +163,17 @@ nci_state_discovery_generic_error_ntf(
     return FALSE;
 }
 
+static
+void
+nci_state_discovery_entered(
+    NciState* self)
+{
+    NciSm* sm = nci_state_sm(self);
+    NciSar* sar = nci_sm_sar(sm);
+
+    nci_sar_set_max_data_payload_size(sar, 0 /* Reset to default */);
+}
+
 /*==========================================================================*
  * Interface
  *==========================================================================*/
@@ -180,6 +191,26 @@ nci_state_discovery_new(
 /*==========================================================================*
  * Methods
  *==========================================================================*/
+
+static
+void
+nci_state_discovery_enter(
+    NciState* self,
+    NciParam* param)
+{
+    nci_state_discovery_entered(self);
+    NCI_STATE_CLASS(PARENT_CLASS)->enter(self, param);
+}
+
+static
+void
+nci_state_discovery_reenter(
+    NciState* self,
+    NciParam* param)
+{
+    nci_state_discovery_entered(self);
+    NCI_STATE_CLASS(PARENT_CLASS)->reenter(self, param);
+}
 
 static
 void
@@ -228,7 +259,9 @@ void
 nci_state_discovery_class_init(
     NciStateDiscoveryClass* klass)
 {
-    NCI_STATE_CLASS(klass)->handle_ntf = nci_state_discovery_handle_ntf;
+    klass->enter = nci_state_discovery_enter;
+    klass->reenter = nci_state_discovery_reenter;
+    klass->handle_ntf = nci_state_discovery_handle_ntf;
 }
 
 /*

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018-2019 Jolla Ltd.
- * Copyright (C) 2018-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2018-2020 Jolla Ltd.
+ * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -39,9 +39,8 @@
 /* SAR (Segmentation and Reassembly) */
 
 #define SAR_DEFAULT_MAX_LOGICAL_CONNECTIONS (1)
-#define SAR_DEFAULT_CONTROL_MTU (0x20)
-#define SAR_DEFAULT_DATA_MTU (0xff)
-#define SAR_MIN_MTU (0x04)
+#define SAR_MIN_CONTROL_PAYLOAD_LIMIT (0x20) /* Valid range is 32 to 255 */
+#define SAR_MIN_DATA_PAYLOAD_LIMIT (0x01) /* Valid range is 1 to 255 */
 #define SAR_UNLIMITED_CREDITS (0xff)
 
 #define NCI_HDR_SIZE (3)
@@ -76,8 +75,8 @@ struct nci_sar {
     NciHalClient hal_client;
     gboolean started;
     guint8 max_logical_conns;
-    guint8 control_mtu;
-    guint8 data_mtu;
+    guint8 control_payload_limit;
+    guint8 data_payload_limit;
     guint last_packet_id;
     guint start_write_id;
     gboolean write_pending;
@@ -223,14 +222,14 @@ nci_sar_attempt_write(
         if (self->writing) {
             NciHalIo* io = self->io;
             NciSarPacketOut* out = self->writing;
-            guint total_len = NCI_HDR_SIZE; /* +1 for payload length */
             const guint8* payload = NULL;
             gsize remaining_payload_len = 0;
             GUtilData chunks[2];
             int nchunks = 1;
             gboolean write_submitted = FALSE;
-            const guint mtu = ((out->hdr[0] & NCI_MT_MASK) ==
-                NCI_MT_CMD_PKT) ? self->control_mtu : self->data_mtu;
+            const guint max_payload_size = ((out->hdr[0] & NCI_MT_MASK) ==
+                NCI_MT_CMD_PKT) ? self->control_payload_limit :
+                self->data_payload_limit;
 
             if (out->payload) {
                 gsize payload_len = 0;
@@ -238,12 +237,11 @@ nci_sar_attempt_write(
                 payload = g_bytes_get_data(out->payload, &payload_len);
                 GASSERT(payload_len >= out->payload_pos);
                 remaining_payload_len = payload_len - out->payload_pos;
-                total_len += remaining_payload_len;
             }
 
             chunks[0].bytes = out->hdr;
             chunks[0].size = NCI_HDR_SIZE;
-            if (total_len <= mtu) {
+            if (remaining_payload_len <= max_payload_size) {
                 /* We can send the whole thing */
                 out->hdr[0] &= ~NCI_PBF;
                 out->hdr[2] = (guint8)remaining_payload_len;
@@ -256,9 +254,9 @@ nci_sar_attempt_write(
             } else {
                 /* Send a fragment */
                 out->hdr[0] |= NCI_PBF;
-                out->hdr[2] = mtu;
+                out->hdr[2] = max_payload_size;
                 chunks[nchunks].bytes = payload;
-                chunks[nchunks].size = mtu - chunks[0].size;
+                chunks[nchunks].size = max_payload_size;
                 out->payload_pos += chunks[nchunks].size;
                 nchunks++;
             }
@@ -655,8 +653,8 @@ nci_sar_new(
     self->client = client;
     self->io = io;
     self->max_logical_conns = SAR_DEFAULT_MAX_LOGICAL_CONNECTIONS;
-    self->control_mtu = SAR_DEFAULT_CONTROL_MTU;
-    self->data_mtu = SAR_DEFAULT_DATA_MTU;
+    self->control_payload_limit = SAR_MIN_CONTROL_PAYLOAD_LIMIT;
+    self->data_payload_limit = SAR_MIN_DATA_PAYLOAD_LIMIT;
     self->conn = g_new0(NciSarLogicalConnection, self->max_logical_conns);
     return self;
 }
@@ -778,15 +776,29 @@ nci_sar_set_max_logical_connections(
 }
 
 void
-nci_sar_set_max_control_packet_size(
+nci_sar_set_max_control_payload_size(
     NciSar* self,
     guint8 max)
 {
     if (G_LIKELY(self)) {
-        if (max < SAR_MIN_MTU) {
-            self->control_mtu = max ? SAR_MIN_MTU : SAR_DEFAULT_CONTROL_MTU;
+        if (max < SAR_MIN_CONTROL_PAYLOAD_LIMIT) {
+            self->control_payload_limit = SAR_MIN_CONTROL_PAYLOAD_LIMIT;
         } else  {
-            self->control_mtu = max;
+            self->control_payload_limit = max;
+        }
+    }
+}
+
+void
+nci_sar_set_max_data_payload_size(
+    NciSar* self,
+    guint8 max)
+{
+    if (G_LIKELY(self)) {
+        if (max < SAR_MIN_DATA_PAYLOAD_LIMIT) {
+            self->data_payload_limit = SAR_MIN_DATA_PAYLOAD_LIMIT;
+        } else  {
+            self->data_payload_limit = max;
         }
     }
 }

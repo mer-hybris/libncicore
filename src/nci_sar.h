@@ -88,7 +88,13 @@ nci_sar_set_max_logical_connections(
     NCI_INTERNAL;
 
 void
-nci_sar_set_max_control_packet_size(
+nci_sar_set_max_control_payload_size(
+    NciSar* sar,
+    guint8 max)
+    NCI_INTERNAL;
+
+void
+nci_sar_set_max_data_payload_size(
     NciSar* sar,
     guint8 max)
     NCI_INTERNAL;
