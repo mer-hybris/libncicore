@@ -1,3 +1,12 @@
+libncicore (1.1.1) unstable; urgency=low
+
+  * Clear cmd_id on command completion
+  * Fixed handling of control packet payload size limit
+  * Apply max data packet size from RF_INTF_ACTIVATED_NTF
+  * Handle NCI_STATUS_SYNTAX_ERROR notifications
+
+ -- Slava Monich <slava.monich@jolla.com>  Mon, 11 May 2020 01:37:06 +0300
+
 libncicore (1.1.0) unstable; urgency=low
 
   * Implement listen part of the state machine
