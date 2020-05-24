@@ -159,8 +159,6 @@ release: $(RELEASE_STATIC_LIB) $(RELEASE_LIB) $(RELEASE_LINK) $(PKGCONFIG)
 
 coverage: $(COVERAGE_STATIC_LIB)
 
-pkgconfig: $(PKGCONFIG)
-
 print_debug_lib:
 	@echo $(DEBUG_STATIC_LIB)
 
@@ -232,8 +230,17 @@ $(DEBUG_BUILD_DIR)/$(LIB_SYMLINK2): $(DEBUG_LIB)
 $(RELEASE_BUILD_DIR)/$(LIB_SYMLINK2): $(RELEASE_LIB)
 	ln -sf $(LIB) $@
 
-$(PKGCONFIG): $(LIB_NAME).pc.in $(VERSION_FILE)
-	sed -e 's/\[version\]/'$(PCVERSION)/g $< > $@
+# This one could be substituted with arch specific dir
+LIBDIR ?= /usr/lib
+ABS_LIBDIR := $(shell echo /$(LIBDIR) | sed -r 's|/+|/|g')
+
+pkgconfig: $(PKGCONFIG)
+
+$(PKGCONFIG): $(LIB_NAME).pc.in Makefile
+	sed -e 's|@version@|$(PCVERSION)|g' -e 's|@libdir@|$(ABS_LIBDIR)|g' $< > $@
+
+debian/%.install: debian/%.install.in
+	sed 's|@LIBDIR@|$(LIBDIR)|g' $< > $@
 
 #
 # Install
@@ -243,9 +250,9 @@ INSTALL = install
 INSTALL_DIRS = $(INSTALL) -d
 INSTALL_FILES = $(INSTALL) -m 644
 
-INSTALL_LIB_DIR = $(DESTDIR)/usr/lib
+INSTALL_LIB_DIR = $(DESTDIR)$(ABS_LIBDIR)
 INSTALL_INCLUDE_DIR = $(DESTDIR)/usr/include/$(NAME)
-INSTALL_PKGCONFIG_DIR = $(DESTDIR)/usr/lib/pkgconfig
+INSTALL_PKGCONFIG_DIR = $(DESTDIR)$(ABS_LIBDIR)/pkgconfig
 
 install: $(INSTALL_LIB_DIR)
 	$(INSTALL_FILES) $(RELEASE_LIB) $(INSTALL_LIB_DIR)
