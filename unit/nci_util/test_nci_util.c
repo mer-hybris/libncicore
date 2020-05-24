@@ -123,6 +123,12 @@ static const guint8 mode_param_success_data_poll_f_2[] =
 static const guint8 mode_param_success_data_poll_f_3[] =
     { 0x03, 0x12, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0xc0, 0xc1,
       0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f, 0xab };
+static const guint8 mode_param_success_data_listen_f_0[] =
+    { 0x00 };
+static const guint8 mode_param_success_data_listen_f_1[] =
+    { 0x08, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21 };
+static const guint8 mode_param_success_data_listen_f_2[] =
+    { 0x00, /* rest is ignored */ 0x01, 0xfe, 0xc0, 0xf1 };
 static const TestModeParamSuccessData mode_param_success_tests[] = {
     {
         .name = "minimal",
@@ -169,6 +175,19 @@ static const TestModeParamSuccessData mode_param_success_tests[] = {
         .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_poll_f_3) },
         .expected = { .poll_f = { 3, {0x01, 0xfe, 0xc0, 0xf1,
                                       0xc4, 0x41, 0x38, 0x21} } }
+    },{
+        .name = "active_listen_f",
+        .mode = NCI_MODE_ACTIVE_LISTEN_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_listen_f_0) },
+    },{
+        .name = "passive_listen_f",
+        .mode = NCI_MODE_PASSIVE_LISTEN_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_listen_f_1) },
+        .expected = { .listen_f = {{mode_param_success_data_listen_f_1+1, 8}}}
+    },{
+        .name = "passive_listen_f_2",
+        .mode = NCI_MODE_PASSIVE_LISTEN_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_listen_f_2) }
     }
 };
 
@@ -210,6 +229,10 @@ static const guint8 mode_param_fail_pollf_data_too_short_1[] =
       0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f };
 static const guint8 mode_param_fail_pollf_data_too_short_2[] =
     { 0x01, 0x07, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38 };
+static const guint8 mode_param_fail_listenf_data_too_short[] =
+    { 0x08, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38 };
+static const guint8 mode_param_fail_listenf_data_bad_len[] =
+    { 0x09, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0x00 };
 static const TestModeParamFailData mode_param_fail_tests[] = {
     {
         .name = "invalid_mode",
@@ -268,6 +291,17 @@ static const TestModeParamFailData mode_param_fail_tests[] = {
         .name = "poll_f_too_short_2",
         .mode = NCI_MODE_PASSIVE_POLL_F,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_pollf_data_too_short_2) }
+    },{
+        .name = "listen_f_empty",
+        .mode = NCI_MODE_ACTIVE_LISTEN_F,
+    },{
+        .name = "listen_f_too_short",
+        .mode = NCI_MODE_ACTIVE_LISTEN_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_listenf_data_too_short) }
+    },{
+        .name = "listen_f_bad_len",
+        .mode = NCI_MODE_PASSIVE_LISTEN_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_listenf_data_bad_len) }
     }
 };
 
