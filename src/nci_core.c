@@ -90,6 +90,7 @@ typedef struct nci_core_object {
 } NciCoreObject;
 
 typedef GObjectClass NciCoreObjectClass;
+GType nci_core_object_get_type() NCI_INTERNAL;
 G_DEFINE_TYPE(NciCoreObject, nci_core_object, G_TYPE_OBJECT)
 #define NCI_TYPE_CORE (nci_core_object_get_type())
 #define NCI_CORE(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), \
