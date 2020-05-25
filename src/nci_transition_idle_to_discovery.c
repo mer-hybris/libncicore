@@ -140,6 +140,22 @@ nci_transition_idle_to_discovery_discover(
     GDEBUG("%c RF_DISCOVER_CMD", DIR_OUT);
     g_byte_array_append(cmd, cmd_header, sizeof(cmd_header));
 
+    /*
+     * RW Modes: Poll A/B/V
+     * Peer Modes: Poll/Listen A/F
+     * CE Modes: Listen A/B
+     */
+    if (sm->op_mode & NFC_OP_MODE_RW) {
+        static const guint8 entries[] = {
+            NCI_MODE_PASSIVE_POLL_B, 1,
+            NCI_MODE_PASSIVE_POLL_15693, 1
+        };
+
+        GDEBUG("  PassivePollB");
+        GDEBUG("  PassivePollV");
+        g_byte_array_append(cmd, entries, sizeof(entries));
+        cmd->data[0] += sizeof(entries)/2;
+    }
     if ((sm->op_mode & NFC_OP_MODE_RW) ||
         (sm->op_mode & (NFC_OP_MODE_PEER|NFC_OP_MODE_POLL)) ==
                        (NFC_OP_MODE_PEER|NFC_OP_MODE_POLL)) {
@@ -153,14 +169,27 @@ nci_transition_idle_to_discovery_discover(
         g_byte_array_append(cmd, entries, sizeof(entries));
         cmd->data[0] += sizeof(entries)/2;
     }
-    if (sm->op_mode & NFC_OP_MODE_RW) {
+    if ((sm->op_mode & (NFC_OP_MODE_PEER|NFC_OP_MODE_POLL)) ==
+                       (NFC_OP_MODE_PEER|NFC_OP_MODE_POLL)) {
         static const guint8 entries[] = {
-            NCI_MODE_PASSIVE_POLL_B, 1,
-            NCI_MODE_PASSIVE_POLL_15693, 1
+            NCI_MODE_PASSIVE_POLL_F, 1,
+            NCI_MODE_ACTIVE_POLL_F, 1
         };
 
-        GDEBUG("  PassivePollB");
-        GDEBUG("  PassivePollV");
+        GDEBUG("  PassivePollF");
+        GDEBUG("  ActivePollF");
+        g_byte_array_append(cmd, entries, sizeof(entries));
+        cmd->data[0] += sizeof(entries)/2;
+    }
+    if ((sm->op_mode & (NFC_OP_MODE_PEER|NFC_OP_MODE_LISTEN)) ==
+                       (NFC_OP_MODE_PEER|NFC_OP_MODE_LISTEN)) {
+        static const guint8 entries[] = {
+            NCI_MODE_PASSIVE_LISTEN_F, 1,
+            NCI_MODE_ACTIVE_LISTEN_F, 1
+        };
+
+        GDEBUG("  PassiveListenF");
+        GDEBUG("  ActiveListenF");
         g_byte_array_append(cmd, entries, sizeof(entries));
         cmd->data[0] += sizeof(entries)/2;
     }
@@ -174,6 +203,15 @@ nci_transition_idle_to_discovery_discover(
 
         GDEBUG("  PassiveListenA");
         GDEBUG("  ActiveListenA");
+        g_byte_array_append(cmd, entries, sizeof(entries));
+        cmd->data[0] += sizeof(entries)/2;
+    }
+    if (sm->op_mode & NFC_OP_MODE_CE) {
+        static const guint8 entries[] = {
+            NCI_MODE_PASSIVE_LISTEN_B, 1
+        };
+
+        GDEBUG("  PassiveListenB");
         g_byte_array_append(cmd, entries, sizeof(entries));
         cmd->data[0] += sizeof(entries)/2;
     }
