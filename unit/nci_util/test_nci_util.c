@@ -333,11 +333,20 @@ test_intf_activated_success(
     g_assert(!ntf.mode_param == !test->mode_param);
     g_assert(!ntf.mode_param || !memcmp(ntf.mode_param,
         test->mode_param, sizeof(mode_param)));
-    g_assert(ntf.activation_param);
-    g_assert(!memcmp(ntf.activation_param, test->activation_param,
+    if (test->activation_param) {
+        g_assert(ntf.activation_param);
+        g_assert(!memcmp(ntf.activation_param, test->activation_param,
              sizeof(activation_param)));
+    } else {
+        g_assert(!ntf.activation_param);
+    }
 }
 
+static const guint8 test_intf_activated_ntf_mifare[] = {
+    0x01, 0x80, 0x80, 0x00, 0xff, 0x01, 0x0c, 0x44,
+    0x00, 0x07, 0x04, 0x47, 0x8a, 0x92, 0x7f, 0x51,
+    0x80, 0x01, 0x08, 0x00, 0x00, 0x00, 0x00
+};
 static const guint8 test_intf_activated_ntf_nfc_dep_poll_1[] = {
     0x01, 0x03, 0x05, 0x00, 0xfb, 0x01, 0x09, 0x08,
     0x00, 0x04, 0x08, 0x50, 0xad, 0x0e, 0x01, 0x40,
@@ -378,6 +387,15 @@ static const guint8 test_intf_activated_ntf_nfc_dep_listen_2[] = {
     0x00, 0x32
 };
 
+static const NciModeParam test_intf_activated_ntf_mifare_mp = {
+    .poll_a = {
+        .sens_res = { 0x44, 0x00 },
+        .nfcid1_len = 7,
+        .nfcid1 = { 0x04, 0x47, 0x8a, 0x92, 0x7f, 0x51, 0x80 },
+        .sel_res_len = 1,
+        .sel_res = 0x08
+    }
+};
 static const NciModeParam test_intf_activated_ntf_poll_a_mp = {
     .poll_a = {
         .sens_res = { 0x08, 0x00 },
@@ -446,6 +464,11 @@ static const NciActivationParam test_intf_activated_ntf_nfc_dep_listen_ap_2 = {
 
 static const TestIntfActivatedSuccessData intf_activated_success_tests[] = {
     {
+        .name = "mifare/ok",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_mifare)},
+        .mode_param = &test_intf_activated_ntf_mifare_mp,
+        .activation_param = NULL
+    },{
         .name = "nfc_dep_poll/ok/1",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_poll_1)},
         .mode_param = &test_intf_activated_ntf_poll_a_mp,
