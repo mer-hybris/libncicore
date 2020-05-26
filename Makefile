@@ -159,6 +159,8 @@ release: $(RELEASE_STATIC_LIB) $(RELEASE_LIB) $(RELEASE_LINK) $(PKGCONFIG)
 
 coverage: $(COVERAGE_STATIC_LIB)
 
+pkgconfig: $(PKGCONFIG)
+
 print_debug_lib:
 	@echo $(DEBUG_STATIC_LIB)
 
@@ -230,11 +232,13 @@ $(DEBUG_BUILD_DIR)/$(LIB_SYMLINK2): $(DEBUG_LIB)
 $(RELEASE_BUILD_DIR)/$(LIB_SYMLINK2): $(RELEASE_LIB)
 	ln -sf $(LIB) $@
 
-# This one could be substituted with arch specific dir
-LIBDIR ?= /usr/lib
-ABS_LIBDIR := $(shell echo /$(LIBDIR) | sed -r 's|/+|/|g')
+#
+# LIBDIR usually gets substituted with arch specific dir.
+# It's relative in deb build and can be whatever in rpm build.
+#
 
-pkgconfig: $(PKGCONFIG)
+LIBDIR ?= usr/lib
+ABS_LIBDIR := $(shell echo /$(LIBDIR) | sed -r 's|/+|/|g')
 
 $(PKGCONFIG): $(LIB_NAME).pc.in Makefile
 	sed -e 's|@version@|$(PCVERSION)|g' -e 's|@libdir@|$(ABS_LIBDIR)|g' $< > $@
