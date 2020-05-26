@@ -1,0 +1,7 @@
+{
+    global:
+        nci_core_*;
+        nci_log;
+    local:
+        *;
+};

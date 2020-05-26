@@ -1,0 +1,3 @@
+debian/tmp/@LIBDIR@/libncicore.so @LIBDIR@
+debian/tmp/@LIBDIR@/pkgconfig/libncicore.pc @LIBDIR@/pkgconfig
+debian/tmp/usr/include/* usr/include

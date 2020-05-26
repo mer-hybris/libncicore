@@ -1,3 +1,0 @@
-debian/tmp/usr/lib/libncicore.so usr/lib
-include/*.h usr/include/ncicore
-build/libncicore.pc usr/lib/pkgconfig

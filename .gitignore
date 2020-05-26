@@ -4,6 +4,7 @@ debian/libncicore
 debian/libncicore-dev
 debian/*.debhelper.log
 debian/*.debhelper
+debian/*.install
 debian/*.substvars
 debian/tmp
 documentation.list
