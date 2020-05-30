@@ -688,7 +688,7 @@ test_send_data_seg(
     void)
 {
     /* Set MTU to minimum and send one byte of payload per data packet */
-    static const guint8 payload[] = { 0x01, 0x02 };
+    static const guint8 payload[] = { 0x01, 0x02, 0x03 };
     GBytes* payload_bytes = g_bytes_new_static(payload, sizeof(payload));
     NciSarClient client;
     TestHalIo* test_io = test_hal_io_new();
