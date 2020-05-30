@@ -255,7 +255,7 @@ nci_sar_attempt_write(
                 /* Send a fragment */
                 out->hdr[0] |= NCI_PBF;
                 out->hdr[2] = max_payload_size;
-                chunks[nchunks].bytes = payload;
+                chunks[nchunks].bytes = payload + out->payload_pos;
                 chunks[nchunks].size = max_payload_size;
                 out->payload_pos += chunks[nchunks].size;
                 nchunks++;
