@@ -211,8 +211,24 @@ nci_state_w4_host_select_handle_intf_activated_ntf(
      */
     if (nci_parse_intf_activated_ntf(&ntf, &mode_param, &activation_param,
         payload->bytes, payload->size)) {
+
+        /* Notify the handler(s) */
         nci_sm_intf_activated(sm, &ntf);
-        nci_sm_enter_state(sm, NCI_RFST_POLL_ACTIVE, NULL);
+
+        /*
+         * If RF_INTF_ACTIVATED_NTF handler is unhappy with the selected
+         * configuration, it may decide to deactivate RF interface by
+         * initiating a transition to NCI_RFST_IDLE or NCI_RFST_DISCOVERY
+         * state. That switches the next state to NCI_RFST_IDLE. In this
+         * case we just let that transition to happily run to the end.
+         *
+         * If handler is happy (or there's no handler) the state remains
+         * RFST_W4_HOST_SELECT and we can switch the state machine to
+         * NCI_RFST_POLL_ACTIVE.
+         */
+        if (sm->next_state == self) {
+            nci_sm_enter_state(sm, NCI_RFST_POLL_ACTIVE, NULL);
+        }
     } else {
         /* Deactivate this target */
         nci_sm_enter_state(sm, NCI_RFST_POLL_ACTIVE, NULL);
