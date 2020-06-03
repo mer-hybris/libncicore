@@ -178,11 +178,30 @@ nci_parse_mode_param(
             ppb->fsc = (fsci < G_N_ELEMENTS(fsc_table)) ?
                 fsc_table[fsci] :
                 fsc_table[G_N_ELEMENTS(fsc_table) - 1];
+            memcpy(ppb->app_data, bytes + 5, 4);
+            ppb->prot_info.size = bytes[0] - 8;
+            ppb->prot_info.bytes = bytes + 9;
 
-            GDEBUG("NFC-B");
-            GDEBUG("  PollB.fsc = %u", ppb->fsc);
-            GDEBUG("  PollB.nfcid0 = %02x %02x %02x %02x", ppb->nfcid0[0],
-                ppb->nfcid0[1], ppb->nfcid0[2], ppb->nfcid0[3]);
+#if GUTIL_LOG_DEBUG
+            if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+                GString *buf = g_string_new(NULL);
+                guint i;
+
+                for (i = 0; i < ppb->prot_info.size; i++) {
+                    g_string_append_printf(buf, " %02x",
+                        ppb->prot_info.bytes[i]);
+                }
+                GDEBUG("NFC-B");
+                GDEBUG("  PollB.fsc = %u", ppb->fsc);
+                GDEBUG("  PollB.nfcid0 = %02x %02x %02x %02x", ppb->nfcid0[0],
+                    ppb->nfcid0[1], ppb->nfcid0[2], ppb->nfcid0[3]);
+                GDEBUG("  PollB.AppData = %02x %02x %02x %02x",
+                    ppb->app_data[0], ppb->app_data[1], ppb->app_data[2],
+                    ppb->app_data[3]);
+                GDEBUG("  PollB.ProtInfo =%s", buf->str);
+                g_string_free(buf, TRUE);
+            }
+#endif
             return param;
         }
         GDEBUG("Failed to parse parameters for NFC-B poll mode");

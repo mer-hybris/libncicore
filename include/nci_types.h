@@ -130,6 +130,9 @@ typedef struct nci_mode_param_poll_a {
 typedef struct nci_mode_param_poll_b {
     guint8 nfcid0[4];
     guint fsc;  /* FSCI converted to bytes */
+    /* Since 1.1.5 */
+    guint8 app_data[4];
+    GUtilData prot_info;
 } NciModeParamPollB;
 
 /* Table 58: Specific Parameters for NFC-F Poll Mode */

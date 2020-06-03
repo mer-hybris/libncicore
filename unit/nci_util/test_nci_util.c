@@ -151,12 +151,16 @@ static const TestModeParamSuccessData mode_param_success_tests[] = {
         .name = "poll_b",
         .mode = NCI_MODE_PASSIVE_POLL_B,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_poll_b) },
-        .expected = { .poll_b = { {0x65, 0xe6, 0x70, 0x15}, 256 } }
+        .expected = { .poll_b = { {0x65, 0xe6, 0x70, 0x15}, 256,
+                                  {0xe1, 0xf3, 0x5e, 0x11},
+                                  {mode_param_success_data_poll_b + 9, 3}}}
     },{
         .name = "poll_b_rfu", /* RFU part of FSCI to FSC conversion table */
         .mode = NCI_MODE_PASSIVE_POLL_B,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_poll_b_rfu) },
-        .expected = { .poll_b = { {0x65, 0xe6, 0x70, 0x15}, 256 } }
+        .expected = { .poll_b = { {0x65, 0xe6, 0x70, 0x15}, 256,
+                                  {0xe1, 0xf3, 0x5e, 0x11},
+                                  {mode_param_success_data_poll_b_rfu + 9, 3}}}
     },{
         .name = "active_poll_f",
         .mode = NCI_MODE_ACTIVE_POLL_F,
