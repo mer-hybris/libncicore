@@ -1,3 +1,10 @@
+libncicore (1.1.5) unstable; urgency=low
+
+  * Added NciActivationParamIsoDepPollB.
+  * Extended NciModeParamPollB to provide all SENSB_RES data
+
+ -- Slava Monich <slava.monich@jolla.com>  Wed, 03 Jun 2020 19:06:39 +0300
+
 libncicore (1.1.4) unstable; urgency=low
 
   * Reversed protocol selection order in RFST_W4_HOST_SELECT state
