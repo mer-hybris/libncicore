@@ -423,6 +423,66 @@ nci_parse_iso_dep_poll_a_param(
 
 static
 gboolean
+nci_parse_iso_dep_poll_b_param(
+    NciActivationParamIsoDepPollB* param,
+    const guint8* bytes,
+    guint len)
+{
+    /* NFCFrum-TS-NCI-1.0
+     * Table 75: Activation parameters for NFC-B/ISO-DEP Poll Mode
+     *
+     * +============================================================+
+     * | Offset | Size | Description                                |
+     * +============================================================+
+     * | 0      | 1    | Length of ATTRIB Response Parameter (n)    |
+     * | 1      | n    | ATTRIB Response                            |
+     * +============================================================+
+     */
+
+    /* ATTRIB Response */
+    const guint attrib_length = bytes[0];
+
+    if (attrib_length >= 1) {
+        /* NFCForum-TS-DigitalProtocol-1.01
+         * Table 79: ATTRIB Response Format */
+
+#define NFC_T4B_MBLI_MASK (0xF0) /* MBLI Mask */
+#define NFC_T4B_DID_MASK  (0x0F) /* DID Mask */
+
+        /* First two octets of the first byte of ATTRIB Response */
+        param->mbli = (bytes[1] & NFC_T4B_MBLI_MASK) >> 4;
+        param->did  = (bytes[1] & NFC_T4B_DID_MASK);
+
+        /* Higher Layer Response */
+        if (attrib_length >= 2) {
+            param->hilr.bytes = bytes + 2;
+            param->hilr.size = attrib_length - 1;
+        }
+
+#if GUTIL_LOG_DEBUG
+        if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+            GDEBUG("ISO-DEP");
+            GDEBUG("  MBLI = %u", param->mbli);
+            GDEBUG("  DID = %u", param->did);
+            if (param->hilr.size > 0) {
+                GString *buf = g_string_new(NULL);
+                guint i;
+
+                for (i = 0; i < param->hilr.size; i++) {
+                    g_string_append_printf(buf, " %02x", bytes[i]);
+                }
+                GDEBUG("  HigherLayer Response =%s", buf->str);
+                g_string_free(buf, TRUE);
+            }
+        }
+#endif
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static
+gboolean
 nci_parse_nfc_dep_poll_param(
     NciActivationParamNfcDepPoll* param,
     const guint8* bytes,
@@ -576,6 +636,12 @@ nci_parse_activation_param(
             GDEBUG("Failed to parse parameters for NFC-A/ISO-DEP poll mode");
             break;
         case NCI_MODE_PASSIVE_POLL_B:
+            if (nci_parse_iso_dep_poll_b_param(&param->iso_dep_poll_b,
+                bytes, len)) {
+                return param;
+            }
+            GDEBUG("Failed to parse parameters for NFC-B/ISO-DEP poll mode");
+            break;
         case NCI_MODE_PASSIVE_POLL_F:
         case NCI_MODE_ACTIVE_POLL_F:
         case NCI_MODE_PASSIVE_POLL_15693:
