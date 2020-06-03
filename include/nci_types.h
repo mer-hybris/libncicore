@@ -130,6 +130,9 @@ typedef struct nci_mode_param_poll_a {
 typedef struct nci_mode_param_poll_b {
     guint8 nfcid0[4];
     guint fsc;  /* FSCI converted to bytes */
+    /* Since 1.1.5 */
+    guint8 app_data[4];
+    GUtilData prot_info;
 } NciModeParamPollB;
 
 /* Table 58: Specific Parameters for NFC-F Poll Mode */
@@ -156,6 +159,13 @@ typedef struct nci_activation_param_iso_dep_poll_a {
     GUtilData t1;  /* T1 to Tk (otherwise called historical bytes) */
 } NciActivationParamIsoDepPollA;
 
+/* Table 75: Activation Parameters for NFC-B/ISO-DEP Poll Mode */
+typedef struct nci_activation_param_iso_dep_poll_b {
+    guint mbli;     /* Maximum buffer length index */
+    guint did;      /* Device ID */
+    GUtilData hilr; /* Higher Layer Response */
+} NciActivationParamIsoDepPollB;
+
 /* Table 82: Activation Parameters for NFC-DEP Poll Mode */
 typedef struct nci_activation_param_nfc_dep_poll {
     /* ATR_RES starting from and including Byte 3 */
@@ -181,6 +191,7 @@ typedef struct nci_activation_param_nfc_dep_listen {
 
 typedef union nci_activation_param {
     NciActivationParamIsoDepPollA iso_dep_poll_a;
+    NciActivationParamIsoDepPollB iso_dep_poll_b;  /* Since 1.1.5 */
     NciActivationParamNfcDepPoll nfc_dep_poll;     /* Since 1.0.8 */
     NciActivationParamNfcDepListen nfc_dep_listen; /* Since 1.0.8 */
 } NciActivationParam;
