@@ -499,7 +499,7 @@ static const NciActivationParam test_intf_activated_ntf_iso_dep_poll_ap_1 = {
     .iso_dep_poll_b = {
         .mbli = 0x00,
         .did = 0x00,
-        .hilr = { NULL, 0 },
+        .hlr = { NULL, 0 },
     }
 };
 
@@ -507,7 +507,7 @@ static const NciActivationParam test_intf_activated_ntf_iso_dep_poll_ap_2 = {
     .iso_dep_poll_b = {
         .mbli = 0x00,
         .did = 0x00,
-        .hilr = { test_intf_activated_ntf_iso_dep_poll_2 + 0x19, 3 },
+        .hlr = { test_intf_activated_ntf_iso_dep_poll_2 + 0x19, 3 },
     }
 };
 

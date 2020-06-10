@@ -161,9 +161,9 @@ typedef struct nci_activation_param_iso_dep_poll_a {
 
 /* Table 75: Activation Parameters for NFC-B/ISO-DEP Poll Mode */
 typedef struct nci_activation_param_iso_dep_poll_b {
-    guint mbli;     /* Maximum buffer length index */
+    guint mbli;     /* Maximum Buffer Length Index */
     guint did;      /* Device ID */
-    GUtilData hilr; /* Higher Layer Response */
+    GUtilData hlr;  /* Higher Layer Response */
 } NciActivationParamIsoDepPollB; /* Since 1.1.5 */
 
 /* Table 82: Activation Parameters for NFC-DEP Poll Mode */

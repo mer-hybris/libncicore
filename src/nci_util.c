@@ -455,8 +455,8 @@ nci_parse_iso_dep_poll_b_param(
 
         /* Higher Layer Response */
         if (attrib_length >= 2) {
-            param->hilr.bytes = bytes + 2;
-            param->hilr.size = attrib_length - 1;
+            param->hlr.bytes = bytes + 2;
+            param->hlr.size = attrib_length - 1;
         }
 
 #if GUTIL_LOG_DEBUG
@@ -464,11 +464,11 @@ nci_parse_iso_dep_poll_b_param(
             GDEBUG("ISO-DEP");
             GDEBUG("  MBLI = %u", param->mbli);
             GDEBUG("  DID = %u", param->did);
-            if (param->hilr.size > 0) {
+            if (param->hlr.size > 0) {
                 GString *buf = g_string_new(NULL);
                 guint i;
 
-                for (i = 0; i < param->hilr.size; i++) {
+                for (i = 0; i < param->hlr.size; i++) {
                     g_string_append_printf(buf, " %02x", bytes[i]);
                 }
                 GDEBUG("  HigherLayer Response =%s", buf->str);
