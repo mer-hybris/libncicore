@@ -1,3 +1,9 @@
+libncicore (1.1.6) unstable; urgency=low
+
+  * Housekeeping release
+
+ -- Slava Monich <slava.monich@jolla.com>  Thu, 11 Jun 2020 01:26:18 +0300
+
 libncicore (1.1.5) unstable; urgency=low
 
   * Added NciActivationParamIsoDepPollB.
