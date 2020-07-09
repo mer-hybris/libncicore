@@ -164,11 +164,27 @@ nci_state_w4_host_select_entered(
              * +=========================================================+
              */
             guint8 cmd[3];
+            NCI_RF_INTERFACE rf_intf = NCI_RF_INTERFACE_FRAME;
+
+            switch (ntf->protocol) {
+            case NCI_PROTOCOL_T1T:
+            case NCI_PROTOCOL_T2T:
+            case NCI_PROTOCOL_T3T:
+            case NCI_PROTOCOL_PROPRIETARY:
+            case NCI_PROTOCOL_UNDETERMINED:
+                /* Choose NCI_RF_INTERFACE_FRAME */
+                break;
+            case NCI_PROTOCOL_ISO_DEP:
+                rf_intf = NCI_RF_INTERFACE_ISO_DEP;
+                break;
+            case NCI_PROTOCOL_NFC_DEP:
+                rf_intf = NCI_RF_INTERFACE_NFC_DEP;
+                break;
+            }
+
             cmd[0] = ntf->discovery_id;
             cmd[1] = ntf->protocol;
-            cmd[2] = (ntf->protocol == NCI_PROTOCOL_ISO_DEP) ?
-                NCI_RF_INTERFACE_ISO_DEP :
-                NCI_RF_INTERFACE_FRAME;
+            cmd[2] = rf_intf;
 
             GDEBUG("%c RF_DISCOVER_SELECT_CMD (0x%02x)", DIR_OUT,
                 ntf->discovery_id);
