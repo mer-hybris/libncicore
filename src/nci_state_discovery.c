@@ -75,12 +75,17 @@ nci_state_discovery_intf_activated_ntf(
      */
     if (nci_parse_intf_activated_ntf(&ntf, &mode_param, &activation_param,
         payload->bytes, payload->size)) {
-        nci_sm_intf_activated(sm, &ntf);
+        /*
+         * Switch the state first because RF_INTF_ACTIVATED_NTF handler
+         * may want to change the state again (e.g. if configuration is
+         * unsupported).
+         */
         if (nci_listen_mode(ntf.mode)) {
             nci_sm_enter_state(sm, NCI_RFST_LISTEN_ACTIVE, NULL);
         } else {
             nci_sm_enter_state(sm, NCI_RFST_POLL_ACTIVE, NULL);
         }
+        nci_sm_intf_activated(sm, &ntf);
     } else {
         /* Deactivate this target */
         nci_sm_enter_state(sm, NCI_RFST_POLL_ACTIVE, NULL);
