@@ -618,11 +618,15 @@ nci_sm_new(
     /* Set up the transitions */
 
     /* Reusable deactivate_to_idle */
+    deactivate_to_idle = nci_transition_active_to_idle_new(sm);
+    nci_sm_add_transition(sm, NCI_RFST_LISTEN_ACTIVE, deactivate_to_idle);
+    nci_sm_add_transition(sm, NCI_RFST_POLL_ACTIVE, deactivate_to_idle);
+    nci_transition_unref(deactivate_to_idle);
+
     deactivate_to_idle = nci_transition_deactivate_to_idle_new(sm);
     nci_sm_add_transition(sm, NCI_RFST_DISCOVERY, deactivate_to_idle);
     nci_sm_add_transition(sm, NCI_RFST_W4_ALL_DISCOVERIES, deactivate_to_idle);
     nci_sm_add_transition(sm, NCI_RFST_W4_HOST_SELECT, deactivate_to_idle);
-    nci_sm_add_transition(sm, NCI_RFST_LISTEN_ACTIVE, deactivate_to_idle);
     nci_sm_add_transition(sm, NCI_RFST_LISTEN_SLEEP, deactivate_to_idle);
     nci_transition_unref(deactivate_to_idle);
 
@@ -635,8 +639,6 @@ nci_sm_new(
     /* And these are not reusable */
     nci_sm_add_new_transition(sm, NCI_RFST_IDLE,
         nci_transition_idle_to_discovery_new);
-    nci_sm_add_new_transition(sm, NCI_RFST_POLL_ACTIVE,
-        nci_transition_poll_active_to_idle_new);
     return sm;
 }
 

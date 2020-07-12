@@ -61,10 +61,10 @@ SRC = \
   nci_state_w4_all_discoveries.c \
   nci_state_w4_host_select.c \
   nci_transition.c \
+  nci_transition_active_to_idle.c \
   nci_transition_deactivate_to_discovery.c \
   nci_transition_deactivate_to_idle.c \
   nci_transition_idle_to_discovery.c \
-  nci_transition_poll_active_to_idle.c \
   nci_transition_reset.c \
   nci_util.c
 
