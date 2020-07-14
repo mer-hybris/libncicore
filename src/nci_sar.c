@@ -46,9 +46,11 @@
 #define NCI_HDR_SIZE (3)
 
 typedef struct nci_sar_packet_out NciSarPacketOut;
+typedef struct nci_sar_logical_connection NciSarLogicalConnection;
 
 struct nci_sar_packet_out {
     NciSarPacketOut* next;
+    NciSarLogicalConnection* conn;
     guint8 hdr[NCI_HDR_SIZE];
     GBytes* payload;
     guint payload_pos;
@@ -63,11 +65,11 @@ typedef struct nci_sar_packet_out_queue {
     NciSarPacketOut* last;
 } NciSarPacketOutQueue;
 
-typedef struct nci_sar_logical_connection {
+struct nci_sar_logical_connection {
     guint8 credits;
     GByteArray* in;
     NciSarPacketOutQueue out;
-} NciSarLogicalConnection;
+};
 
 struct nci_sar {
     NciHalIo* io;
@@ -183,8 +185,9 @@ nci_sar_write_queue(
             NciSarLogicalConnection* conn = self->conn + i;
 
             if (conn->out.first && conn->credits) {
-                if (eat_credit) {
+                if (eat_credit && conn->credits != SAR_UNLIMITED_CREDITS) {
                     conn->credits--;
+                    GVERBOSE("cid %u: %u credit(s)", i, conn->credits);
                 }
                 return &conn->out;
             }
@@ -207,6 +210,22 @@ nci_sar_attempt_write(
     NciSar* self)
 {
     if (!self->write_pending) {
+        if (self->writing && self->writing->conn) {
+            NciSarLogicalConnection* conn = self->writing->conn;
+
+            if (conn->credits) {
+                if (conn->credits != SAR_UNLIMITED_CREDITS) {
+                    conn->credits--;
+                    GVERBOSE("cid %d: %u credit(s)", (int)(conn - self->conn),
+                        conn->credits);
+                }
+            } else {
+                /* No more credits left, put it back to the queue */
+                self->writing->next = conn->out.first;
+                conn->out.first = self->writing;
+                self->writing = NULL;
+            }
+        }
         if (!self->writing) {
             NciSarPacketOutQueue* queue = nci_sar_write_queue(self, TRUE);
 
@@ -323,6 +342,7 @@ guint
 nci_sar_send(
     NciSar* self,
     NciSarPacketOutQueue* queue,
+    NciSarLogicalConnection* conn,
     const guint8* hdr,
     GBytes* payload,
     NciSarCompletionFunc complete,
@@ -338,6 +358,7 @@ nci_sar_send(
 
     /* Fill in the packet structure */
     out->id = id;
+    out->conn = conn;
     out->complete = complete;
     out->destroy = destroy;
     out->user_data = user_data;
@@ -813,6 +834,7 @@ nci_sar_set_initial_credits(
         /* The queue should be empty at this point */
         GASSERT(!self->conn[cid].out.first);
         self->conn[cid].credits = credits;
+        GVERBOSE("cid %u: %u initial credit(s)", cid, credits);
     }
 }
 
@@ -830,6 +852,7 @@ nci_sar_add_credits(
             conn->credits = SAR_UNLIMITED_CREDITS;
         } else {
             conn->credits += credits;
+            GVERBOSE("cid %u: %u credit(s)", cid, conn->credits);
         }
         if (conn->out.first) {
             nci_sar_schedule_write(self);
@@ -854,7 +877,7 @@ nci_sar_send_command(
 
         hdr[0] = NCI_MT_CMD_PKT | (gid & NCI_CONTROL_GID_MASK);
         hdr[1] = oid & NCI_CONTROL_OID_MASK;
-        return nci_sar_send(self, &self->cmd, hdr, payload, complete,
+        return nci_sar_send(self, &self->cmd, NULL, hdr, payload, complete,
             destroy, user_data);
     }
     return 0;
@@ -876,7 +899,7 @@ nci_sar_send_data_packet(
 
         hdr[0] = cid & NCI_DATA_CID_MASK;
         hdr[1] = 0;
-        return nci_sar_send(self, &conn->out, hdr, payload, complete,
+        return nci_sar_send(self, &conn->out, conn, hdr, payload, complete,
             destroy, user_data);
     }
     return 0;
