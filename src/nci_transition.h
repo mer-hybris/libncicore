@@ -109,7 +109,7 @@ nci_transition_deactivate_to_idle_new(
     NCI_INTERNAL;
 
 NciTransition*
-nci_transition_poll_active_to_idle_new(
+nci_transition_active_to_idle_new(
     NciSm* sm)
     NCI_INTERNAL;
 

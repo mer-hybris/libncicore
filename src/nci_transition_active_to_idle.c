@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -38,6 +38,7 @@
 /*==========================================================================*
  *
  * 5.2.5 State RFST_POLL_ACTIVE
+ * 5.2.6 State RFST_LISTEN_ACTIVE
  *
  * ...
  * If the DH sends RF_DEACTIVATE_CMD (Idle Mode), the NFCC SHALL send
@@ -46,13 +47,13 @@
  *
  *==========================================================================*/
 
-typedef NciTransition NciTransitionPollActiveToIdle;
-typedef NciTransitionClass NciTransitionPollActiveToIdleClass;
+typedef NciTransition NciTransitionActiveToIdle;
+typedef NciTransitionClass NciTransitionActiveToIdleClass;
 
-G_DEFINE_TYPE(NciTransitionPollActiveToIdle,
-    nci_transition_poll_active_to_idle, NCI_TYPE_TRANSITION)
-#define THIS_TYPE (nci_transition_poll_active_to_idle_get_type())
-#define PARENT_CLASS (nci_transition_poll_active_to_idle_parent_class)
+G_DEFINE_TYPE(NciTransitionActiveToIdle, nci_transition_active_to_idle,
+    NCI_TYPE_TRANSITION)
+#define THIS_TYPE (nci_transition_active_to_idle_get_type())
+#define PARENT_CLASS (nci_transition_active_to_idle_parent_class)
 
 /*==========================================================================*
  * Implementation
@@ -60,7 +61,7 @@ G_DEFINE_TYPE(NciTransitionPollActiveToIdle,
 
 static
 void
-nci_transition_poll_active_to_idle_rsp(
+nci_transition_active_to_idle_rsp(
     NCI_REQUEST_STATUS status,
     const GUtilData* payload,
     NciTransition* self)
@@ -93,7 +94,7 @@ nci_transition_poll_active_to_idle_rsp(
  *==========================================================================*/
 
 NciTransition* 
-nci_transition_poll_active_to_idle_new(
+nci_transition_active_to_idle_new(
     NciSm* sm)
 {
     NciState* dest = nci_sm_get_state(sm, NCI_RFST_IDLE);
@@ -113,7 +114,7 @@ nci_transition_poll_active_to_idle_new(
 
 static
 void
-nci_transition_poll_active_to_idle_handle_ntf(
+nci_transition_active_to_idle_handle_ntf(
     NciTransition* self,
     guint8 gid,
     guint8 oid,
@@ -133,11 +134,11 @@ nci_transition_poll_active_to_idle_handle_ntf(
 
 static
 gboolean
-nci_transition_poll_active_to_idle_start(
+nci_transition_active_to_idle_start(
     NciTransition* self)
 {
     return nci_transition_deactivate_to_idle(self,
-        nci_transition_poll_active_to_idle_rsp);
+        nci_transition_active_to_idle_rsp);
 }
 
 /*==========================================================================*
@@ -146,18 +147,18 @@ nci_transition_poll_active_to_idle_start(
 
 static
 void
-nci_transition_poll_active_to_idle_init(
-    NciTransitionPollActiveToIdle* self)
+nci_transition_active_to_idle_init(
+    NciTransitionActiveToIdle* self)
 {
 }
 
 static
 void
-nci_transition_poll_active_to_idle_class_init(
-    NciTransitionPollActiveToIdleClass* klass)
+nci_transition_active_to_idle_class_init(
+    NciTransitionActiveToIdleClass* klass)
 {
-    klass->start = nci_transition_poll_active_to_idle_start;
-    klass->handle_ntf = nci_transition_poll_active_to_idle_handle_ntf;
+    klass->start = nci_transition_active_to_idle_start;
+    klass->handle_ntf = nci_transition_active_to_idle_handle_ntf;
 }
 
 /*
