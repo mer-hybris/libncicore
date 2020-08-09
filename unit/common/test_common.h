@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018-2019 Jolla Ltd.
- * Copyright (C) 2018-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2018-2020 Jolla Ltd.
+ * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -48,10 +48,18 @@ test_init(
     char* argv[]);
 
 /* Run loop with a timeout */
+guint
+test_setup_timeout(
+    const TestOpt* opt);
+
 void
-test_run(
+test_run_loop(
     const TestOpt* opt,
     GMainLoop* loop);
+
+void
+test_run(
+    const TestOpt* opt);
 
 /* Quits the event loop on the next iteration (or after n iterations) */
 void

@@ -41,31 +41,8 @@
 
 static TestOpt test_opt;
 
-#define TEST_TIMEOUT (10) /* seconds */
-
 #define TEST_GID  (0x01)
 #define TEST_OID  (0x02)
-
-static
-gboolean
-test_timeout(
-    gpointer loop)
-{
-    g_assert(!"TIMEOUT");
-    return G_SOURCE_REMOVE;
-}
-
-static
-guint
-test_setup_timeout(
-    GMainLoop* loop)
-{
-    if (!(test_opt.flags & TEST_FLAG_DEBUG)) {
-        return g_timeout_add_seconds(TEST_TIMEOUT, test_timeout, loop);
-    } else {
-        return 0;
-    }
-}
 
 static
 void
@@ -439,7 +416,6 @@ test_fail(
 {
     NciSar* sar;
     TestFailClient test;
-    guint timeout_id;
 
     memset(&test, 0, sizeof(test));
     test.client.fn = &test_dummy_sar_client_fn;
@@ -455,11 +431,7 @@ test_fail(
     nci_sar_cancel(sar, 112345); /* Invalid ID */
 
     test.loop = g_main_loop_new(NULL, TRUE);
-    timeout_id = test_setup_timeout(test.loop);
-    g_main_loop_run(test.loop);
-    if (timeout_id) {
-        g_source_remove(timeout_id);
-    }
+    test_run_loop(&test_opt, test.loop);
 
     nci_sar_free(sar);
     g_main_loop_unref(test.loop);
@@ -511,7 +483,6 @@ test_basic(
     NciSar* sar;
     TestHalIo* test_io = test_hal_io_new();
     TestBasicClient test;
-    guint timeout_id;
 
     memset(&test, 0, sizeof(test));
     test.client.fn = &test_basic_sar_client_fn;
@@ -537,8 +508,7 @@ test_basic(
     nci_sar_add_credits(sar, 42, 1); /* Invalid cid */
 
     test.loop = g_main_loop_new(NULL, TRUE);
-    timeout_id = test_setup_timeout(test.loop);
-    g_main_loop_run(test.loop);
+    test_run_loop(&test_opt, test.loop);
 
     /* Signal error */
     g_assert(test_io->sar);
@@ -547,9 +517,6 @@ test_basic(
     nci_sar_reset(sar);
 
     g_assert(test_io->written->len == 3);
-    if (timeout_id) {
-        g_source_remove(timeout_id);
-    }
 
     nci_sar_free(sar);
     test_hal_io_free(test_io);
@@ -628,7 +595,7 @@ test_send_seg(
     GBytes* payload_bytes = g_bytes_new_static(payload, sizeof(payload));
     TestHalIo* test_io = test_hal_io_new_with_functions(&hal_io_fn);
     TestSendSegData test;
-    guint timeout_id, i;
+    guint i;
 
     memset(&test, 0, sizeof(test));
     test.client.fn = &test_dummy_sar_client_fn;
@@ -643,8 +610,7 @@ test_send_seg(
         payload_bytes, test_send_seg_expect_success_and_quit, NULL, NULL));
 
     test.loop = g_main_loop_new(NULL, TRUE);
-    timeout_id = test_setup_timeout(test.loop);
-    g_main_loop_run(test.loop);
+    test_run_loop(&test_opt, test.loop);
 
     /* The same data have been sent twice */
     g_assert_cmpuint(test_io->written->len, == ,4);
@@ -656,9 +622,6 @@ test_send_seg(
         g_assert_cmpuint(packet_size, == , 35 /* Minimum size + header */);
         g_assert(!memcmp(packet_data + 3, payload + (i % 2) * 32, 32));
 
-    }
-    if (timeout_id) {
-        g_source_remove(timeout_id);
     }
 
     nci_sar_free(test.sar);
@@ -694,7 +657,7 @@ test_send_data_seg(
     TestHalIo* test_io = test_hal_io_new();
     NciSar* sar = nci_sar_new(&test_io->io, &client);
     GMainLoop* loop = g_main_loop_new(NULL, TRUE);
-    guint i, timeout_id = test_setup_timeout(loop);
+    guint i;
     gsize packet_size;
     const guint8* packet_data;
 
@@ -705,7 +668,7 @@ test_send_data_seg(
         NULL, loop));
     nci_sar_add_credits(sar, NCI_STATIC_RF_CONN_ID, 3);
 
-    g_main_loop_run(loop);
+    test_run_loop(&test_opt, loop);
 
     /* One byte per packet with minimum MTU */
     g_assert_cmpuint(test_io->written->len, == ,sizeof(payload));
@@ -725,15 +688,12 @@ test_send_data_seg(
     g_assert(nci_sar_send_data_packet(sar, NCI_STATIC_RF_CONN_ID,
         payload_bytes, test_send_data_seg_expect_success_and_quit,
         NULL, loop));
-    g_main_loop_run(loop);
+    test_run_loop(&test_opt, loop);
     g_assert_cmpuint(test_io->written->len, == ,1);
     packet_data = g_bytes_get_data(test_io->written->pdata[0], &packet_size);
     g_assert_cmpuint(packet_size, == ,3 + sizeof(payload));
     g_assert(!memcmp(packet_data + 3, payload, sizeof(payload)));
 
-    if (timeout_id) {
-        g_source_remove(timeout_id);
-    }
     nci_sar_free(sar);
     test_hal_io_free(test_io);
     g_main_loop_unref(loop);
@@ -756,7 +716,7 @@ test_send_data_seg2(
     TestHalIo* test_io = test_hal_io_new();
     NciSar* sar = nci_sar_new(&test_io->io, &client);
     GMainLoop* loop = g_main_loop_new(NULL, TRUE);
-    guint i, timeout_id = test_setup_timeout(loop);
+    guint i;
     gsize packet_size;
     const guint8* packet_data;
 
@@ -769,7 +729,7 @@ test_send_data_seg2(
 
     /* Send first 2 segments */
     test_quit_later_n(loop, 10);
-    g_main_loop_run(loop);
+    test_run_loop(&test_opt, loop);
 
     /* One byte per packet with minimum MTU */
     g_assert_cmpuint(test_io->written->len, == ,2);
@@ -782,7 +742,7 @@ test_send_data_seg2(
 
     /* And the last segment */
     nci_sar_add_credits(sar, NCI_STATIC_RF_CONN_ID, 1);
-    g_main_loop_run(loop);
+    test_run_loop(&test_opt, loop);
 
     /* Now the last bytes is sent too */
     g_assert_cmpuint(test_io->written->len, == ,i+1);
@@ -790,9 +750,6 @@ test_send_data_seg2(
     g_assert_cmpuint(packet_size, == ,4);
     g_assert_cmpuint(packet_data[3], == ,payload[i % sizeof(payload)]);
 
-    if (timeout_id) {
-        g_source_remove(timeout_id);
-    }
     nci_sar_free(sar);
     test_hal_io_free(test_io);
     g_main_loop_unref(loop);
@@ -849,7 +806,7 @@ test_send_data_seg3(
     TestHalIo* test_io = test_hal_io_new();
     NciSar* sar = nci_sar_new(&test_io->io, &client);
     GMainLoop* loop = g_main_loop_new(NULL, TRUE);
-    guint i, timeout_id = test_setup_timeout(loop);
+    guint i;
     gsize packet_size;
     const guint8* packet_data;
 
@@ -860,7 +817,7 @@ test_send_data_seg3(
         payload_bytes, test_send_data_seg_expect_success_and_quit,
         NULL, loop));
 
-    g_main_loop_run(loop);
+    test_run_loop(&test_opt, loop);
 
     /* One byte per packet with minimum MTU */
     g_assert_cmpuint(test_io->written->len, == ,sizeof(payload));
@@ -871,9 +828,6 @@ test_send_data_seg3(
         g_assert_cmpuint(packet_data[3], == ,payload[i % sizeof(payload)]);
     }
 
-    if (timeout_id) {
-        g_source_remove(timeout_id);
-    }
     nci_sar_free(sar);
     test_hal_io_free(test_io);
     g_main_loop_unref(loop);
@@ -1006,12 +960,10 @@ test_send_err(
     TestSendErrHalIo* test_io = test_send_err_hal_io_new();
     TestSendErrSarClient test;
     NciSar* sar;
-    guint timeout_id;
 
     memset(&test, 0, sizeof(test));
     test.client.fn = &test_send_err_sar_client_fn;
     test.loop = g_main_loop_new(NULL, TRUE);
-    timeout_id = test_setup_timeout(test.loop);
 
     sar = nci_sar_new(&test_io->io, &test.client);
     g_assert(nci_sar_start(sar));
@@ -1021,17 +973,13 @@ test_send_err(
     g_assert(nci_sar_send_command(sar, TEST_GID, TEST_OID, NULL,
         NULL, NULL, NULL));
 
-    g_main_loop_run(test.loop);
+    test_run_loop(&test_opt, test.loop);
 
     /* Same thing but with a completion callback */
     g_assert(nci_sar_send_command(sar, TEST_GID, TEST_OID, NULL,
         test_send_err_sar_send_complete, NULL, &test));
 
-    g_main_loop_run(test.loop);
-    if (timeout_id) {
-        g_source_remove(timeout_id);
-    }
-
+    test_run_loop(&test_opt, test.loop);
     nci_sar_free(sar);
     test_send_err_hal_io(test_io);
     g_main_loop_unref(test.loop);

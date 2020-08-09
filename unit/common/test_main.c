@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018-2019 Jolla Ltd.
- * Copyright (C) 2018-2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2018-2020 Jolla Ltd.
+ * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -39,7 +39,7 @@ gboolean
 test_timeout_expired(
     gpointer data)
 {
-    g_assert(!"TIMEOUT");
+    g_assert_not_reached();
     return G_SOURCE_REMOVE;
 }
 
@@ -95,19 +95,36 @@ test_quit_later(
     test_quit_later_n(loop, 0);
 }
 
+guint
+test_setup_timeout(
+    const TestOpt* opt)
+{
+    return g_timeout_add_seconds(TEST_TIMEOUT_SEC, test_timeout_expired, NULL);
+}
+
 void
-test_run(
+test_run_loop(
     const TestOpt* opt,
     GMainLoop* loop)
 {
     if (opt->flags & TEST_FLAG_DEBUG) {
         g_main_loop_run(loop);
     } else {
-        const guint timeout_id = g_timeout_add_seconds(TEST_TIMEOUT_SEC,
-            test_timeout_expired, NULL);
+        const guint timeout_id = test_setup_timeout(opt);
+
         g_main_loop_run(loop);
         g_source_remove(timeout_id);
     }
+}
+
+void
+test_run(
+    const TestOpt* opt)
+{
+    GMainLoop* loop = g_main_loop_new(NULL, TRUE);
+
+    test_run_loop(opt, loop);
+    g_main_loop_unref(loop);
 }
 
 void
