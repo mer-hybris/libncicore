@@ -43,7 +43,6 @@
 
 static TestOpt test_opt;
 
-#define TEST_TIMEOUT (20) /* seconds */
 #define TEST_DEFAULT_CMD_TIMEOUT (10000) /* milliseconds */
 
 static const guint8 CORE_RESET_RSP[] = {
@@ -118,8 +117,23 @@ static const guint8 CORE_INIT_RSP_BROKEN[] = {
     0x40, 0x01, 0x00
 };
 static const guint8 CORE_GET_CONFIG_RSP[] = {
-    0x40, 0x03, 0x0b, 0x00, 0x03, 0x08, 0x01, 0x00,
-    0x11, 0x01, 0x00, 0x22, 0x01, 0x00
+    0x40, 0x03, 0x08, 0x00, 0x02, 0x08, 0x01, 0x00,
+    0x11, 0x01, 0x00
+};
+static const guint8 CORE_GET_CONFIG_RSP_DEFAULT_DURATION[] = {
+    0x40, 0x03, 0x06, 0x00, 0x01, 0x00, 0x02, 0xf4, 0x01
+};
+static const guint8 CORE_GET_CONFIG_RSP_WRONG_DURATION[] = {
+    0x40, 0x03, 0x06, 0x00, 0x01, 0x00, 0x02, 0xe8, 0x03
+};
+static const guint8 CORE_GET_CONFIG_RSP_BROKEN_DURATION_1[] = {
+    0x40, 0x03, 0x05, 0x00, 0x01, 0x00, 0x02, 0xf4
+};
+static const guint8 CORE_GET_CONFIG_RSP_BROKEN_DURATION_2[] = {
+    0x40, 0x03, 0x05, 0x00, 0x01, 0x00, 0x01, 0xf4
+};
+static const guint8 CORE_GET_CONFIG_RSP_BROKEN_DURATION_3[] = {
+    0x40, 0x03, 0x03, 0x00, 0x01, 0x00
 };
 static const guint8 CORE_GET_CONFIG_RSP_ERROR[] = {
     0x40, 0x03, 0x02, 0x03, 0x00
@@ -333,27 +347,6 @@ static const guint8 RF_DISCOVER_NTF_3_PROPRIETARY_LAST[] = {
 static const guint8 RF_DISCOVER_SELECT_RSP[] = {
     0x41, 0x04, 0x01, 0x00
 };
-
-static
-gboolean
-test_timeout(
-    gpointer loop)
-{
-    g_assert(!"TIMEOUT");
-    return G_SOURCE_REMOVE;
-}
-
-static
-guint
-test_setup_timeout(
-    GMainLoop* loop)
-{
-    if (!(test_opt.flags & TEST_FLAG_DEBUG)) {
-        return g_timeout_add_seconds(TEST_TIMEOUT, test_timeout, loop);
-    } else {
-        return 0;
-    }
-}
 
 static
 void
@@ -780,7 +773,6 @@ test_restart(
     TestHalIo* hal = test_hal_io_new();
     NciCore* nci = nci_core_new(&hal->io);
     GMainLoop* loop = g_main_loop_new(NULL, TRUE);
-    guint timeout_id = test_setup_timeout(loop);
     gulong id;
 
     nci->cmd_timeout = (test_opt.flags & TEST_FLAG_DEBUG) ? 0 :
@@ -797,10 +789,7 @@ test_restart(
         test_restart_done, loop);
 
     nci_core_restart(nci);
-    g_main_loop_run(loop);
-    if (timeout_id) {
-        g_source_remove(timeout_id);
-    }
+    test_run_loop(&test_opt, loop);
 
     g_assert(nci->current_state == NCI_RFST_IDLE);
     g_assert(nci->next_state == NCI_RFST_IDLE);
@@ -833,7 +822,6 @@ test_init_ok(
     TestHalIo* hal = test_hal_io_new();
     NciCore* nci = nci_core_new(&hal->io);
     GMainLoop* loop = g_main_loop_new(NULL, TRUE);
-    guint timeout_id;
     gulong id[2];
 
     /* Second time does nothing */
@@ -869,11 +857,7 @@ test_init_ok(
     g_assert(id[0]);
     g_assert(id[1]);
 
-    timeout_id = test_setup_timeout(loop);
-    g_main_loop_run(loop);
-    if (timeout_id) {
-        g_source_remove(timeout_id);
-    }
+    test_run_loop(&test_opt, loop);
 
     g_assert(nci->current_state == NCI_RFST_IDLE);
     g_assert(nci->next_state == NCI_RFST_IDLE);
@@ -906,18 +890,13 @@ test_init_failed1(
 {
     NciCore* nci = nci_core_new(&test_dummy_hal_io);
     GMainLoop* loop = g_main_loop_new(NULL, TRUE);
-    guint timeout_id;
     gulong id;
 
     nci_core_set_state(nci, NCI_RFST_IDLE);
     id = nci_core_add_current_state_changed_handler(nci,
         test_init_failed1_done, loop);
 
-    timeout_id = test_setup_timeout(loop);
-    g_main_loop_run(loop);
-    if (timeout_id) {
-        g_source_remove(timeout_id);
-    }
+    test_run_loop(&test_opt, loop);
 
     g_assert(nci->current_state == NCI_STATE_ERROR);
     g_assert(nci->next_state == NCI_STATE_ERROR);
@@ -948,7 +927,6 @@ test_init_failed2(
     TestHalIo* hal = test_hal_io_new();
     NciCore* nci;
     GMainLoop* loop;
-    guint timeout_id;
     gulong id;
 
     hal->fail_write++;
@@ -958,11 +936,7 @@ test_init_failed2(
     id = nci_core_add_current_state_changed_handler(nci,
         test_init_failed2_done, loop);
 
-    timeout_id = test_setup_timeout(loop);
-    g_main_loop_run(loop);
-    if (timeout_id) {
-        g_source_remove(timeout_id);
-    }
+    test_run_loop(&test_opt, loop);
 
     g_assert(nci->current_state == NCI_STATE_ERROR);
     g_assert(nci->next_state == NCI_STATE_ERROR);
@@ -1232,7 +1206,7 @@ test_nci_sm(
 
     test.nci->cmd_timeout = (test_opt.flags & TEST_FLAG_DEBUG) ? 0 :
         TEST_DEFAULT_CMD_TIMEOUT;
-    timeout_id = test_setup_timeout(test.loop);
+    timeout_id = test_setup_timeout(&test_opt);
     while (test.entry->func) {
         test.entry->func(&test);
         test.entry++;
@@ -1248,11 +1222,60 @@ test_nci_sm(
 
 /* State machine tests */
 
-static const TestSmEntry test_nci_sm_init_ok[] = {
+static const TestSmEntry test_nci_sm_init_ok_default_duration[] = {
+    TEST_NCI_SM_SET_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DEFAULT_DURATION),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_sm_init_ok_no_duration[] = {
     TEST_NCI_SM_SET_STATE(NCI_RFST_IDLE),
     TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
     TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP),
     TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_sm_init_ok_wrong_duration[] = {
+    TEST_NCI_SM_SET_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_WRONG_DURATION),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_sm_init_ok_broken_duration1[] = {
+    TEST_NCI_SM_SET_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_BROKEN_DURATION_1),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_sm_init_ok_broken_duration2[] = {
+    TEST_NCI_SM_SET_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_BROKEN_DURATION_2),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_sm_init_ok_broken_duration3[] = {
+    TEST_NCI_SM_SET_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_BROKEN_DURATION_3),
     TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
     TEST_NCI_SM_END()
@@ -2508,7 +2531,12 @@ static const TestSmEntry test_nci_sm_iso_dep_ce[] = {
 };
 
 static const TestNciSmData nci_sm_tests[] = {
-    { "init-ok", test_nci_sm_init_ok },
+    { "init-ok-no-duration", test_nci_sm_init_ok_no_duration },
+    { "init-ok-default-duration", test_nci_sm_init_ok_default_duration },
+    { "init-ok-wrong-duration", test_nci_sm_init_ok_wrong_duration },
+    { "init-ok-broken-duration1", test_nci_sm_init_ok_broken_duration1 },
+    { "init-ok-broken-duration2", test_nci_sm_init_ok_broken_duration2 },
+    { "init-ok-broken-duration3", test_nci_sm_init_ok_broken_duration3 },
     { "init-timeout", test_nci_sm_init_timeout },
     { "get-config-timeout", test_nci_sm_get_config_timeout },
     { "set-config-timeout", test_nci_sm_set_config_timeout },

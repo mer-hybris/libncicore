@@ -43,9 +43,42 @@ G_DEFINE_TYPE(NciTransitionReset, nci_transition_reset, NCI_TYPE_TRANSITION)
 #define THIS_TYPE (nci_transition_reset_get_type())
 #define PARENT_CLASS (nci_transition_reset_parent_class)
 
+#define DEFAULT_TOTAL_DURATION (500) /* ms */
+
 /*==========================================================================*
  * Implementation
  *==========================================================================*/
+
+static
+gboolean
+nci_transition_reset_find_config_param(
+    guint nparams,
+    const guint8* params,
+    const guint len,
+    guint8 id,
+    GUtilData* value)
+{
+    const guint8* ptr = params;
+    const guint8* end = params + len;
+
+    /*
+     * +-----------------------------------------+
+     * | ID  | 1 | The identifier                |
+     * | Len | 1 | The length of Val (m)         |
+     * | Val | m | The value of the parameter    |
+     * +-----------------------------------------+
+     */
+    while (nparams > 0 && (ptr + 2) <= end && (ptr + 2 + ptr[1]) <= end) {
+        if (ptr[0] == id) {
+            value->size = ptr[1];
+            value->bytes = ptr + 2;
+            return TRUE;
+        }
+        nparams--;
+        ptr += 2 + ptr[1];
+    }
+    return FALSE;
+}
 
 static
 void
@@ -110,7 +143,10 @@ nci_transition_reset_set_config(
      * +=========================================================+
      */
     static const guint8 cmd[] = {
-        2,
+        3,
+        NCI_CONFIG_TOTAL_DURATION, 0x02,
+        (guint8)(DEFAULT_TOTAL_DURATION & 0xff),
+        (guint8)((DEFAULT_TOTAL_DURATION >> 8) & 0xff),
         NCI_CONFIG_PA_BAIL_OUT, 0x01, 0x00,
         NCI_CONFIG_PB_BAIL_OUT, 0x01, 0x00
     };
@@ -159,7 +195,33 @@ nci_transition_reset_get_config_rsp(
             const guint n = pkt[1];
 
             if (pkt[0] == NCI_STATUS_OK) {
+                GUtilData data;
+
                 GDEBUG("%c CORE_GET_CONFIG_RSP ok", DIR_IN);
+
+                /* Check if we need to tweak TOTAL_DURATION */
+                if (nci_transition_reset_find_config_param(n, pkt + 2, len - 2,
+                    NCI_CONFIG_TOTAL_DURATION, &data) && data.size == 2) {
+                    /*
+                     * 1.11 Coding Conventions
+                     *
+                     * All values greater than 1 octet are sent and
+                     * received in Little Endian format.
+                     */
+                    const guint ms = data.bytes[0] +
+                        (((guint)data.bytes[1]) << 8);
+
+                    if (ms == DEFAULT_TOTAL_DURATION) {
+                        GDEBUG("TOTAL_DURATION is %u ms", ms);
+                        /* Done with transition */
+                        nci_transition_finish(self, NULL);
+                        return;
+                    } else {
+                        GDEBUG("TOTAL_DURATION is %u ms, fixing that", ms);
+                    }
+                } else {
+                    GDEBUG("Could not determine TOTAL_DURATION");
+                }
             } else if (pkt[0] == NCI_STATUS_INVALID_PARAM && len >= 2 + n*2) {
 #if GUTIL_LOG_DEBUG
                 /*
@@ -217,15 +279,10 @@ nci_transition_reset_get_config(
      * +=========================================================+
      */
     static const guint8 cmd[] = {
-        2,
-        NCI_CONFIG_PA_BAIL_OUT,
-        NCI_CONFIG_PB_BAIL_OUT
+        1,
+        NCI_CONFIG_TOTAL_DURATION
     };
 
-    /*
-     * We may want to set some parameters some day but for now let's just
-     * query something and see how it works...
-     */
     GDEBUG("%c CORE_GET_CONFIG_CMD", DIR_OUT);
     nci_transition_send_command_static(self,
         NCI_GID_CORE, NCI_OID_CORE_GET_CONFIG, cmd, sizeof(cmd),
