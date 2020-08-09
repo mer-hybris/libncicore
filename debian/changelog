@@ -1,3 +1,9 @@
+libncicore (1.1.10) unstable; urgency=low
+
+  * Set TOTAL_DURATION to 500ms
+
+ -- Slava Monich <slava.monich@jolla.com>  Mon, 10 Aug 2020 02:49:45 +0300
+
 libncicore (1.1.9) unstable; urgency=low
 
   * Fixed credit management for fragmented data packets
