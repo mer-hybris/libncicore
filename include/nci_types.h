@@ -162,7 +162,7 @@ typedef struct nci_activation_param_iso_dep_poll_a {
 
 #define NFC_T4A_ATS_T0_A         (0x10) /* TA is transmitted */
 #define NFC_T4A_ATS_T0_B         (0x20) /* TB is transmitted */
-#define NFC_T4A_ATS_T0_C         (0x30) /* TC is transmitted */
+#define NFC_T4A_ATS_T0_C         (0x40) /* TC is transmitted */
 #define NFC_T4A_ATS_T0_FSCI_MASK (0x0f) /* FSCI mask */
 
     guint8 ta;     /* Interface byte TA (optional) */
