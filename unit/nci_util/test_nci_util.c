@@ -383,26 +383,51 @@ static const guint8 test_intf_activated_ntf_nfc_dep_listen_1[] = {
     0x02, 0x02, 0x07, 0xff, 0x03, 0x02, 0x00, 0x13,
     0x04, 0x01, 0xff
 };
-
 static const guint8 test_intf_activated_ntf_nfc_dep_listen_2[] = {
     0x01, 0x03, 0x05, 0x83, 0xfb, 0x01, 0x00, 0x83,
     0x00, 0x00, 0x0f, 0x0e, 0xc5, 0x47, 0xe4, 0x98,
     0x4d, 0x88, 0x04, 0xb4, 0x92, 0xe5, 0x00, 0x00,
     0x00, 0x32
 };
-
-static const guint8 test_intf_activated_ntf_iso_dep_poll_1[] = {
+static const guint8 test_intf_activated_ntf_isodep_poll_1[] = {
     0x01, 0x02, 0x04, 0x01, 0xff, 0x01, 0x0c, 0x0b,
     0xdb, 0xa2, 0xa2, 0x2b, 0x52, 0x74, 0x4d, 0x43,
     0x00, 0x81, 0xc1, 0x01, 0x00, 0x00, 0x02, 0x01,
     0x00
 };
-
-static const guint8 test_intf_activated_ntf_iso_dep_poll_2[] = {
+static const guint8 test_intf_activated_ntf_isodep_poll_2[] = {
     0x01, 0x02, 0x04, 0x01, 0xff, 0x01, 0x0c, 0x0b,
     0xdb, 0xa2, 0xa2, 0x2b, 0x52, 0x74, 0x4d, 0x43,
     0x00, 0x81, 0xc1, 0x01, 0x00, 0x00, 0x05, 0x04,
     0x00, 0x01, 0x02, 0x03
+};
+static const guint8 test_intf_activated_ntf_isodep_polla_1[] = {
+    0x01, 0x02, 0x04, 0x00, 0xff, 0x01, 0x09, 0x04,
+    0x00, 0x04, 0x08, 0x46, 0x91, 0xde, 0x01, 0x20,
+    0x00, 0x00, 0x00, 0x05, 0x04, 0x78, 0x77, 0x95,
+    0x02
+};
+static const guint8 test_intf_activated_ntf_isodep_polla_2[] = {
+    0x01, 0x02, 0x04, 0x00, 0xff, 0x01, 0x09, 0x04,
+    0x00, 0x04, 0x08, 0x46, 0x91, 0xde, 0x01, 0x20,
+    0x00, 0x00, 0x00, 0x04, 0x03, 0x38, 0x77, 0x95
+};
+static const guint8 test_intf_activated_ntf_isodep_polla_3[] = {
+    0x01, 0x02, 0x04, 0x00, 0xff, 0x01, 0x09, 0x04,
+    0x00, 0x04, 0x08, 0x46, 0x91, 0xde, 0x01, 0x20,
+    0x00, 0x00, 0x00, 0x03, 0x02, 0x18, 0x77
+};
+static const guint8 test_intf_activated_ntf_isodep_polla_4[] = {
+    0x01, 0x02, 0x04, 0x00, 0xff, 0x01, 0x09, 0x04,
+    0x00, 0x04, 0x08, 0x46, 0x91, 0xde, 0x01, 0x20,
+    0x00, 0x00, 0x00, 0x02, 0x01, 0x08
+};
+static const guint8 test_intf_activated_ntf_isodep_polla_5[] = {
+    0x01, 0x02, 0x04, 0x00, 0xff, 0x01, 0x09, 0x04,
+    0x00, 0x04, 0x08, 0x46, 0x91, 0xde, 0x01, 0x20,
+    0x00, 0x00, 0x00, 0x14, 0x13, 0x78, 0x77, 0x95,
+    0x02, 0x80, 0x31, 0xb8, 0x65, 0xb0, 0x85, 0x03,
+    0x00, 0xef, 0x12, 0x00, 0xf6, 0x82, 0x90, 0x00
 };
 
 static const NciModeParam test_intf_activated_ntf_mifare_mp = {
@@ -423,12 +448,21 @@ static const NciModeParam test_intf_activated_ntf_poll_a_mp = {
         .sel_res = 0x40
     }
 };
+static const NciModeParam test_intf_activated_ntf_polla_mp_1 = {
+    .poll_a = {
+        .sens_res = { 0x04, 0x00 },
+        .nfcid1_len = 4,
+        .nfcid1 = { 0x08, 0x46, 0x91, 0xde },
+        .sel_res_len = 1,
+        .sel_res = 0x20
+    }
+};
 static const NciModeParam test_intf_activated_ntf_poll_b_mp_1 = {
     .poll_b = {
         .nfcid0 = {0xdb, 0xa2, 0xa2, 0x2b},
         .fsc = 256,
         .app_data = {0x52, 0x74, 0x4d, 0x43},
-        .prot_info = { test_intf_activated_ntf_iso_dep_poll_1 + 0x10, 3 }
+        .prot_info = { test_intf_activated_ntf_isodep_poll_1 + 0x10, 3 }
     }
 };
 static const NciModeParam test_intf_activated_ntf_poll_b_mp_2 = {
@@ -436,7 +470,7 @@ static const NciModeParam test_intf_activated_ntf_poll_b_mp_2 = {
         .nfcid0 = {0xdb, 0xa2, 0xa2, 0x2b},
         .fsc = 256,
         .app_data = {0x52, 0x74, 0x4d, 0x43},
-        .prot_info = { test_intf_activated_ntf_iso_dep_poll_2 + 0x10, 3 }
+        .prot_info = { test_intf_activated_ntf_isodep_poll_2 + 0x10, 3 }
     }
 };
 static const NciActivationParam test_intf_activated_ntf_nfc_dep_poll_ap_1 = {
@@ -495,19 +529,58 @@ static const NciActivationParam test_intf_activated_ntf_nfc_dep_listen_ap_2 = {
         .pp = 0x32
     }
 };
-static const NciActivationParam test_intf_activated_ntf_iso_dep_poll_ap_1 = {
+static const NciActivationParam test_intf_activated_ntf_isodep_poll_ap_1 = {
     .iso_dep_poll_b = {
         .mbli = 0x00,
         .did = 0x00,
         .hlr = { NULL, 0 },
     }
 };
-
-static const NciActivationParam test_intf_activated_ntf_iso_dep_poll_ap_2 = {
+static const NciActivationParam test_intf_activated_ntf_isodep_poll_ap_2 = {
     .iso_dep_poll_b = {
         .mbli = 0x00,
         .did = 0x00,
-        .hlr = { test_intf_activated_ntf_iso_dep_poll_2 + 0x19, 3 },
+        .hlr = { test_intf_activated_ntf_isodep_poll_2 + 0x19, 3 },
+    }
+};
+static const NciActivationParam test_intf_activated_ntf_isodep_polla_ap_1 = {
+    .iso_dep_poll_a = {
+        .fsc = 256,
+        .t0 = 0x78,
+        .ta = 0x77,
+        .tb = 0x95,
+        .tc = 0x02
+    }
+};
+static const NciActivationParam test_intf_activated_ntf_isodep_polla_ap_2 = {
+    .iso_dep_poll_a = {
+        .fsc = 256,
+        .t0 = 0x38,
+        .ta = 0x77,
+        .tb = 0x95
+    }
+};
+static const NciActivationParam test_intf_activated_ntf_isodep_polla_ap_3 = {
+    .iso_dep_poll_a = {
+        .fsc = 256,
+        .t0 = 0x18,
+        .ta = 0x77
+    }
+};
+static const NciActivationParam test_intf_activated_ntf_isodep_polla_ap_4 = {
+    .iso_dep_poll_a = {
+        .fsc = 256,
+        .t0 = 0x08
+    }
+};
+static const NciActivationParam test_intf_activated_ntf_isodep_polla_ap_5 = {
+    .iso_dep_poll_a = {
+        .fsc = 256,
+        .t1 = { test_intf_activated_ntf_isodep_polla_5 + 0x19, 15 },
+        .t0 = 0x78,
+        .ta = 0x77,
+        .tb = 0x95,
+        .tc = 0x02
     }
 };
 
@@ -518,37 +591,62 @@ static const TestIntfActivatedSuccessData intf_activated_success_tests[] = {
         .mode_param = &test_intf_activated_ntf_mifare_mp,
         .activation_param = NULL
     },{
-        .name = "nfc_dep_poll/ok/1",
+        .name = "nfcdep/poll/ok/1",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_poll_1)},
         .mode_param = &test_intf_activated_ntf_poll_a_mp,
         .activation_param = &test_intf_activated_ntf_nfc_dep_poll_ap_1
     },{
-        .name = "nfc_dep_poll/ok/2",
+        .name = "nfcdep/poll/ok/2",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_poll_2)},
         .activation_param = &test_intf_activated_ntf_nfc_dep_poll_ap_2
     },{
-        .name = "nfc_dep_poll/ok/3",
+        .name = "nfcdep/poll/ok/3",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_poll_3)},
         .mode_param = &test_intf_activated_ntf_poll_a_mp,
         .activation_param = &test_intf_activated_ntf_nfc_dep_poll_ap_3
     },{
-        .name = "nfc_dep_listen/ok/1",
+        .name = "nfcdep/listen/ok/1",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_listen_1)},
         .activation_param = &test_intf_activated_ntf_nfc_dep_listen_ap_1
     },{
-        .name = "nfc_dep_listen/ok/2",
+        .name = "nfcdep/listen/ok/2",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_listen_2)},
         .activation_param = &test_intf_activated_ntf_nfc_dep_listen_ap_2
     },{
-        .name = "iso_dep_poll/ok/1",
-        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_iso_dep_poll_1)},
+        .name = "isodep/poll/ok/1",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_isodep_poll_1)},
         .mode_param = &test_intf_activated_ntf_poll_b_mp_1,
-        .activation_param = &test_intf_activated_ntf_iso_dep_poll_ap_1
+        .activation_param = &test_intf_activated_ntf_isodep_poll_ap_1
     },{
-        .name = "iso_dep_poll/ok/2",
-        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_iso_dep_poll_2)},
+        .name = "isodep/poll/ok/2",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_isodep_poll_2)},
         .mode_param = &test_intf_activated_ntf_poll_b_mp_2,
-        .activation_param = &test_intf_activated_ntf_iso_dep_poll_ap_2
+        .activation_param = &test_intf_activated_ntf_isodep_poll_ap_2
+    },{
+        .name = "isodep/nfca/poll/1",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_isodep_polla_1)},
+        .mode_param = &test_intf_activated_ntf_polla_mp_1,
+        .activation_param = &test_intf_activated_ntf_isodep_polla_ap_1
+    },{
+        .name = "isodep/nfca/poll/2",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_isodep_polla_2)},
+        .mode_param = &test_intf_activated_ntf_polla_mp_1,
+        .activation_param = &test_intf_activated_ntf_isodep_polla_ap_2
+    },{
+        .name = "isodep/nfca/poll/3",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_isodep_polla_3)},
+        .mode_param = &test_intf_activated_ntf_polla_mp_1,
+        .activation_param = &test_intf_activated_ntf_isodep_polla_ap_3
+    },{
+        .name = "isodep/nfca/poll/4",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_isodep_polla_4)},
+        .mode_param = &test_intf_activated_ntf_polla_mp_1,
+        .activation_param = &test_intf_activated_ntf_isodep_polla_ap_4
+    },{
+        .name = "isodep/nfca/poll/5",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_isodep_polla_5)},
+        .mode_param = &test_intf_activated_ntf_polla_mp_1,
+        .activation_param = &test_intf_activated_ntf_isodep_polla_ap_5
     }
 };
 
@@ -620,26 +718,37 @@ static const guint8 test_intf_activated_ntf_iso_dep_fail_1[] = {
           /* ATTRIB Response is too short ^^    ^^ */
 };
 
+static const guint8 test_intf_activated_ntf_iso_dep_fail_2[] = {
+    0x01, 0x02, 0x04, 0x00, 0xff, 0x01, 0x09, 0x04,
+    0x00, 0x04, 0x08, 0x46, 0x91, 0xde, 0x01, 0x20,
+    0x00, 0x00, 0x00, 0x02, 0x01, 0x18
+            /* TA marked as present ^ but is missing */
+};
+
 static const TestIntfActivatedFailData intf_activated_fail_tests[] = {
     {
-        .name = "nfc_dep_1",
+        .name = "nfc_dep/1",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_fail_1)},
         .parse_ok = TRUE, .mode_param_ok = TRUE, .activation_param_ok = FALSE
     },{
-        .name = "nfc_dep_2",
+        .name = "nfc_dep/2",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_fail_2)},
         .parse_ok = TRUE, .mode_param_ok = TRUE, .activation_param_ok = FALSE
     },{
-        .name = "nfc_dep_3",
+        .name = "nfc_dep/3",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_fail_3)},
         .parse_ok = TRUE, .mode_param_ok = FALSE, .activation_param_ok = FALSE
     },{
-        .name = "nfc_dep_4",
+        .name = "nfc_dep/4",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_nfc_dep_fail_4)},
         .parse_ok = TRUE, .mode_param_ok = FALSE, .activation_param_ok = FALSE
     },{
-        .name = "iso_dep_1",
+        .name = "iso_dep/1",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_iso_dep_fail_1)},
+        .parse_ok = TRUE, .mode_param_ok = TRUE, .activation_param_ok = FALSE
+    },{
+        .name = "iso_dep/2",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_iso_dep_fail_2)},
         .parse_ok = TRUE, .mode_param_ok = TRUE, .activation_param_ok = FALSE
     }
 };
