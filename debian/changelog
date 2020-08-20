@@ -1,3 +1,11 @@
+libncicore (1.1.11) unstable; urgency=low
+
+  * Added missing activation params for t4a tags
+  * Fixed TC presense bit in RATS response
+  * Avoid accessing data beyond the end of RATS response
+
+ -- Slava Monich <slava.monich@jolla.com>  Thu, 20 Aug 2020 20:33:45 +0300
+
 libncicore (1.1.10) unstable; urgency=low
 
   * Set TOTAL_DURATION to 500ms
