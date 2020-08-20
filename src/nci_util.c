@@ -373,21 +373,16 @@ nci_parse_iso_dep_poll_a_param(
         const guint8* ats = bytes + 1;
         const guint8* ats_end = ats + ats_len;
         const guint8* ats_ptr = ats;
-        const guint8 t0 = *ats_ptr++;
 
-#define NFC_T4A_ATS_T0_A         (0x10) /* TA is transmitted */
-#define NFC_T4A_ATS_T0_B         (0x20) /* TB is transmitted */
-#define NFC_T4A_ATS_T0_C         (0x30) /* TC is transmitted */
-#define NFC_T4A_ATS_T0_FSCI_MASK (0x0f) /* FSCI mask */
-
-        /* Skip TA, TB and TC if they are present */
-        if (t0 & NFC_T4A_ATS_T0_A) ats_ptr++;
-        if (t0 & NFC_T4A_ATS_T0_B) ats_ptr++;
-        if (t0 & NFC_T4A_ATS_T0_C) ats_ptr++;
+        param->t0 = *ats_ptr++;
+        /* Save TA, TB and TC if they are present */
+        if (param->t0 & NFC_T4A_ATS_T0_A) param->ta = *ats_ptr++;
+        if (param->t0 & NFC_T4A_ATS_T0_B) param->tb = *ats_ptr++;
+        if (param->t0 & NFC_T4A_ATS_T0_C) param->tc = *ats_ptr++;
         if (ats_ptr <= ats_end) {
             /* NFCForum-TS-DigitalProtocol-1.01
              * Table 66: FSCI to FSC Conversion */
-            const guint8 fsci = (t0 & NFC_T4A_ATS_T0_FSCI_MASK);
+            const guint8 fsci = (param->t0 & NFC_T4A_ATS_T0_FSCI_MASK);
             static const guint fsc_table[] = {
                 16, 24, 32, 40, 48, 64, 96, 128, 256
             };
@@ -412,6 +407,16 @@ nci_parse_iso_dep_poll_a_param(
                     }
                     GDEBUG("  T1 =%s", buf->str);
                     g_string_free(buf, TRUE);
+                }
+                GDEBUG("  T0 = 0x%02x", param->t0);
+                if (param->t0 & NFC_T4A_ATS_T0_A) {
+                    GDEBUG("  TA = 0x%02x", param->ta);
+                }
+                if (param->t0 & NFC_T4A_ATS_T0_B) {
+                    GDEBUG("  TB = 0x%02x", param->tb);
+                }
+                if (param->t0 & NFC_T4A_ATS_T0_C) {
+                    GDEBUG("  TC = 0x%02x", param->tc);
                 }
             }
 #endif

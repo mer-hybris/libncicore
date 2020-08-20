@@ -157,6 +157,17 @@ typedef union nci_mode_param {
 typedef struct nci_activation_param_iso_dep_poll_a {
     guint fsc;     /* FSC (FSCI converted to bytes) */
     GUtilData t1;  /* T1 to Tk (otherwise called historical bytes) */
+    /* Since 1.1.11 */
+    guint8 t0;     /* Format byte T0 */
+
+#define NFC_T4A_ATS_T0_A         (0x10) /* TA is transmitted */
+#define NFC_T4A_ATS_T0_B         (0x20) /* TB is transmitted */
+#define NFC_T4A_ATS_T0_C         (0x30) /* TC is transmitted */
+#define NFC_T4A_ATS_T0_FSCI_MASK (0x0f) /* FSCI mask */
+
+    guint8 ta;     /* Interface byte TA (optional) */
+    guint8 tb;     /* Interface byte TB (optional) */
+    guint8 tc;     /* Interface byte TC (optional) */
 } NciActivationParamIsoDepPollA;
 
 /* Table 75: Activation Parameters for NFC-B/ISO-DEP Poll Mode */
