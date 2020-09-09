@@ -240,7 +240,7 @@ $(RELEASE_BUILD_DIR)/$(LIB_SYMLINK2): $(RELEASE_LIB)
 LIBDIR ?= usr/lib
 ABS_LIBDIR := $(shell echo /$(LIBDIR) | sed -r 's|/+|/|g')
 
-$(PKGCONFIG): $(LIB_NAME).pc.in Makefile
+$(PKGCONFIG): $(LIB_NAME).pc.in $(VERSION_FILE)
 	sed -e 's|@version@|$(PCVERSION)|g' -e 's|@libdir@|$(ABS_LIBDIR)|g' $< > $@
 
 debian/%.install: debian/%.install.in
