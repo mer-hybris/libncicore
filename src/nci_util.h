@@ -76,6 +76,19 @@ nci_discovery_ntf_copy(
     const NciDiscoveryNtf* ntf)
     NCI_INTERNAL;
 
+NciModeParam*
+nci_mode_param_copy(
+    const NciModeParam* param,
+    NCI_MODE mode)
+    NCI_INTERNAL;
+
+NciActivationParam*
+nci_activation_param_copy(
+    const NciActivationParam* param,
+    NCI_RF_INTERFACE intf,
+    NCI_MODE mode)
+    NCI_INTERNAL;
+
 #endif /* NCI_UTIL_H */
 
 /*

@@ -849,6 +849,105 @@ nci_parse_intf_activated_ntf(
     return FALSE;
 }
 
+static
+gsize nci_mode_param_inplace_copy(const NciModeParam* param, NciModeParam* copy,
+    NCI_MODE mode)
+{
+    if (G_LIKELY(param) && G_LIKELY(copy)) {
+        gsize size = G_ALIGN8(sizeof(NciModeParam));
+        const NciModeParamPollB* poll_b = NULL;
+        const NciModeParamListenF* listen_f = NULL;
+
+        switch (mode) {
+        case NCI_MODE_ACTIVE_POLL_A:        /* fallthrough */
+        case NCI_MODE_PASSIVE_POLL_A:       /* fallthrough */
+        case NCI_MODE_ACTIVE_POLL_F:        /* fallthrough */
+        case NCI_MODE_PASSIVE_POLL_F:
+            memcpy(copy, param, size);
+            return size;
+        case NCI_MODE_PASSIVE_POLL_B:
+            poll_b = &param->poll_b;
+            GASSERT(!poll_b->prot_info.bytes || poll_b->prot_info.size);
+            GASSERT(!poll_b->prot_info.size || poll_b->prot_info.bytes);
+            memcpy(copy, param, sizeof(NciModeParam));
+            if (poll_b->prot_info.bytes)
+            {
+                guint8* dest = (guint8*)copy + size;
+                memcpy(dest, poll_b->prot_info.bytes, poll_b->prot_info.size);
+                copy->poll_b.prot_info.bytes = dest;
+                size += G_ALIGN8(poll_b->prot_info.size);
+            }
+            return size;
+        case NCI_MODE_ACTIVE_LISTEN_F:
+        case NCI_MODE_PASSIVE_LISTEN_F:
+            listen_f = &param->listen_f;
+            GASSERT(!listen_f->nfcid2.bytes || listen_f->nfcid2.size);
+            GASSERT(!listen_f->nfcid2.size || listen_f->nfcid2.bytes);
+            memcpy(copy, param, sizeof(NciModeParam));
+            if (listen_f->nfcid2.bytes)
+            {
+                guint8* dest = (guint8*)copy + size;
+                memcpy(dest, listen_f->nfcid2.bytes, listen_f->nfcid2.size);
+                copy->listen_f.nfcid2.bytes = dest;
+                size += G_ALIGN8(listen_f->nfcid2.size);
+            }
+            return size;
+        case NCI_MODE_PASSIVE_POLL_15693:
+        case NCI_MODE_PASSIVE_LISTEN_15693:
+            break;
+        case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_B:     /* fallthrough */
+        case NCI_MODE_ACTIVE_LISTEN_A:
+            /* NCI 1.0 defines no parameters for A/B Listen modes */
+            return 0;
+        }
+        GDEBUG("Unhandled activation mode 0x%02x", mode);
+        return 0;
+    } else {
+        return 0;
+    }
+}
+
+static gsize calculate_mode_param_fit_size(
+    const NciModeParam* param,
+    NCI_MODE mode)
+{
+    gsize size = G_ALIGN8(sizeof(NciModeParam));
+    if (G_LIKELY(param)) {
+        const NciModeParamPollB* poll_b = NULL;
+        const NciModeParamListenF* listen_f = NULL;
+
+        switch (mode) {
+        case NCI_MODE_PASSIVE_POLL_B:
+            poll_b = &param->poll_b;
+            GASSERT(!poll_b->prot_info.bytes || poll_b->prot_info.size);
+            GASSERT(!poll_b->prot_info.size || poll_b->prot_info.bytes);
+            size += G_ALIGN8(poll_b->prot_info.size);
+            break;
+        case NCI_MODE_ACTIVE_LISTEN_F:
+        case NCI_MODE_PASSIVE_LISTEN_F:
+            listen_f = &param->listen_f;
+            GASSERT(!listen_f->nfcid2.bytes || listen_f->nfcid2.size);
+            GASSERT(!listen_f->nfcid2.size || listen_f->nfcid2.bytes);
+            size += G_ALIGN8(listen_f->nfcid2.size);
+            break;
+        case NCI_MODE_ACTIVE_POLL_A:        /* fallthrough */
+        case NCI_MODE_PASSIVE_POLL_A:       /* fallthrough */
+        case NCI_MODE_ACTIVE_POLL_F:        /* fallthrough */
+        case NCI_MODE_PASSIVE_POLL_F:       /* fallthrough */
+        case NCI_MODE_PASSIVE_POLL_15693:   /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_15693: /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_B:     /* fallthrough */
+        case NCI_MODE_ACTIVE_LISTEN_A:      /* fallthrough */
+            /* NCI 1.0 defines no parameters for A/B Listen modes */
+            break;
+        }
+        GDEBUG("Unhandled activation mode 0x%02x", mode);
+    }
+    return size;
+}
+
 NciDiscoveryNtf*
 nci_discovery_ntf_copy_array(
     const NciDiscoveryNtf* const* ntfs,
@@ -867,7 +966,8 @@ nci_discovery_ntf_copy_array(
             if (src->param_len) {
                 size += G_ALIGN8(src->param_len);
                 if (src->param) {
-                    size += G_ALIGN8(sizeof(*src->param));
+                    size += calculate_mode_param_fit_size(src->param,
+                        src->mode);
                 }
             }
         }
@@ -888,9 +988,15 @@ nci_discovery_ntf_copy_array(
                 if (src->param) {
                     NciModeParam* dest_param = (NciModeParam*)ptr;
 
-                    *dest_param = *src->param;
-                    dest->param = dest_param;
-                    ptr += G_ALIGN8(sizeof(*src->param));
+                    gsize copied = nci_mode_param_inplace_copy(src->param,
+                        dest_param, src->mode);
+                    if(copied) {
+                        dest->param = dest_param;
+                        ptr += copied;
+                    } else {
+                        GDEBUG("Cannot copy mode params during copying nfc");
+                        ptr += G_ALIGN8(sizeof(*src->param));
+                    }
                 }
             }
         }
@@ -907,6 +1013,169 @@ nci_discovery_ntf_copy(
 {
     if (G_LIKELY(ntf)) {
         return nci_discovery_ntf_copy_array(&ntf, 1);
+    } else {
+        return NULL;
+    }
+}
+
+NciModeParam*
+nci_mode_param_copy(
+    const NciModeParam* param,
+    NCI_MODE mode)
+{
+    if (G_LIKELY(param)) {
+        NciModeParam* copy = NULL;
+        gsize size = calculate_mode_param_fit_size(param, mode);
+        gsize copied = 0;
+
+        switch (mode) {
+        case NCI_MODE_ACTIVE_POLL_A:        /* fallthrough */
+        case NCI_MODE_PASSIVE_POLL_A:       /* fallthrough */
+        case NCI_MODE_ACTIVE_POLL_F:        /* fallthrough */
+        case NCI_MODE_PASSIVE_POLL_F:       /* fallthrough */
+        case NCI_MODE_PASSIVE_POLL_B:       /* fallthrough */
+        case NCI_MODE_ACTIVE_LISTEN_F:      /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_F:     /* fallthrough */
+            copy = (NciModeParam*) g_malloc0(size);
+            copied = nci_mode_param_inplace_copy(param, copy, mode);
+            if(!copied) {
+                g_free(copy);
+                copy = NULL;
+            }
+            return copy;
+        case NCI_MODE_PASSIVE_POLL_15693:
+        case NCI_MODE_PASSIVE_LISTEN_15693:
+            break;
+        case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_B:     /* fallthrough */
+        case NCI_MODE_ACTIVE_LISTEN_A:
+            /* NCI 1.0 defines no parameters for A/B Listen modes */
+            return NULL;
+        }
+        GDEBUG("Unhandled activation mode 0x%02x", mode);
+        return NULL;
+    } else {
+        return NULL;
+    }
+}
+
+NciActivationParam*
+nci_activation_param_copy(
+    const NciActivationParam* param,
+    NCI_RF_INTERFACE intf,
+    NCI_MODE mode)
+{
+    if (G_LIKELY(param)) {
+        NciActivationParam* copy = NULL;
+        gsize size = G_ALIGN8(sizeof(NciActivationParam));
+        const NciActivationParamIsoDepPollA* iso_dep_poll_a = NULL;
+        const NciActivationParamIsoDepPollB* iso_dep_poll_b = NULL;
+        const NciActivationParamNfcDepPoll* nfc_dep_poll = NULL;
+        const NciActivationParamNfcDepListen* nfc_dep_listen = NULL;
+        switch (intf) {
+        case NCI_RF_INTERFACE_ISO_DEP:
+            switch (mode) {
+            case NCI_MODE_PASSIVE_POLL_A:
+            case NCI_MODE_ACTIVE_POLL_A:
+                iso_dep_poll_a = &param->iso_dep_poll_a;
+                g_assert(iso_dep_poll_a->t1.bytes ? iso_dep_poll_a->t1.size :
+                    TRUE);
+                size += G_ALIGN8(iso_dep_poll_a->t1.size);
+                copy = (NciActivationParam*) g_malloc0(size);
+                memcpy(copy, param, sizeof(NciActivationParam));
+                if (iso_dep_poll_a->t1.bytes)
+                {
+                    guint8* dest = (guint8*)copy +
+                        G_ALIGN8(sizeof(NciActivationParam));
+                    memcpy(dest, iso_dep_poll_a->t1.bytes,
+                        iso_dep_poll_a->t1.size);
+                    copy->iso_dep_poll_a.t1.bytes = dest;
+                }
+                return copy;
+            case NCI_MODE_PASSIVE_POLL_B:
+                iso_dep_poll_b = &param->iso_dep_poll_b;
+                g_assert(iso_dep_poll_b->hlr.bytes ? iso_dep_poll_b->hlr.size :
+                    TRUE);
+                size += G_ALIGN8(iso_dep_poll_b->hlr.size);
+                copy = (NciActivationParam*) g_malloc0(size);
+                memcpy(copy, param, sizeof(NciActivationParam));
+                if (iso_dep_poll_b->hlr.bytes)
+                {
+                    guint8* dest = (guint8*)copy +
+                        G_ALIGN8(sizeof(NciActivationParam));
+                    memcpy(dest, iso_dep_poll_b->hlr.bytes,
+                        iso_dep_poll_b->hlr.size);
+                    copy->iso_dep_poll_b.hlr.bytes = dest;
+                }
+                return copy;
+            case NCI_MODE_PASSIVE_POLL_F:
+            case NCI_MODE_ACTIVE_POLL_F:
+            case NCI_MODE_PASSIVE_POLL_15693:
+            case NCI_MODE_PASSIVE_LISTEN_A:
+            case NCI_MODE_PASSIVE_LISTEN_B:
+            case NCI_MODE_PASSIVE_LISTEN_F:
+            case NCI_MODE_ACTIVE_LISTEN_A:
+            case NCI_MODE_ACTIVE_LISTEN_F:
+            case NCI_MODE_PASSIVE_LISTEN_15693:
+                break;
+            }
+            break;
+        case NCI_RF_INTERFACE_FRAME:
+            /* There are no Activation Parameters for Frame RF interface */
+            break;
+        case NCI_RF_INTERFACE_NFC_DEP:
+            switch (mode) {
+            case NCI_MODE_ACTIVE_POLL_A:
+            case NCI_MODE_ACTIVE_POLL_F:
+            case NCI_MODE_PASSIVE_POLL_A:
+            case NCI_MODE_PASSIVE_POLL_F:
+                nfc_dep_poll = &param->nfc_dep_poll;
+                g_assert(nfc_dep_poll->g.bytes ? nfc_dep_poll->g.size :
+                    TRUE);
+                size += G_ALIGN8(nfc_dep_poll->g.size);
+                copy = (NciActivationParam*) g_malloc0(size);
+                memcpy(copy, param, sizeof(NciActivationParam));
+                if (nfc_dep_poll->g.bytes)
+                {
+                    guint8* dest = (guint8*)copy +
+                        G_ALIGN8(sizeof(NciActivationParam));
+                    memcpy(dest, nfc_dep_poll->g.bytes,
+                        nfc_dep_poll->g.size);
+                    copy->nfc_dep_poll.g.bytes = dest;
+                }
+                return copy;
+            case NCI_MODE_ACTIVE_LISTEN_A:
+            case NCI_MODE_ACTIVE_LISTEN_F:
+            case NCI_MODE_PASSIVE_LISTEN_A:
+            case NCI_MODE_PASSIVE_LISTEN_F:
+                nfc_dep_listen = &param->nfc_dep_listen;
+                g_assert(nfc_dep_listen->g.bytes ? nfc_dep_listen->g.size :
+                    TRUE);
+                size += G_ALIGN8(nfc_dep_listen->g.size);
+                copy = (NciActivationParam*) g_malloc0(size);
+                memcpy(copy, param, sizeof(NciActivationParam));
+                if (nfc_dep_listen->g.bytes)
+                {
+                    guint8* dest = (guint8*)copy +
+                        G_ALIGN8(sizeof(NciActivationParam));
+                    memcpy(dest, nfc_dep_listen->g.bytes,
+                        nfc_dep_listen->g.size);
+                    copy->nfc_dep_listen.g.bytes = dest;
+                }
+                return copy;
+            case NCI_MODE_PASSIVE_POLL_B:
+            case NCI_MODE_PASSIVE_POLL_15693:
+            case NCI_MODE_PASSIVE_LISTEN_B:
+            case NCI_MODE_PASSIVE_LISTEN_15693:
+                break;
+            }
+            break;
+        case NCI_RF_INTERFACE_NFCEE_DIRECT:
+        case NCI_RF_INTERFACE_PROPRIETARY:
+            GDEBUG("Unhandled interface type");
+            break;
+        }
+        return NULL;
     } else {
         return NULL;
     }
