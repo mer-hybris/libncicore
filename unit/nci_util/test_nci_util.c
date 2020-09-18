@@ -766,7 +766,6 @@ typedef struct test_discover_success_data {
     const char* name;
     GUtilData data;
     NciDiscoveryNtf ntf;
-
 } TestDiscoverSuccessData;
 
 static
@@ -798,6 +797,17 @@ static const guint8 discover_success_data_full_2[] =
     { 0x02, 0x80, 0x00, 0x09, 0x04, 0x00, 0x04, 0x4f,
       0x01, 0x74, 0x01, 0x01, 0x08, 0x00 };
 
+static const guint8 discover_success_data_full_3_param_app_data[] =
+{0x00, 0x81, 0xc1};
+
+static const NciModeParam discover_success_data_full_3_param = {
+    .poll_b = { {0x8e, 0x9c, 0x6d, 0xca}, 0x0b, { 0x52, 0x74, 0x4d, 0x43 },
+        { TEST_ARRAY_AND_SIZE(discover_success_data_full_3_param_app_data) } }
+};
+static const guint8 discover_success_data_full_3[] =
+    { 0x01, 0x04, 0x01, 0x0c, 0x0b, 0x8e, 0x9c, 0x6d, 0xca,
+      0x52, 0x74, 0x4d, 0x43, 0x00, 0x81, 0xc1, 0x00 };
+
 static const TestDiscoverSuccessData discover_success_tests[] = {
     {
         .name = "no_param",
@@ -820,6 +830,14 @@ static const TestDiscoverSuccessData discover_success_tests[] = {
                  .mode = NCI_MODE_PASSIVE_POLL_A, .param_len = 9,
                  .param_bytes = discover_success_data_full_2 + 4,
                  .param = &discover_success_data_full_2_param,
+                 .last = TRUE }
+    },{
+        .name = "full/3",
+        .data = { TEST_ARRAY_AND_SIZE(discover_success_data_full_3) },
+        .ntf = { .discovery_id = 0x01, .protocol = 0x04,
+                 .mode = NCI_MODE_PASSIVE_POLL_B, .param_len = 0x0c,
+                 .param_bytes = discover_success_data_full_3 + 4,
+                 .param = &discover_success_data_full_3_param,
                  .last = TRUE }
     }
 };
@@ -864,6 +882,30 @@ test_discover_copy_check(
                 g_assert(p1->sel_res_len == p2->sel_res_len);
                 g_assert(p1->sel_res == p2->sel_res);
                 g_assert(!memcmp(p1->nfcid1, p2->nfcid1, p2->nfcid1_len));
+            }
+            break;
+        case NCI_MODE_PASSIVE_POLL_B:
+            {
+                const NciModeParamPollB* p1 = &n1->param->poll_b;
+                const NciModeParamPollB* p2 = &n2->param->poll_b;
+
+                g_assert(p1->fsc == p2->fsc);
+                g_assert(!memcmp(p1->nfcid0, p2->nfcid0,
+                    FIELD_SIZEOF(NciModeParamPollB, nfcid0)));
+                g_assert(!memcmp(p1->app_data, p2->app_data,
+                    FIELD_SIZEOF(NciModeParamPollB, app_data)));
+                g_assert(!p1->prot_info.bytes || p1->prot_info.size);
+                g_assert(!p1->prot_info.size || p1->prot_info.bytes);
+                g_assert(!p2->prot_info.bytes || p2->prot_info.size);
+                g_assert(!p2->prot_info.size || p2->prot_info.bytes);
+                if (p1->prot_info.bytes) {
+                    g_assert(p1->prot_info.bytes != p2->prot_info.bytes);
+                    g_assert(p1->prot_info.size == p2->prot_info.size);
+                    g_assert(!memcmp(p1->prot_info.bytes, p2->prot_info.bytes,
+                        p1->prot_info.size));
+                } else {
+                    g_assert(p1->prot_info.bytes == p2->prot_info.bytes);
+                }
             }
             break;
         default:

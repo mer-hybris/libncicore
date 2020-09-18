@@ -974,7 +974,8 @@ nci_discovery_ntf_copy_array(
             if (src->param_len) {
                 size += G_ALIGN8(src->param_len);
                 if (src->param) {
-                    size += G_ALIGN8(sizeof(*src->param));
+                    size += G_ALIGN8(nci_mode_param_size(src->param,
+                        src->mode));
                 }
             }
         }
@@ -994,10 +995,16 @@ nci_discovery_ntf_copy_array(
                 ptr += G_ALIGN8(src->param_len);
                 if (src->param) {
                     NciModeParam* dest_param = (NciModeParam*)ptr;
+                    const gsize copied = nci_mode_param_copy_impl(dest_param,
+                        src->param, src->mode);
 
-                    *dest_param = *src->param;
-                    dest->param = dest_param;
-                    ptr += G_ALIGN8(sizeof(*src->param));
+                    if (copied) {
+                        dest->param = dest_param;
+                        ptr += G_ALIGN8(copied);
+                    } else {
+                        GWARN("ModeParam is not NULL but non copyable");
+                        dest->param = NULL;
+                    }
                 }
             }
         }
