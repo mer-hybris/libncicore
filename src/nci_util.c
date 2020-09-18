@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2019-2020 Jolla Ltd.
  * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -30,7 +31,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "nci_util.h"
+#include "nci_util_p.h"
 #include "nci_log.h"
 
 #include <gutil_macros.h>
@@ -849,6 +850,112 @@ nci_parse_intf_activated_ntf(
     return FALSE;
 }
 
+static
+gsize
+nci_mode_param_copy_impl(
+    NciModeParam* dest,
+    const NciModeParam* src,
+    NCI_MODE mode)
+{
+    if (G_LIKELY(src) && G_LIKELY(dest)) {
+        gsize size = sizeof(NciModeParam);
+        const NciModeParamPollB* poll_b = NULL;
+        const NciModeParamListenF* listen_f = NULL;
+
+        switch (mode) {
+        case NCI_MODE_ACTIVE_POLL_A:        /* fallthrough */
+        case NCI_MODE_PASSIVE_POLL_A:
+        case NCI_MODE_ACTIVE_POLL_F:
+        case NCI_MODE_PASSIVE_POLL_F:
+            memcpy(dest, src, size);
+            return size;
+        case NCI_MODE_PASSIVE_POLL_B:
+            poll_b = &src->poll_b;
+            memcpy(dest, src, size);
+            if (poll_b->prot_info.bytes) {
+                size = G_ALIGN8(size);
+                guint8* ptr = (guint8*)dest + size;
+
+                memcpy(ptr, poll_b->prot_info.bytes, poll_b->prot_info.size);
+                dest->poll_b.prot_info.bytes = ptr;
+                size += G_ALIGN8(poll_b->prot_info.size);
+            }
+            return size;
+        case NCI_MODE_ACTIVE_LISTEN_F:
+        case NCI_MODE_PASSIVE_LISTEN_F:
+            listen_f = &src->listen_f;
+            memcpy(dest, src, size);
+            if (listen_f->nfcid2.bytes) {
+                size = G_ALIGN8(size);
+                guint8* ptr = (guint8*)dest + size;
+
+                memcpy(ptr, listen_f->nfcid2.bytes, listen_f->nfcid2.size);
+                dest->listen_f.nfcid2.bytes = ptr;
+                size += G_ALIGN8(listen_f->nfcid2.size);
+            }
+            return size;
+        case NCI_MODE_PASSIVE_POLL_15693:   /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_15693:
+            break;
+        case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_B:
+        case NCI_MODE_ACTIVE_LISTEN_A:
+            /* NCI 1.0 defines no parameters for A/B Listen modes */
+            return 0;
+        }
+        GDEBUG("Unhandled activation mode 0x%02x", mode);
+    }
+    return 0;
+}
+
+static
+gsize
+nci_mode_param_size(
+    const NciModeParam* param,
+    NCI_MODE mode)
+{
+    gsize size = 0;
+
+    if (G_LIKELY(param)) {
+        const NciModeParamPollB* poll_b = NULL;
+        const NciModeParamListenF* listen_f = NULL;
+
+        switch (mode) {
+        case NCI_MODE_ACTIVE_POLL_A:        /* fallthrough */
+        case NCI_MODE_PASSIVE_POLL_A:
+        case NCI_MODE_ACTIVE_POLL_F:
+        case NCI_MODE_PASSIVE_POLL_F:
+            size = sizeof(NciModeParam);
+            break;
+        case NCI_MODE_PASSIVE_POLL_B:
+            size = sizeof(NciModeParam);
+            poll_b = &param->poll_b;
+            if (poll_b->prot_info.size) {
+                size = G_ALIGN8(size);
+                size += G_ALIGN8(poll_b->prot_info.size);
+            }
+            break;
+        case NCI_MODE_ACTIVE_LISTEN_F:      /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_F:
+            size = sizeof(NciModeParam);
+            listen_f = &param->listen_f;
+            if (listen_f->nfcid2.size) {
+                size = G_ALIGN8(size);
+                size += G_ALIGN8(listen_f->nfcid2.size);
+            }
+            break;
+        case NCI_MODE_PASSIVE_POLL_15693:   /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_15693:
+        case NCI_MODE_PASSIVE_LISTEN_A:
+        case NCI_MODE_PASSIVE_LISTEN_B:
+        case NCI_MODE_ACTIVE_LISTEN_A:
+            /* NCI 1.0 defines no parameters for A/B Listen modes */
+            break;
+        }
+    }
+    return size;
+}
+
 NciDiscoveryNtf*
 nci_discovery_ntf_copy_array(
     const NciDiscoveryNtf* const* ntfs,
@@ -910,6 +1017,159 @@ nci_discovery_ntf_copy(
     } else {
         return NULL;
     }
+}
+
+/* Free the result with g_free() */
+NciModeParam*
+nci_util_copy_mode_param(
+    const NciModeParam* param,
+    NCI_MODE mode) /* Since 1.1.13 */
+{
+    if (G_LIKELY(param)) {
+        NciModeParam* copy = NULL;
+        gsize size = nci_mode_param_size(param, mode);
+
+        switch (mode) {
+        case NCI_MODE_ACTIVE_POLL_A:        /* fallthrough */
+        case NCI_MODE_PASSIVE_POLL_A:
+        case NCI_MODE_ACTIVE_POLL_F:
+        case NCI_MODE_PASSIVE_POLL_F:
+        case NCI_MODE_PASSIVE_POLL_B:
+        case NCI_MODE_ACTIVE_LISTEN_F:
+        case NCI_MODE_PASSIVE_LISTEN_F:
+            if (size) {
+                copy = g_malloc0(size);
+                nci_mode_param_copy_impl(copy, param, mode);
+            }
+            return copy;
+        case NCI_MODE_PASSIVE_POLL_15693:   /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_15693:
+            break;
+        case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_B:
+        case NCI_MODE_ACTIVE_LISTEN_A:
+            /* NCI 1.0 defines no parameters for A/B Listen modes */
+            return NULL;
+        }
+        GDEBUG("Unhandled activation mode 0x%02x", mode);
+    }
+    return NULL;
+}
+
+/* Free the result with g_free() */
+NciActivationParam*
+nci_util_copy_activation_param(
+    const NciActivationParam* param,
+    NCI_RF_INTERFACE intf,
+    NCI_MODE mode) /* Since 1.1.13 */
+{
+    if (G_LIKELY(param)) {
+        NciActivationParam* copy = NULL;
+        gsize size = sizeof(NciActivationParam);
+        const NciActivationParamIsoDepPollA* iso_dep_poll_a = NULL;
+        const NciActivationParamIsoDepPollB* iso_dep_poll_b = NULL;
+        const NciActivationParamNfcDepPoll* nfc_dep_poll = NULL;
+        const NciActivationParamNfcDepListen* nfc_dep_listen = NULL;
+
+        switch (intf) {
+        case NCI_RF_INTERFACE_ISO_DEP:
+            switch (mode) {
+            case NCI_MODE_PASSIVE_POLL_A:
+            case NCI_MODE_ACTIVE_POLL_A:
+                iso_dep_poll_a = &param->iso_dep_poll_a;
+                if (iso_dep_poll_a->t1.size) {
+                    size = G_ALIGN8(size);
+                    size += G_ALIGN8(iso_dep_poll_a->t1.size);
+                }
+                copy = g_malloc0(size);
+                memcpy(copy, param, sizeof(NciActivationParam));
+                if (iso_dep_poll_a->t1.bytes) {
+                    guint8* dest = (guint8*)copy +
+                        G_ALIGN8(sizeof(NciActivationParam));
+                    memcpy(dest, iso_dep_poll_a->t1.bytes,
+                        iso_dep_poll_a->t1.size);
+                    copy->iso_dep_poll_a.t1.bytes = dest;
+                }
+                return copy;
+            case NCI_MODE_PASSIVE_POLL_B:
+                iso_dep_poll_b = &param->iso_dep_poll_b;
+                if (iso_dep_poll_b->hlr.size) {
+                    size = G_ALIGN8(size);
+                    size += G_ALIGN8(iso_dep_poll_b->hlr.size);
+                }
+                copy = g_malloc0(size);
+                memcpy(copy, param, sizeof(NciActivationParam));
+                if (iso_dep_poll_b->hlr.bytes) {
+                    guint8* dest = (guint8*)copy +
+                        G_ALIGN8(sizeof(NciActivationParam));
+                    memcpy(dest, iso_dep_poll_b->hlr.bytes,
+                        iso_dep_poll_b->hlr.size);
+                    copy->iso_dep_poll_b.hlr.bytes = dest;
+                }
+                return copy;
+            case NCI_MODE_PASSIVE_POLL_F:
+            case NCI_MODE_ACTIVE_POLL_F:
+            case NCI_MODE_PASSIVE_POLL_15693:
+            case NCI_MODE_PASSIVE_LISTEN_A:
+            case NCI_MODE_PASSIVE_LISTEN_B:
+            case NCI_MODE_PASSIVE_LISTEN_F:
+            case NCI_MODE_ACTIVE_LISTEN_A:
+            case NCI_MODE_ACTIVE_LISTEN_F:
+            case NCI_MODE_PASSIVE_LISTEN_15693:
+                break;
+            }
+            break;
+        case NCI_RF_INTERFACE_FRAME:
+            /* There are no Activation Parameters for Frame RF interface */
+            break;
+        case NCI_RF_INTERFACE_NFC_DEP:
+            switch (mode) {
+            case NCI_MODE_ACTIVE_POLL_A:
+            case NCI_MODE_ACTIVE_POLL_F:
+            case NCI_MODE_PASSIVE_POLL_A:
+            case NCI_MODE_PASSIVE_POLL_F:
+                nfc_dep_poll = &param->nfc_dep_poll;
+                size += G_ALIGN8(nfc_dep_poll->g.size);
+                copy = g_malloc0(size);
+                memcpy(copy, param, sizeof(NciActivationParam));
+                if (nfc_dep_poll->g.bytes) {
+                    guint8* dest = (guint8*)copy +
+                        G_ALIGN8(sizeof(NciActivationParam));
+                    memcpy(dest, nfc_dep_poll->g.bytes,
+                        nfc_dep_poll->g.size);
+                    copy->nfc_dep_poll.g.bytes = dest;
+                }
+                return copy;
+            case NCI_MODE_ACTIVE_LISTEN_A:
+            case NCI_MODE_ACTIVE_LISTEN_F:
+            case NCI_MODE_PASSIVE_LISTEN_A:
+            case NCI_MODE_PASSIVE_LISTEN_F:
+                nfc_dep_listen = &param->nfc_dep_listen;
+                size += G_ALIGN8(nfc_dep_listen->g.size);
+                copy = g_malloc0(size);
+                memcpy(copy, param, sizeof(NciActivationParam));
+                if (nfc_dep_listen->g.bytes) {
+                    guint8* dest = (guint8*)copy +
+                        G_ALIGN8(sizeof(NciActivationParam));
+                    memcpy(dest, nfc_dep_listen->g.bytes,
+                        nfc_dep_listen->g.size);
+                    copy->nfc_dep_listen.g.bytes = dest;
+                }
+                return copy;
+            case NCI_MODE_PASSIVE_POLL_B:
+            case NCI_MODE_PASSIVE_POLL_15693:
+            case NCI_MODE_PASSIVE_LISTEN_B:
+            case NCI_MODE_PASSIVE_LISTEN_15693:
+                break;
+            }
+            break;
+        case NCI_RF_INTERFACE_NFCEE_DIRECT:
+        case NCI_RF_INTERFACE_PROPRIETARY:
+            GDEBUG("Unhandled interface type");
+            break;
+        }
+    }
+    return NULL;
 }
 
 /*

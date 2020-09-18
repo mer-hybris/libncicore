@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2019 Jolla Ltd.
- * Copyright (C) 2019 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2020 Jolla Ltd.
+ * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -30,59 +31,29 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "nci_param_w4_host_select.h"
-#include "nci_param_impl.h"
-#include "nci_util_p.h"
+#ifndef NCI_UTIL_H
+#define NCI_UTIL_H
 
-typedef NciParamClass NciParamW4HostSelectClass;
-G_DEFINE_TYPE(NciParamW4HostSelect, nci_param_w4_host_select, NCI_TYPE_PARAM)
+#include <nci_types.h>
 
-/*==========================================================================*
- * Interface
- *==========================================================================*/
+G_BEGIN_DECLS
 
-NciParamW4HostSelect*
-nci_param_w4_host_select_new(
-    const NciDiscoveryNtf* const* ntf,
-    guint count)
-{
-    NciParamW4HostSelect* self =
-        g_object_new(NCI_TYPE_PARAM_W4_HOST_SELECT, NULL);
+/* Free the result with g_free() */
+NciModeParam*
+nci_util_copy_mode_param(
+    const NciModeParam* param,
+    NCI_MODE mode); /* Since 1.1.13 */
 
-    self->ntf = nci_discovery_ntf_copy_array(ntf, count);
-    self->count = count;
-    return self;
-}
+/* Free the result with g_free() */
+NciActivationParam*
+nci_util_copy_activation_param(
+    const NciActivationParam* param,
+    NCI_RF_INTERFACE intf,
+    NCI_MODE mode); /* Since 1.1.13 */
 
-/*==========================================================================*
- * Internals
- *==========================================================================*/
+G_END_DECLS
 
-static
-void
-nci_param_w4_host_select_init(
-    NciParamW4HostSelect* self)
-{
-}
-
-static
-void
-nci_param_w4_host_select_finalize(
-    GObject* obj)
-{
-    NciParamW4HostSelect* self = NCI_PARAM_W4_HOST_SELECT(obj);
-
-    g_free(self->ntf);
-    G_OBJECT_CLASS(nci_param_w4_host_select_parent_class)->finalize(obj);
-}
-
-static
-void
-nci_param_w4_host_select_class_init(
-    NciParamClass* klass)
-{
-    G_OBJECT_CLASS(klass)->finalize = nci_param_w4_host_select_finalize;
-}
+#endif /* NCI_UTIL_H */
 
 /*
  * Local Variables:

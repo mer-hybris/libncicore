@@ -32,7 +32,7 @@
 
 #include "nci_param_w4_all_discoveries.h"
 #include "nci_param_impl.h"
-#include "nci_util.h"
+#include "nci_util_p.h"
 
 typedef NciParamClass NciParamW4AllDiscoveriesClass;
 G_DEFINE_TYPE(NciParamW4AllDiscoveries, nci_param_w4_all_discoveries,

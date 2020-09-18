@@ -32,7 +32,7 @@
 
 #include "nci_sm.h"
 #include "nci_state_impl.h"
-#include "nci_util.h"
+#include "nci_util_p.h"
 #include "nci_log.h"
 
 typedef NciState NciStateListenSleep;

@@ -2,6 +2,7 @@
     global:
         nci_core_*;
         nci_log;
+        nci_util_*;
     local:
         *;
 };
