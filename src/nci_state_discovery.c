@@ -34,7 +34,7 @@
 #include "nci_sar.h"
 #include "nci_state_impl.h"
 #include "nci_param_w4_all_discoveries.h"
-#include "nci_util.h"
+#include "nci_util_p.h"
 #include "nci_log.h"
 
 typedef NciState NciStateDiscovery;

@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2019-2020 Jolla Ltd.
  * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -30,9 +31,10 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef NCI_UTIL_H
-#define NCI_UTIL_H
+#ifndef NCI_UTIL_PRIVATE_H
+#define NCI_UTIL_PRIVATE_H
 
+#include <nci_util.h>
 #include "nci_types_p.h"
 
 gboolean
@@ -76,7 +78,7 @@ nci_discovery_ntf_copy(
     const NciDiscoveryNtf* ntf)
     NCI_INTERNAL;
 
-#endif /* NCI_UTIL_H */
+#endif /* NCI_UTIL_PRIVATE_H */
 
 /*
  * Local Variables:

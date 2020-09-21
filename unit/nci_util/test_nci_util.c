@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2019-2020 Jolla Ltd.
  * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -32,7 +33,9 @@
 
 #include "test_common.h"
 
-#include "nci_util.h"
+#include "nci_util_p.h"
+
+#define FIELD_SIZEOF(t, f) (sizeof(((t*)0)->f))
 
 static TestOpt test_opt;
 
@@ -47,6 +50,8 @@ test_null(
 {
     g_assert(!nci_discovery_ntf_copy_array(NULL, 0));
     g_assert(!nci_discovery_ntf_copy(NULL));
+    g_assert(!nci_util_copy_mode_param(NULL, 0));
+    g_assert(!nci_util_copy_activation_param(NULL, 0, 0));
 }
 
 /*==========================================================================*
@@ -761,7 +766,6 @@ typedef struct test_discover_success_data {
     const char* name;
     GUtilData data;
     NciDiscoveryNtf ntf;
-    
 } TestDiscoverSuccessData;
 
 static
@@ -793,6 +797,17 @@ static const guint8 discover_success_data_full_2[] =
     { 0x02, 0x80, 0x00, 0x09, 0x04, 0x00, 0x04, 0x4f,
       0x01, 0x74, 0x01, 0x01, 0x08, 0x00 };
 
+static const guint8 discover_success_data_full_3_param_app_data[] =
+{0x00, 0x81, 0xc1};
+
+static const NciModeParam discover_success_data_full_3_param = {
+    .poll_b = { {0x8e, 0x9c, 0x6d, 0xca}, 0x0b, { 0x52, 0x74, 0x4d, 0x43 },
+        { TEST_ARRAY_AND_SIZE(discover_success_data_full_3_param_app_data) } }
+};
+static const guint8 discover_success_data_full_3[] =
+    { 0x01, 0x04, 0x01, 0x0c, 0x0b, 0x8e, 0x9c, 0x6d, 0xca,
+      0x52, 0x74, 0x4d, 0x43, 0x00, 0x81, 0xc1, 0x00 };
+
 static const TestDiscoverSuccessData discover_success_tests[] = {
     {
         .name = "no_param",
@@ -815,6 +830,14 @@ static const TestDiscoverSuccessData discover_success_tests[] = {
                  .mode = NCI_MODE_PASSIVE_POLL_A, .param_len = 9,
                  .param_bytes = discover_success_data_full_2 + 4,
                  .param = &discover_success_data_full_2_param,
+                 .last = TRUE }
+    },{
+        .name = "full/3",
+        .data = { TEST_ARRAY_AND_SIZE(discover_success_data_full_3) },
+        .ntf = { .discovery_id = 0x01, .protocol = 0x04,
+                 .mode = NCI_MODE_PASSIVE_POLL_B, .param_len = 0x0c,
+                 .param_bytes = discover_success_data_full_3 + 4,
+                 .param = &discover_success_data_full_3_param,
                  .last = TRUE }
     }
 };
@@ -842,7 +865,7 @@ test_discover_copy_check(
     } else {
         g_assert(!n1->param_bytes);
     }
-    
+
     if (n2->param) {
         g_assert(n1->param);
         g_assert(!memcmp(n1->param_bytes, n2->param_bytes, n2->param_len));
@@ -859,6 +882,30 @@ test_discover_copy_check(
                 g_assert(p1->sel_res_len == p2->sel_res_len);
                 g_assert(p1->sel_res == p2->sel_res);
                 g_assert(!memcmp(p1->nfcid1, p2->nfcid1, p2->nfcid1_len));
+            }
+            break;
+        case NCI_MODE_PASSIVE_POLL_B:
+            {
+                const NciModeParamPollB* p1 = &n1->param->poll_b;
+                const NciModeParamPollB* p2 = &n2->param->poll_b;
+
+                g_assert(p1->fsc == p2->fsc);
+                g_assert(!memcmp(p1->nfcid0, p2->nfcid0,
+                    FIELD_SIZEOF(NciModeParamPollB, nfcid0)));
+                g_assert(!memcmp(p1->app_data, p2->app_data,
+                    FIELD_SIZEOF(NciModeParamPollB, app_data)));
+                g_assert(!p1->prot_info.bytes || p1->prot_info.size);
+                g_assert(!p1->prot_info.size || p1->prot_info.bytes);
+                g_assert(!p2->prot_info.bytes || p2->prot_info.size);
+                g_assert(!p2->prot_info.size || p2->prot_info.bytes);
+                if (p1->prot_info.bytes) {
+                    g_assert(p1->prot_info.bytes != p2->prot_info.bytes);
+                    g_assert(p1->prot_info.size == p2->prot_info.size);
+                    g_assert(!memcmp(p1->prot_info.bytes, p2->prot_info.bytes,
+                        p1->prot_info.size));
+                } else {
+                    g_assert(p1->prot_info.bytes == p2->prot_info.bytes);
+                }
             }
             break;
         default:
@@ -930,6 +977,387 @@ static const TestDiscoverFailData discover_fail_tests[] = {
 };
 
 /*==========================================================================*
+ * copy_check helpers
+ *==========================================================================*/
+
+static
+void
+test_poll_a_copy_check(
+    const NciModeParamPollA* orig,
+    const NciModeParamPollA* copy)
+{
+    g_assert(orig);
+    g_assert(copy);
+    g_assert(orig != copy);
+    g_assert(orig->sel_res == copy->sel_res);
+    g_assert(orig->sel_res_len == copy->sel_res_len);
+    g_assert(orig->nfcid1_len == copy->nfcid1_len);
+    g_assert(orig->nfcid1_len == copy->nfcid1_len);
+    g_assert(!memcmp(orig->sens_res, copy->sens_res,
+        FIELD_SIZEOF(NciModeParamPollA, sens_res)));
+    g_assert(!memcmp(orig->nfcid1, copy->nfcid1,
+        FIELD_SIZEOF(NciModeParamPollA, nfcid1)));
+}
+
+static
+void
+test_poll_b_copy_check(
+    const NciModeParamPollB* orig,
+    const NciModeParamPollB* copy)
+{
+    g_assert(orig);
+    g_assert(copy);
+    g_assert(orig != copy);
+    g_assert(orig->fsc == copy->fsc);
+    g_assert(!memcmp(orig->nfcid0, copy->nfcid0,
+        FIELD_SIZEOF(NciModeParamPollB, nfcid0)));
+    g_assert(!memcmp(orig->app_data, copy->app_data,
+        FIELD_SIZEOF(NciModeParamPollB, app_data)));
+    g_assert(!orig->prot_info.bytes || orig->prot_info.size);
+    g_assert(!orig->prot_info.size || orig->prot_info.bytes);
+    g_assert(!copy->prot_info.bytes || copy->prot_info.size);
+    g_assert(!copy->prot_info.size || copy->prot_info.bytes);
+    if (orig->prot_info.bytes) {
+        g_assert(orig->prot_info.bytes != copy->prot_info.bytes);
+        g_assert(orig->prot_info.size == copy->prot_info.size);
+        g_assert(!memcmp(orig->prot_info.bytes, copy->prot_info.bytes,
+            orig->prot_info.size));
+    } else {
+        g_assert(orig->prot_info.bytes == copy->prot_info.bytes);
+    }
+}
+
+static
+void
+test_poll_f_copy_check(
+    const NciModeParamPollF* orig,
+    const NciModeParamPollF* copy)
+{
+    g_assert(orig);
+    g_assert(copy);
+    g_assert(orig != copy);
+    g_assert(orig->bitrate == copy->bitrate);
+    g_assert(!memcmp(orig->nfcid2, copy->nfcid2,
+        FIELD_SIZEOF(NciModeParamPollF, nfcid2)));
+}
+
+static
+void
+test_listen_f_copy_check(
+    const NciModeParamListenF* orig,
+    const NciModeParamListenF* copy)
+{
+    g_assert(orig);
+    g_assert(copy);
+    g_assert(orig != copy);
+    g_assert(!orig->nfcid2.bytes || orig->nfcid2.size);
+    g_assert(!orig->nfcid2.size || orig->nfcid2.bytes);
+    g_assert(!copy->nfcid2.bytes || copy->nfcid2.size);
+    g_assert(!copy->nfcid2.size || copy->nfcid2.bytes);
+    if (orig->nfcid2.bytes) {
+        g_assert(orig->nfcid2.bytes != copy->nfcid2.bytes);
+        g_assert(orig->nfcid2.size == copy->nfcid2.size);
+        g_assert(!memcmp(orig->nfcid2.bytes, copy->nfcid2.bytes,
+            orig->nfcid2.size));
+    } else {
+        g_assert(orig->nfcid2.bytes == copy->nfcid2.bytes);
+    }
+}
+
+static
+void
+test_mode_param_copy_check(
+    const NciModeParam* orig,
+    const NciModeParam* copy,
+    NCI_MODE mode)
+{
+    if (orig) {
+        g_assert(copy);
+        g_assert(orig != copy);
+        switch (mode) {
+        case NCI_MODE_ACTIVE_POLL_A:        /* fallthrough */
+        case NCI_MODE_PASSIVE_POLL_A:
+            test_poll_a_copy_check(&orig->poll_a, &copy->poll_a);
+            break;
+        case NCI_MODE_ACTIVE_POLL_F:        /* fallthrough */
+        case NCI_MODE_PASSIVE_POLL_F:
+            test_poll_f_copy_check(&orig->poll_f, &copy->poll_f);
+            break;
+        case NCI_MODE_PASSIVE_POLL_B:
+            test_poll_b_copy_check(&orig->poll_b, &copy->poll_b);
+            break;
+        case NCI_MODE_ACTIVE_LISTEN_F:
+        case NCI_MODE_PASSIVE_LISTEN_F:
+            test_listen_f_copy_check(&orig->listen_f, &copy->listen_f);
+            break;
+        case NCI_MODE_PASSIVE_POLL_15693:
+        case NCI_MODE_PASSIVE_LISTEN_15693:
+            break;
+        case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_B:     /* fallthrough */
+        case NCI_MODE_ACTIVE_LISTEN_A:
+            break;
+        }
+    } else {
+        g_assert(orig == copy);
+    }
+}
+
+static
+void
+test_act_param_iso_dep_poll_a_copy_check(
+    const NciActivationParamIsoDepPollA* orig,
+    const NciActivationParamIsoDepPollA* copy)
+{
+    g_assert(orig);
+    g_assert(copy);
+    g_assert(orig != copy);
+    g_assert(orig->fsc == copy->fsc);
+    g_assert(orig->t0 == copy->t0);
+    g_assert(orig->ta == copy->ta);
+    g_assert(orig->tb == copy->tb);
+    g_assert(orig->tc == copy->tc);
+    g_assert(!orig->t1.bytes || orig->t1.size);
+    g_assert(!orig->t1.size || orig->t1.bytes);
+    g_assert(!copy->t1.bytes || copy->t1.size);
+    g_assert(!copy->t1.size || copy->t1.bytes);
+    if (orig->t1.bytes) {
+        g_assert(orig->t1.bytes != copy->t1.bytes);
+        g_assert(orig->t1.size == copy->t1.size);
+        g_assert(!memcmp(orig->t1.bytes, copy->t1.bytes, orig->t1.size));
+    } else {
+        g_assert(orig->t1.bytes == copy->t1.bytes);
+    }
+}
+
+static
+void
+test_act_param_iso_dep_poll_b_copy_check(
+    const NciActivationParamIsoDepPollB* orig,
+    const NciActivationParamIsoDepPollB* copy)
+{
+    g_assert(orig);
+    g_assert(copy);
+    g_assert(orig != copy);
+    g_assert(orig->mbli == copy->mbli);
+    g_assert(orig->did == copy->did);
+    g_assert(!orig->hlr.bytes || orig->hlr.size);
+    g_assert(!orig->hlr.size || orig->hlr.bytes);
+    g_assert(!copy->hlr.bytes || copy->hlr.size);
+    g_assert(!copy->hlr.size || copy->hlr.bytes);
+    if (orig->hlr.bytes) {
+        g_assert(orig->hlr.bytes != copy->hlr.bytes);
+        g_assert(orig->hlr.size == copy->hlr.size);
+        g_assert(!memcmp(orig->hlr.bytes, copy->hlr.bytes, orig->hlr.size));
+    } else {
+        g_assert(orig->hlr.bytes == copy->hlr.bytes);
+    }
+}
+
+static
+void
+test_act_param_nfc_dep_poll_copy_check(
+    const NciActivationParamNfcDepPoll* orig,
+    const NciActivationParamNfcDepPoll* copy)
+{
+    g_assert(orig);
+    g_assert(copy);
+    g_assert(orig != copy);
+    g_assert(orig->did == copy->did);
+    g_assert(orig->bs == copy->bs);
+    g_assert(orig->br == copy->br);
+    g_assert(orig->to == copy->to);
+    g_assert(orig->pp == copy->pp);
+    g_assert(!memcmp(orig->nfcid3, copy->nfcid3,
+        FIELD_SIZEOF(NciActivationParamNfcDepPoll, nfcid3)));
+    g_assert(!orig->g.bytes || orig->g.size);
+    g_assert(!orig->g.size || orig->g.bytes);
+    g_assert(!copy->g.bytes || copy->g.size);
+    g_assert(!copy->g.size || copy->g.bytes);
+    if (orig->g.bytes) {
+        g_assert(orig->g.bytes != copy->g.bytes);
+        g_assert(orig->g.size == copy->g.size);
+        g_assert(!memcmp(orig->g.bytes, copy->g.bytes, orig->g.size));
+    } else {
+        g_assert(orig->g.bytes == copy->g.bytes);
+    }
+}
+
+static
+void
+test_act_param_nfc_dep_listen_copy_check(
+    const NciActivationParamNfcDepListen* orig,
+    const NciActivationParamNfcDepListen* copy)
+{
+    g_assert(orig);
+    g_assert(copy);
+    g_assert(orig != copy);
+    g_assert(orig->did == copy->did);
+    g_assert(orig->bs == copy->bs);
+    g_assert(orig->br == copy->br);
+    g_assert(orig->pp == copy->pp);
+    g_assert(!memcmp(orig->nfcid3, copy->nfcid3,
+        FIELD_SIZEOF(NciActivationParamNfcDepPoll, nfcid3)));
+    g_assert(!orig->g.bytes || orig->g.size);
+    g_assert(!orig->g.size || orig->g.bytes);
+    g_assert(!copy->g.bytes || copy->g.size);
+    g_assert(!copy->g.size || copy->g.bytes);
+    if (orig->g.bytes) {
+        g_assert(orig->g.bytes != copy->g.bytes);
+        g_assert(orig->g.size == copy->g.size);
+        g_assert(!memcmp(orig->g.bytes, copy->g.bytes, orig->g.size));
+    } else {
+        g_assert(orig->g.bytes == copy->g.bytes);
+    }
+}
+
+static
+void
+test_activation_param_copy_check(
+    const NciActivationParam* orig,
+    const NciActivationParam* copy,
+    NCI_RF_INTERFACE intf,
+    NCI_MODE mode)
+{
+    if (orig) {
+        g_assert(copy);
+        g_assert(orig != copy);
+        switch (intf) {
+        case NCI_RF_INTERFACE_ISO_DEP:
+            switch (mode) {
+            case NCI_MODE_PASSIVE_POLL_A:
+            case NCI_MODE_ACTIVE_POLL_A:
+                test_act_param_iso_dep_poll_a_copy_check(&orig->iso_dep_poll_a,
+                    &copy->iso_dep_poll_a);
+                break;
+            case NCI_MODE_PASSIVE_POLL_B:
+                test_act_param_iso_dep_poll_b_copy_check(&orig->iso_dep_poll_b,
+                    &copy->iso_dep_poll_b);
+            case NCI_MODE_PASSIVE_POLL_F:
+            case NCI_MODE_ACTIVE_POLL_F:
+            case NCI_MODE_PASSIVE_POLL_15693:
+            case NCI_MODE_PASSIVE_LISTEN_A:
+            case NCI_MODE_PASSIVE_LISTEN_B:
+            case NCI_MODE_PASSIVE_LISTEN_F:
+            case NCI_MODE_ACTIVE_LISTEN_A:
+            case NCI_MODE_ACTIVE_LISTEN_F:
+            case NCI_MODE_PASSIVE_LISTEN_15693:
+                break;
+            }
+            break;
+        case NCI_RF_INTERFACE_FRAME:
+            /* There are no Activation Parameters for Frame RF interface */
+            break;
+        case NCI_RF_INTERFACE_NFC_DEP:
+            switch (mode) {
+            case NCI_MODE_ACTIVE_POLL_A:
+            case NCI_MODE_ACTIVE_POLL_F:
+            case NCI_MODE_PASSIVE_POLL_A:
+            case NCI_MODE_PASSIVE_POLL_F:
+                test_act_param_nfc_dep_poll_copy_check(&orig->nfc_dep_poll,
+                    &copy->nfc_dep_poll);
+            case NCI_MODE_ACTIVE_LISTEN_A:
+            case NCI_MODE_ACTIVE_LISTEN_F:
+            case NCI_MODE_PASSIVE_LISTEN_A:
+            case NCI_MODE_PASSIVE_LISTEN_F:
+                test_act_param_nfc_dep_listen_copy_check(&orig->nfc_dep_listen,
+                    &copy->nfc_dep_listen);
+            case NCI_MODE_PASSIVE_POLL_B:
+            case NCI_MODE_PASSIVE_POLL_15693:
+            case NCI_MODE_PASSIVE_LISTEN_B:
+            case NCI_MODE_PASSIVE_LISTEN_15693:
+                break;
+            }
+            break;
+        case NCI_RF_INTERFACE_NFCEE_DIRECT:
+        case NCI_RF_INTERFACE_PROPRIETARY:
+            break;
+        }
+    } else {
+        g_assert(orig == copy);
+    }
+}
+
+/*==========================================================================*
+ * mode_param_copy
+ *==========================================================================*/
+
+static
+void
+test_mode_param_copy(
+    gconstpointer test_data)
+{
+    const TestModeParamSuccessData* test = test_data;
+    const NCI_MODE mode = test->mode;
+    NciModeParam param;
+    memset(&param, 0, sizeof(param));
+    g_assert(nci_parse_mode_param(&param, mode, test->data.bytes,
+        test->data.size));
+
+    NciModeParam* copy = nci_util_copy_mode_param(&param, mode);
+    test_mode_param_copy_check(&param, copy, mode);
+    g_free(copy);
+}
+
+/*==========================================================================*
+ * discover_mode_param_copy
+ *==========================================================================*/
+
+static
+void
+test_discover_mode_param_copy(
+    gconstpointer test_data)
+{
+    const TestDiscoverSuccessData* test = test_data;
+    const NciModeParam* orig = test->ntf.param;
+    const NCI_MODE mode = test->ntf.mode;
+    NciModeParam* copy = nci_util_copy_mode_param(orig, mode);
+
+    test_mode_param_copy_check(orig, copy, mode);
+    g_free(copy);
+
+    orig = NULL;
+    copy = nci_util_copy_mode_param(orig, mode);
+    test_mode_param_copy_check(orig, copy, mode);
+    g_free(copy);
+}
+
+/*==========================================================================*
+ * intf_activated_copy_params
+ *==========================================================================*/
+
+
+static
+void
+test_intf_activated_copy_params(
+    gconstpointer test_data)
+{
+    const TestIntfActivatedSuccessData* test = test_data;
+    NciIntfActivationNtf ntf;
+    NciModeParam mode_param;
+    NciActivationParam activation_param;
+
+    memset(&mode_param, 0, sizeof(mode_param));
+    memset(&activation_param, 0, sizeof(activation_param));
+    g_assert(nci_parse_intf_activated_ntf(&ntf, &mode_param, &activation_param,
+        test->data.bytes, test->data.size));
+
+    const NciModeParam* orig_mode = test->mode_param;
+    const NCI_MODE mode = ntf.mode;
+    const NCI_RF_INTERFACE intf = ntf.rf_intf;
+    const NciActivationParam* orig_act = test->activation_param;
+    NciModeParam* copy_mode = nci_util_copy_mode_param(orig_mode, mode);
+    NciActivationParam* copy_act = nci_util_copy_activation_param(orig_act, intf,
+        mode);
+
+    test_mode_param_copy_check(orig_mode, copy_mode, mode);
+    test_activation_param_copy_check(orig_act, copy_act, intf, mode);
+    g_free(copy_mode);
+    g_free(copy_act);
+}
+
+
+/*==========================================================================*
  * Common
  *==========================================================================*/
 
@@ -945,10 +1373,14 @@ int main(int argc, char* argv[])
     g_test_add_func(TEST_("listen_mode"), test_listen_mode);
     for (i = 0; i < G_N_ELEMENTS(mode_param_success_tests); i++) {
         const TestModeParamSuccessData* test = mode_param_success_tests + i;
-        char* path = g_strconcat(TEST_("mode_param/ok/"), test->name, NULL);
+        char* path1 = g_strconcat(TEST_("mode_param/ok/"), test->name, NULL);
+        char* path2 = g_strconcat(TEST_("mode_param/ok_copy/"), test->name,
+            NULL);
 
-        g_test_add_data_func(path, test, test_mode_param_success);
-        g_free(path);
+        g_test_add_data_func(path1, test, test_mode_param_success);
+        g_test_add_data_func(path2, test, test_mode_param_copy);
+        g_free(path1);
+        g_free(path2);
     }
     for (i = 0; i < G_N_ELEMENTS(mode_param_fail_tests); i++) {
         const TestModeParamFailData* test = mode_param_fail_tests + i;
@@ -961,20 +1393,28 @@ int main(int argc, char* argv[])
         const TestDiscoverSuccessData* test = discover_success_tests + i;
         char* path1 = g_strconcat(TEST_("discover/success/"), test->name, NULL);
         char* path2 = g_strconcat(TEST_("discover/copy/"), test->name, NULL);
+        char* path3 = g_strconcat(TEST_("discover/copy_mode_param/"),
+            test->name, NULL);
 
         g_test_add_data_func(path1, test, test_discover_success);
         g_test_add_data_func(path2, test, test_discover_copy);
+        g_test_add_data_func(path3, test, test_discover_mode_param_copy);
         g_free(path1);
         g_free(path2);
+        g_free(path3);
     }
     for (i = 0; i < G_N_ELEMENTS(intf_activated_success_tests); i++) {
         const TestIntfActivatedSuccessData* test =
             intf_activated_success_tests + i;
-        char* path = g_strconcat(TEST_("intf_activated/success/"),
+        char* path1 = g_strconcat(TEST_("intf_activated/success/"),
+            test->name, NULL);
+        char* path2 = g_strconcat(TEST_("intf_activated/copy_params/"),
             test->name, NULL);
 
-        g_test_add_data_func(path, test, test_intf_activated_success);
-        g_free(path);
+        g_test_add_data_func(path1, test, test_intf_activated_success);
+        g_test_add_data_func(path2, test, test_intf_activated_copy_params);
+        g_free(path1);
+        g_free(path2);
     }
     for (i = 0; i < G_N_ELEMENTS(intf_activated_fail_tests); i++) {
         const TestIntfActivatedFailData* test = intf_activated_fail_tests + i;
