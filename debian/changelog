@@ -1,3 +1,9 @@
+libncicore (1.1.13) unstable; urgency=low
+
+  * Added nci_util_copy_mode_param() and nci_util_copy_activation_param()
+
+ -- Slava Monich <slava.monich@jolla.com>  Mon, 21 Sep 2020 18:31:29 +0300
+
 libncicore (1.1.12) unstable; urgency=low
 
   * Update libncicore.pc when version header changes
