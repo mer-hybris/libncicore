@@ -915,7 +915,6 @@ nci_sar_cancel(
             /* We can't really cancel the packet once we started writing it.
              * Just clear the completion callback. */
             self->writing->complete = NULL;
-            return;
         } else if (!nci_sar_cancel_queue(self, &self->cmd, id)) {
             guint i;
 
@@ -926,8 +925,8 @@ nci_sar_cancel(
                     return;
                 }
             }
+            GWARN("Invalid packet id %u", id);
         }
-        GWARN("Invalid packet id %u", id);
     }
 }
 
