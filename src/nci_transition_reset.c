@@ -43,6 +43,84 @@ G_DEFINE_TYPE(NciTransitionReset, nci_transition_reset, NCI_TYPE_TRANSITION)
 #define THIS_TYPE (nci_transition_reset_get_type())
 #define PARENT_CLASS (nci_transition_reset_parent_class)
 
+/*
+ * The reset sequence goes like this:
+ *
+ *            +-----------+                             +=========+
+ *            | RESET_CMD |----- error ---------------->| Failure |
+ *            +-----------+                             +=========+
+ *                  |                                        ^
+ *                  ok                                       |
+ *                  |                                        |
+ *                  v                                        |
+ *       +-----------------------+                           |
+ *       | Determine NCI version |---- unexpected ---------->+
+ *       +-----------------------+                           |
+ *            |              |                               |
+ *            v1             v2                              |
+ *            |              |                               |
+ *            |          +-------------------------+         |
+ *            |          | Wait for CORE_RESET_NTF |         |
+ *            v          +-------------------------+         |
+ *     +-------------+               |                       |
+ *     | INIT_CMD v1 |-- error ------|---------------------->+
+ *     +-------------+               v                       |
+ *            |            +------------------------+        |
+ *            ok           | CORE_RESET_NTF arrives |        |
+ *            |            +------------------------+        |
+ *            |                      |                       |
+ *            |                      v                       |
+ *            |               +-------------+                |
+ *            |               | INIT_CMD v2 |-- error ------>/
+ *            |               +-------------+
+ *            |                      |
+ *            |                      ok
+ *            |                      |
+ *            v                      v
+ *  +----------------------------------------------------+
+ *  | GET_CONFIG_CMD (TOTAL_DURATION + LF_PROTOCOL_TYPE) |
+ *  +----------------------------------------------------+
+ *        |                       |
+ *        ok                    error
+ *        |                       |
+ *        |                       v
+ *        |      +------------------------------------+
+ *        |      |  GET_CONFIG_CMD (LF_PROTOCOL_TYPE) |
+ *        |      +------------------------------------+
+ *        |                       |
+ *        v                       v
+ * +------------------+   +------------------+ 
+ * | Update POLL_F,   |   | Update POLL_F,   |
+ * | LISTEN_F and     |   | LISTEN_F and     |
+ * | LISTEN_F_NFC_DEP |   | LISTEN_F_NFC_DEP |
+ * | opions           |   | opions           |
+ * +------------------+   +------------------+
+ *        |                       |
+ *        |                       v
+ *        |       +---------------------------------+
+ *        |       | GET_CONFIG_CMD (TOTAL_DURATION) |
+ *        |       +---------------------------------+
+ *        |                |             |
+ *        |                ok          error
+ *        |                |             |
+ *        v                v             |
+ * +----------------------------+        |
+ * | Check TOTAL_DURATION value |        |
+ * +----------------------------+        |
+ *        |          |                   |
+ *     correct     wrong                 |
+ *        |          |                   |
+ *        |          v                   v
+ *        |  +---------------------------------+
+ *        |  | SET_CONFIG_CMD (TOTAL_DURATION) |
+ *        |  +---------------------------------+
+ *        |     |
+ *        v     v
+ *      +=========+
+ *      | Success |
+ *      +=========+
+ */
+
 #define DEFAULT_TOTAL_DURATION (500) /* ms */
 
 /*==========================================================================*
@@ -53,13 +131,12 @@ static
 gboolean
 nci_transition_reset_find_config_param(
     guint nparams,
-    const guint8* params,
-    const guint len,
+    const GUtilData* params,
     guint8 id,
     GUtilData* value)
 {
-    const guint8* ptr = params;
-    const guint8* end = params + len;
+    const guint8* ptr = params->bytes;
+    const guint8* end = ptr + params->size;
 
     /*
      * +-----------------------------------------+
@@ -81,8 +158,132 @@ nci_transition_reset_find_config_param(
 }
 
 static
+guint
+nci_transition_reset_get_param_value(
+    guint nparams,
+    const GUtilData* params,
+    guint8 id,
+    guint* value)
+{
+    GUtilData data;
+
+    if (nci_transition_reset_find_config_param(nparams, params, id, &data) &&
+        data.size > 0 && data.size <= sizeof(guint)) {
+        gsize i;
+
+        /*
+         * 1.11 Coding Conventions
+         *
+         * All values greater than 1 octet are sent and
+         * received in Little Endian format.
+         */
+        for (*value = 0, i = 0; i < data.size; i++) {
+            *value += ((guint)data.bytes[i]) << (8 * i);
+        }
+        return data.size;
+    } else {
+        return 0;
+    }
+}
+
+static
 void
-nci_transition_reset_set_config_rsp(
+nci_transition_reset_update_nfc_f_options(
+    NciSm* sm,
+    guint nparams,
+    const GUtilData* params)
+{
+    guint value;
+
+    /*
+     * 6.1.8 Listen F Parameters
+     * Table 35: Discovery Configuration Parameters for Listen F
+     * LF_PROTOCOL_TYPE
+     *
+     * We use bit b1 (If set to 1b, NFC-DEP Protocol is supported
+     * by the NFC Forum Device in Listen F Mode) as the indicator
+     * of NFC-F support in general (both Poll and Listen, NFC-DEP
+     * or not).
+     */
+    if (nci_transition_reset_get_param_value(nparams, params,
+        NCI_CONFIG_LF_PROTOCOL_TYPE, &value) == 1 /* byte */ &&
+        /* Table 36: Supported Protocols for Listen F */
+        (value & 0x02) ) {
+        GDEBUG("  PollF/ListenF/NFC-DEP");
+        sm->options |= NCI_OPTION_POLL_F | NCI_OPTION_LISTEN_F |
+            NCI_OPTION_LISTEN_F_NFC_DEP;
+    }
+}
+
+static
+gboolean
+nci_transition_reset_total_duration_ok(
+    guint nparams,
+    const GUtilData* params)
+{
+    guint value;
+
+    /*
+     * 6.1.11 Common Parameters
+     * Table 41: Common Parameters for Discovery Configuration
+     * TOTAL_DURATION
+     */
+    if (nci_transition_reset_get_param_value(nparams, params,
+        NCI_CONFIG_TOTAL_DURATION, &value) == 2 /* bytes */) {
+        if (value == DEFAULT_TOTAL_DURATION) {
+            GDEBUG("TOTAL_DURATION is %u ms", value);
+            return TRUE;
+        } else {
+            GDEBUG("TOTAL_DURATION is %u ms, fixing that", value);
+        }
+    } else {
+        GDEBUG("Could not determine TOTAL_DURATION");
+    }
+    return FALSE;
+}
+
+#if GUTIL_LOG_DEBUG
+static
+void
+nci_transition_reset_dump_invalid_config_params(
+    guint nparams,
+    const GUtilData* params)
+{
+    /*
+     * [NFCForum-TS-NCI-1.0]
+     * 4.3.2 Retrieve the Configuration
+     *
+     * If the DH tries to retrieve any parameter(s) that
+     * are not available in the NFCC, the NFCC SHALL respond
+     * with a CORE_GET_CONFIG_RSP with a Status field of
+     * STATUS_INVALID_PARAM, containing each unavailable
+     * Parameter ID with a Parameter Len field of value zero.
+     * In this case, the CORE_GET_CONFIG_RSP SHALL NOT include
+     * any parameter(s) that are available on the NFCC.
+     */
+    if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+        const guint8* ptr = params->bytes;
+        const guint8* end = ptr + params->size;
+        GString* buf = g_string_new(NULL);
+        guint i;
+
+        for (i = 0; i < nparams && (ptr + 1) < end; i++, ptr += 2) {
+            g_string_append_printf(buf, " %02x", *ptr);
+        }
+        GDEBUG("%c CORE_GET_CONFIG_RSP invalid parameter(s):%s", DIR_IN,
+            buf->str);
+        g_string_free(buf, TRUE);
+    }
+}
+#  define DUMP_INVALID_CONFIG_PARAMS(n,params) \
+    nci_transition_reset_dump_invalid_config_params(n,params)
+#else
+#  define DUMP_INVALID_CONFIG_PARAMS(n,params) ((void)0)
+#endif
+
+static
+void
+nci_transition_reset_set_total_duration_rsp(
     NCI_REQUEST_STATUS status,
     const GUtilData* payload,
     NciTransition* self)
@@ -123,7 +324,7 @@ nci_transition_reset_set_config_rsp(
 
 static
 void
-nci_transition_reset_set_config(
+nci_transition_reset_set_total_duration(
     NciTransition* self)
 {
     /*
@@ -151,15 +352,15 @@ nci_transition_reset_set_config(
         NCI_CONFIG_PB_BAIL_OUT, 0x01, 0x00
     };
 
-    GDEBUG("%c CORE_SET_CONFIG_CMD", DIR_OUT);
+    GDEBUG("%c CORE_SET_CONFIG_CMD (TOTAL_DURATION)", DIR_OUT);
     nci_transition_send_command_static(self,
         NCI_GID_CORE, NCI_OID_CORE_SET_CONFIG, cmd, sizeof(cmd),
-        nci_transition_reset_set_config_rsp);
+        nci_transition_reset_set_total_duration_rsp);
 }
 
 static
 void
-nci_transition_reset_get_config_rsp(
+nci_transition_reset_get_all_config_rsp(
     NCI_REQUEST_STATUS status,
     const GUtilData* payload,
     NciTransition* self)
@@ -190,72 +391,35 @@ nci_transition_reset_get_config_rsp(
          * +=========================================================+
          */
         if (status == NCI_REQUEST_SUCCESS && payload->size >= 2) {
-            const guint8* pkt = payload->bytes;
-            const guint len = payload->size;
-            const guint n = pkt[1];
+            const guint cmd_status = payload->bytes[0];
+            const guint n = payload->bytes[1];
+            GUtilData data;
 
-            if (pkt[0] == NCI_STATUS_OK) {
-                GUtilData data;
+            data.bytes = payload->bytes + 2;
+            data.size = payload->size - 2;
+            if (cmd_status == NCI_STATUS_OK) {
 
                 GDEBUG("%c CORE_GET_CONFIG_RSP ok", DIR_IN);
-
-                /* Check if we need to tweak TOTAL_DURATION */
-                if (nci_transition_reset_find_config_param(n, pkt + 2, len - 2,
-                    NCI_CONFIG_TOTAL_DURATION, &data) && data.size == 2) {
-                    /*
-                     * 1.11 Coding Conventions
-                     *
-                     * All values greater than 1 octet are sent and
-                     * received in Little Endian format.
-                     */
-                    const guint ms = data.bytes[0] +
-                        (((guint)data.bytes[1]) << 8);
-
-                    if (ms == DEFAULT_TOTAL_DURATION) {
-                        GDEBUG("TOTAL_DURATION is %u ms", ms);
-                        /* Done with transition */
-                        nci_transition_finish(self, NULL);
-                        return;
-                    } else {
-                        GDEBUG("TOTAL_DURATION is %u ms, fixing that", ms);
-                    }
+                nci_transition_reset_update_nfc_f_options(sm, n, &data);
+                if (nci_transition_reset_total_duration_ok(n, &data)) {
+                    /* Done with transition */
+                    nci_transition_finish(self, NULL);
                 } else {
-                    GDEBUG("Could not determine TOTAL_DURATION");
+                    /* Fix the duration */
+                    nci_transition_reset_set_total_duration(self);
                 }
-            } else if (pkt[0] == NCI_STATUS_INVALID_PARAM && len >= 2 + n*2) {
-#if GUTIL_LOG_DEBUG
-                /*
-                 * [NFCForum-TS-NCI-1.0]
-                 * 4.3.2 Retrieve the Configuration
-                 *
-                 * If the DH tries to retrieve any parameter(s) that
-                 * are not available in the NFCC, the NFCC SHALL respond
-                 * with a CORE_GET_CONFIG_RSP with a Status field of
-                 * STATUS_INVALID_PARAM, containing each unavailable
-                 * Parameter ID with a Parameter Len field of value zero.
-                 * In this case, the CORE_GET_CONFIG_RSP SHALL NOT include
-                 * any parameter(s) that are available on the NFCC.
-                 */
-                if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
-                    GString* buf = g_string_new(NULL);
-                    guint i;
-
-                    for (i = 0; i < n; i++) {
-                        g_string_append_printf(buf, " %02x", pkt[2 + i*2]);
-                    }
-                    GDEBUG("%c CORE_GET_CONFIG_RSP invalid parameter(s):%s",
-                        DIR_IN, buf->str);
-                    g_string_free(buf, TRUE);
-                }
-#endif
             } else {
-                GWARN("CORE_GET_CONFIG_CMD error 0x%02x (continuing anyway)",
-                    payload->bytes[0]);
+                if (cmd_status == NCI_STATUS_INVALID_PARAM) {
+                    DUMP_INVALID_CONFIG_PARAMS(n, &data);
+                } else {
+                    GWARN("CORE_GET_CONFIG_CMD error 0x%02x "
+                        "(continuing anyway)", cmd_status);
+                }
+                nci_transition_reset_set_total_duration(self);
             }
-            nci_transition_reset_set_config(self);
             return;
         } else {
-            GWARN("CORE_GET_CONFIG_CMD failed (continuing anyway)");
+            GWARN("CORE_GET_CONFIG_CMD (All) unexpected response");
         }
     }
     nci_sm_stall(sm, NCI_STALL_ERROR);
@@ -263,7 +427,7 @@ nci_transition_reset_get_config_rsp(
 
 static
 void
-nci_transition_reset_get_config(
+nci_transition_reset_get_all_config(
     NciTransition* self)
 {
     /*
@@ -279,14 +443,16 @@ nci_transition_reset_get_config(
      * +=========================================================+
      */
     static const guint8 cmd[] = {
-        1,
-        NCI_CONFIG_TOTAL_DURATION
+        2,
+        NCI_CONFIG_TOTAL_DURATION,
+        NCI_CONFIG_LF_PROTOCOL_TYPE /* For detecting NFC-F support */
     };
 
-    GDEBUG("%c CORE_GET_CONFIG_CMD", DIR_OUT);
+    /* Optimistically request all parameters */
+    GDEBUG("%c CORE_GET_CONFIG_CMD (All)", DIR_OUT);
     nci_transition_send_command_static(self,
         NCI_GID_CORE, NCI_OID_CORE_GET_CONFIG, cmd, sizeof(cmd),
-        nci_transition_reset_get_config_rsp);
+        nci_transition_reset_get_all_config_rsp);
 }
 
 static
@@ -373,7 +539,7 @@ nci_transition_reset_init_v1_rsp(
             nci_sar_set_max_logical_connections(sar, max_logical_conns);
             nci_sar_set_max_control_payload_size(sar, max_control_payload);
             nci_sar_set_max_data_payload_size(sar, 0 /* Reset to default */);
-            nci_transition_reset_get_config(self);
+            nci_transition_reset_get_all_config(self);
             return;
         }
         GWARN("CORE_INIT (v1) failed (or is incomprehensible)");
@@ -426,13 +592,19 @@ nci_transition_reset_init_v2_rsp(
             const guint8* rf_interfaces = pkt + 14;
             guint8 max_logical_conns = pkt[5];
             guint8 max_control_payload = pkt[8];
+            guint i;
 
             if (sm->rf_interfaces) {
                 g_bytes_unref(sm->rf_interfaces);
                 sm->rf_interfaces = NULL;
             }
             if (n > 0) {
-                sm->rf_interfaces = g_bytes_new(rf_interfaces, n);
+                guint8* ifs = g_new(guint8, n);
+
+                for (i = 0; i < n; i++) {
+                    ifs[i] = rf_interfaces[2 * i];
+                }
+                sm->rf_interfaces = g_bytes_new_take(ifs, n);
             }
 
             sm->nfcc_discovery = pkt[1];
@@ -446,7 +618,6 @@ nci_transition_reset_init_v2_rsp(
 #if GUTIL_LOG_DEBUG
             if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
                 GString* buf = g_string_new(NULL);
-                guint i;
 
                 for (i = 0; i < n; i++) {
                     g_string_append_printf(buf, " %02x", rf_interfaces[2 * i]);
@@ -462,7 +633,7 @@ nci_transition_reset_init_v2_rsp(
             nci_sar_set_max_logical_connections(sar, max_logical_conns);
             nci_sar_set_max_control_payload_size(sar, max_control_payload);
             nci_sar_set_max_data_payload_size(sar, 0 /* Reset to default */);
-            nci_transition_reset_get_config(self);
+            nci_transition_reset_get_all_config(self);
             return;
         }
         GWARN("CORE_INIT (v1) failed (or is incomprehensible)");
@@ -489,6 +660,7 @@ nci_transition_reset_rsp(
         const guint len = payload->size;
 
         /*
+         * [NFCForum-TS-NCI-1.0]
          * Table 5: Control Messages to Reset the NFCC
          *
          * CORE_RESET_RSP
@@ -505,6 +677,8 @@ nci_transition_reset_rsp(
             sm->version = NCI_INTERFACE_VERSION_1;
             if (pkt[0] == NCI_STATUS_OK) {
                 GDEBUG("%c CORE_RESET_RSP (v1) ok", DIR_IN);
+                GDEBUG("  NCI Version = %u.%u", pkt[1] >> 4, pkt[1] & 0x0f);
+                GDEBUG("  Configuration Status = %u", pkt[2]);
                 GDEBUG("%c CORE_INIT_CMD (v1)", DIR_OUT);
                 nci_transition_send_command(self, NCI_GID_CORE,
                     NCI_OID_CORE_INIT, NULL, nci_transition_reset_init_v1_rsp);
@@ -565,14 +739,53 @@ nci_transition_reset_handle_ntf(
         case NCI_OID_CORE_RESET:
             /* Notification is only expected in NCI 2.x case */
             if (sm && sm->version == NCI_INTERFACE_VERSION_2) {
-                static const guint8 cmd[] = { 0x00, 0x00 };
+                const guint8* pkt = payload->bytes;
+                const guint len = payload->size;
 
-                GDEBUG("CORE_RESET_NTF (v2)");
-                GDEBUG("%c CORE_INIT_CMD (v2)", DIR_OUT);
-                nci_transition_send_command_static(self,
-                    NCI_GID_CORE, NCI_OID_CORE_INIT, cmd, sizeof(cmd),
-                    nci_transition_reset_init_v2_rsp);
-                return;
+                if (len >= 5 && (5 + pkt[4]) <= len) {
+                    /* Disable all post NCI 2.0 features: */
+                    static const guint8 cmd[] = { 0x00, 0x00 };
+
+                    /*
+                     * NFC Controller Interface (NCI), Version 2.0
+                     * Section 4.1
+                     *
+                     * CORE_RESET_NTF
+                     *
+                     * +=====================================================+
+                     * | Offset | Size | Description                         |
+                     * +=====================================================+
+                     * | 0      | 1    | Reset Trigger                       |
+                     * | 1      | 1    | Configuration Status                |
+                     * | 2      | 1    | NCI Version (0x20 == 2.0)           |
+                     * | 3      | 1    | Manufacturer ID                     |
+                     * | 4      | 1    | Manufacturer Info Length (n)        |
+                     * | 5      | n    | Manufacturer Info                   |
+                     * +=====================================================+
+                     */
+                    GDEBUG("CORE_RESET_NTF (v2)");
+                    GDEBUG("  Reset Trigger = %u", pkt[0]);
+                    GDEBUG("  Configuration Status = %u", pkt[1]);
+                    GDEBUG("  NCI Version = %u.%u", pkt[2] >> 4, pkt[2]&0x0f);
+                    GDEBUG("  Manufacturer = 0x%02x", pkt[3]);
+#if GUTIL_LOG_DEBUG
+                    if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+                        GString* buf = g_string_new(NULL);
+                        guint i;
+
+                        for (i = 0; i < pkt[4]; i++) {
+                            g_string_append_printf(buf, " %02x", pkt[5 + i]);
+                        }
+                        GDEBUG("  Manufacturer Info =%s", buf->str);
+                        g_string_free(buf, TRUE);
+                    }
+#endif
+                    GDEBUG("%c CORE_INIT_CMD (v2)", DIR_OUT);
+                    nci_transition_send_command_static(self,
+                        NCI_GID_CORE, NCI_OID_CORE_INIT, cmd, sizeof(cmd),
+                        nci_transition_reset_init_v2_rsp);
+                    return;
+                }
             }
         }
         break;
@@ -609,6 +822,7 @@ nci_transition_reset_start(
         }
         sm->max_routing_table_size = 0;
         sm->version = NCI_INTERFACE_VERSION_UNKNOWN;
+        sm->options = NCI_OPTION_NONE;
         sm->nfcc_discovery = NCI_NFCC_DISCOVERY_NONE;
         sm->nfcc_routing = NCI_NFCC_ROUTING_NONE;
         sm->nfcc_power = NCI_NFCC_POWER_NONE;
