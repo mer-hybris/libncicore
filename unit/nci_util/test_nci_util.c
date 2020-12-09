@@ -69,7 +69,7 @@ test_listen_mode(
     g_assert(nci_listen_mode(NCI_MODE_PASSIVE_LISTEN_F));
     g_assert(nci_listen_mode(NCI_MODE_ACTIVE_LISTEN_A));
     g_assert(nci_listen_mode(NCI_MODE_ACTIVE_LISTEN_F));
-    g_assert(nci_listen_mode(NCI_MODE_PASSIVE_LISTEN_15693));
+    g_assert(nci_listen_mode(NCI_MODE_PASSIVE_LISTEN_V));
 
     /* Poll modes */
     g_assert(!nci_listen_mode(NCI_MODE_PASSIVE_POLL_A));
@@ -77,7 +77,7 @@ test_listen_mode(
     g_assert(!nci_listen_mode(NCI_MODE_PASSIVE_POLL_F));
     g_assert(!nci_listen_mode(NCI_MODE_ACTIVE_POLL_A));
     g_assert(!nci_listen_mode(NCI_MODE_ACTIVE_POLL_F));
-    g_assert(!nci_listen_mode(NCI_MODE_PASSIVE_POLL_15693));
+    g_assert(!nci_listen_mode(NCI_MODE_PASSIVE_POLL_V));
 
     /* Invalid mode */
     g_assert(!nci_listen_mode((NCI_MODE)(-1)));
@@ -248,7 +248,7 @@ static const TestModeParamFailData mode_param_fail_tests[] = {
         .mode = (NCI_MODE)(-1)
     },{
         .name = "unhandled_mode",
-        .mode = NCI_MODE_PASSIVE_LISTEN_15693
+        .mode = NCI_MODE_PASSIVE_LISTEN_V
     },{
         .name = "listen_mode",
         .mode = NCI_MODE_PASSIVE_LISTEN_A
@@ -1090,8 +1090,8 @@ test_mode_param_copy_check(
         case NCI_MODE_PASSIVE_LISTEN_F:
             test_listen_f_copy_check(&orig->listen_f, &copy->listen_f);
             break;
-        case NCI_MODE_PASSIVE_POLL_15693:
-        case NCI_MODE_PASSIVE_LISTEN_15693:
+        case NCI_MODE_PASSIVE_POLL_V:
+        case NCI_MODE_PASSIVE_LISTEN_V:
             break;
         case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
         case NCI_MODE_PASSIVE_LISTEN_B:     /* fallthrough */
@@ -1235,13 +1235,13 @@ test_activation_param_copy_check(
                     &copy->iso_dep_poll_b);
             case NCI_MODE_PASSIVE_POLL_F:
             case NCI_MODE_ACTIVE_POLL_F:
-            case NCI_MODE_PASSIVE_POLL_15693:
+            case NCI_MODE_PASSIVE_POLL_V:
             case NCI_MODE_PASSIVE_LISTEN_A:
             case NCI_MODE_PASSIVE_LISTEN_B:
             case NCI_MODE_PASSIVE_LISTEN_F:
             case NCI_MODE_ACTIVE_LISTEN_A:
             case NCI_MODE_ACTIVE_LISTEN_F:
-            case NCI_MODE_PASSIVE_LISTEN_15693:
+            case NCI_MODE_PASSIVE_LISTEN_V:
                 break;
             }
             break;
@@ -1263,9 +1263,9 @@ test_activation_param_copy_check(
                 test_act_param_nfc_dep_listen_copy_check(&orig->nfc_dep_listen,
                     &copy->nfc_dep_listen);
             case NCI_MODE_PASSIVE_POLL_B:
-            case NCI_MODE_PASSIVE_POLL_15693:
+            case NCI_MODE_PASSIVE_POLL_V:
             case NCI_MODE_PASSIVE_LISTEN_B:
-            case NCI_MODE_PASSIVE_LISTEN_15693:
+            case NCI_MODE_PASSIVE_LISTEN_V:
                 break;
             }
             break;

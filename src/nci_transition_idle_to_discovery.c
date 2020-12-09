@@ -148,7 +148,7 @@ nci_transition_idle_to_discovery_discover(
     if (sm->op_mode & NFC_OP_MODE_RW) {
         static const guint8 entries[] = {
             NCI_MODE_PASSIVE_POLL_B, 1,
-            NCI_MODE_PASSIVE_POLL_15693, 1
+            NCI_MODE_PASSIVE_POLL_V, 1
         };
 
         GDEBUG("  PassivePollB");
@@ -438,7 +438,7 @@ nci_transition_idle_to_discovery_set_technology_routing(
         3,
         NCI_NFCEE_ID_DH,
         NCI_ROUTING_ENTRY_POWER_ON,
-        NCI_RF_TECHNOLOGY_15693,
+        NCI_RF_TECHNOLOGY_V,
     };
 
     GDEBUG("%c RF_SET_LISTEN_MODE_ROUTING_CMD (Technology)", DIR_OUT);

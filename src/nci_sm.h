@@ -120,10 +120,10 @@ typedef enum nci_deactivation_reason {
 
 /* Table 95: RF Technologies */
 typedef enum nci_rf_technology {
-    NCI_RF_TECHNOLOGY_A         = 0x00,
-    NCI_RF_TECHNOLOGY_B         = 0x01,
-    NCI_RF_TECHNOLOGY_F         = 0x02,
-    NCI_RF_TECHNOLOGY_15693     = 0x03
+    NCI_RF_TECHNOLOGY_A = 0x00,
+    NCI_RF_TECHNOLOGY_B = 0x01,
+    NCI_RF_TECHNOLOGY_F = 0x02,
+    NCI_RF_TECHNOLOGY_V = 0x03
 } NCI_RF_TECHNOLOGY;
 
 /* Table 101: Configuration Parameter Tags */
