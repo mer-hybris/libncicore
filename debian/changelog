@@ -1,3 +1,10 @@
+libncicore (1.1.15) unstable; urgency=low
+
+  * Detect NFC-F support at run time
+  * Use NFC-V terminology instead of ISO-15693
+
+ -- Slava Monich <slava.monich@jolla.com>  Fri, 11 Dec 2020 03:10:55 +0200
+
 libncicore (1.1.14) unstable; urgency=low
 
   * Fixed misleading "Invalid packet id" warning
