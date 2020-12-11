@@ -43,6 +43,15 @@ typedef enum nci_interface_version {
     NCI_INTERFACE_VERSION_2
 } NCI_INTERFACE_VERSION;
 
+typedef enum nci_options {
+    NCI_OPTION_NONE                     = 0x00,
+    NCI_OPTION_POLL_F                   = 0x01,
+    NCI_OPTION_LISTEN_F                 = 0x02,
+    NCI_OPTION_LISTEN_F_NFC_DEP         = 0x04,
+    NCI_OPTION_POLL_V                   = 0x08,
+    NCI_OPTION_LISTEN_V                 = 0x10
+} NCI_OPTIONS;
+
 /* Table 9: NFCC Features */
 typedef enum nci_nfcc_discovery {
     NCI_NFCC_DISCOVERY_NONE             = 0x00,
@@ -120,10 +129,10 @@ typedef enum nci_deactivation_reason {
 
 /* Table 95: RF Technologies */
 typedef enum nci_rf_technology {
-    NCI_RF_TECHNOLOGY_A         = 0x00,
-    NCI_RF_TECHNOLOGY_B         = 0x01,
-    NCI_RF_TECHNOLOGY_F         = 0x02,
-    NCI_RF_TECHNOLOGY_15693     = 0x03
+    NCI_RF_TECHNOLOGY_A = 0x00,
+    NCI_RF_TECHNOLOGY_B = 0x01,
+    NCI_RF_TECHNOLOGY_F = 0x02,
+    NCI_RF_TECHNOLOGY_V = 0x03
 } NCI_RF_TECHNOLOGY;
 
 /* Table 101: Configuration Parameter Tags */
@@ -252,6 +261,7 @@ struct nci_sm {
     NciState* next_state;
     GBytes* rf_interfaces;
     guint max_routing_table_size;
+    NCI_OPTIONS options;
     NCI_INTERFACE_VERSION version;
     NCI_NFCC_DISCOVERY nfcc_discovery;
     NCI_NFCC_ROUTING nfcc_routing;

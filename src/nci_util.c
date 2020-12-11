@@ -46,14 +46,14 @@ nci_listen_mode(
     case NCI_MODE_PASSIVE_LISTEN_F:
     case NCI_MODE_ACTIVE_LISTEN_A:
     case NCI_MODE_ACTIVE_LISTEN_F:
-    case NCI_MODE_PASSIVE_LISTEN_15693:
+    case NCI_MODE_PASSIVE_LISTEN_V:
         return TRUE;
     case NCI_MODE_PASSIVE_POLL_A:
     case NCI_MODE_PASSIVE_POLL_B:
     case NCI_MODE_PASSIVE_POLL_F:
     case NCI_MODE_ACTIVE_POLL_A:
     case NCI_MODE_ACTIVE_POLL_F:
-    case NCI_MODE_PASSIVE_POLL_15693:
+    case NCI_MODE_PASSIVE_POLL_V:
         break;
     }
     /* Assume Poll by default */
@@ -266,8 +266,8 @@ nci_parse_mode_param(
         /* This does happen */
         GDEBUG("No parameters for NFC-F listen mode");
         return NULL;
-    case NCI_MODE_PASSIVE_POLL_15693:
-    case NCI_MODE_PASSIVE_LISTEN_15693:
+    case NCI_MODE_PASSIVE_POLL_V:
+    case NCI_MODE_PASSIVE_LISTEN_V:
         break;
     case NCI_MODE_PASSIVE_LISTEN_A:
     case NCI_MODE_PASSIVE_LISTEN_B:
@@ -657,13 +657,13 @@ nci_parse_activation_param(
             break;
         case NCI_MODE_PASSIVE_POLL_F:
         case NCI_MODE_ACTIVE_POLL_F:
-        case NCI_MODE_PASSIVE_POLL_15693:
+        case NCI_MODE_PASSIVE_POLL_V:
         case NCI_MODE_PASSIVE_LISTEN_A:
         case NCI_MODE_PASSIVE_LISTEN_B:
         case NCI_MODE_PASSIVE_LISTEN_F:
         case NCI_MODE_ACTIVE_LISTEN_A:
         case NCI_MODE_ACTIVE_LISTEN_F:
-        case NCI_MODE_PASSIVE_LISTEN_15693:
+        case NCI_MODE_PASSIVE_LISTEN_V:
             break;
         }
         break;
@@ -693,9 +693,9 @@ nci_parse_activation_param(
             GDEBUG("Failed to parse parameters for NFC-DEP listen mode");
             break;
         case NCI_MODE_PASSIVE_POLL_B:
-        case NCI_MODE_PASSIVE_POLL_15693:
+        case NCI_MODE_PASSIVE_POLL_V:
         case NCI_MODE_PASSIVE_LISTEN_B:
-        case NCI_MODE_PASSIVE_LISTEN_15693:
+        case NCI_MODE_PASSIVE_LISTEN_V:
             break;
         }
         break;
@@ -819,11 +819,11 @@ nci_parse_intf_activated_ntf(
             case NCI_MODE_ACTIVE_POLL_F:
                 active_mode = TRUE;
                 break;
-            case NCI_MODE_PASSIVE_LISTEN_15693:
+            case NCI_MODE_PASSIVE_LISTEN_V:
             case NCI_MODE_PASSIVE_POLL_A:
             case NCI_MODE_PASSIVE_POLL_B:
             case NCI_MODE_PASSIVE_POLL_F:
-            case NCI_MODE_PASSIVE_POLL_15693:
+            case NCI_MODE_PASSIVE_POLL_V:
                 break;
             }
 
@@ -894,8 +894,8 @@ nci_mode_param_copy_impl(
                 size += G_ALIGN8(listen_f->nfcid2.size);
             }
             return size;
-        case NCI_MODE_PASSIVE_POLL_15693:   /* fallthrough */
-        case NCI_MODE_PASSIVE_LISTEN_15693:
+        case NCI_MODE_PASSIVE_POLL_V:   /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_V:
             break;
         case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
         case NCI_MODE_PASSIVE_LISTEN_B:
@@ -944,8 +944,8 @@ nci_mode_param_size(
                 size += G_ALIGN8(listen_f->nfcid2.size);
             }
             break;
-        case NCI_MODE_PASSIVE_POLL_15693:   /* fallthrough */
-        case NCI_MODE_PASSIVE_LISTEN_15693:
+        case NCI_MODE_PASSIVE_POLL_V:   /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_V:
         case NCI_MODE_PASSIVE_LISTEN_A:
         case NCI_MODE_PASSIVE_LISTEN_B:
         case NCI_MODE_ACTIVE_LISTEN_A:
@@ -1049,8 +1049,8 @@ nci_util_copy_mode_param(
                 nci_mode_param_copy_impl(copy, param, mode);
             }
             return copy;
-        case NCI_MODE_PASSIVE_POLL_15693:   /* fallthrough */
-        case NCI_MODE_PASSIVE_LISTEN_15693:
+        case NCI_MODE_PASSIVE_POLL_V:       /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_V:
             break;
         case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
         case NCI_MODE_PASSIVE_LISTEN_B:
@@ -1116,13 +1116,13 @@ nci_util_copy_activation_param(
                 return copy;
             case NCI_MODE_PASSIVE_POLL_F:
             case NCI_MODE_ACTIVE_POLL_F:
-            case NCI_MODE_PASSIVE_POLL_15693:
+            case NCI_MODE_PASSIVE_POLL_V:
             case NCI_MODE_PASSIVE_LISTEN_A:
             case NCI_MODE_PASSIVE_LISTEN_B:
             case NCI_MODE_PASSIVE_LISTEN_F:
             case NCI_MODE_ACTIVE_LISTEN_A:
             case NCI_MODE_ACTIVE_LISTEN_F:
-            case NCI_MODE_PASSIVE_LISTEN_15693:
+            case NCI_MODE_PASSIVE_LISTEN_V:
                 break;
             }
             break;
@@ -1164,9 +1164,9 @@ nci_util_copy_activation_param(
                 }
                 return copy;
             case NCI_MODE_PASSIVE_POLL_B:
-            case NCI_MODE_PASSIVE_POLL_15693:
+            case NCI_MODE_PASSIVE_POLL_V:
             case NCI_MODE_PASSIVE_LISTEN_B:
-            case NCI_MODE_PASSIVE_LISTEN_15693:
+            case NCI_MODE_PASSIVE_LISTEN_V:
                 break;
             }
             break;
