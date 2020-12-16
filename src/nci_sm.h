@@ -52,6 +52,10 @@ typedef enum nci_options {
     NCI_OPTION_LISTEN_V                 = 0x10
 } NCI_OPTIONS;
 
+#define NCI_OPTION_TYPE_F   (NCI_OPTION_POLL_F|NCI_OPTION_LISTEN_F)
+#define NCI_OPTION_TYPE_V   (NCI_OPTION_POLL_V|NCI_OPTION_LISTEN_V)
+#define NCI_OPTIONS_DEFAULT NCI_OPTION_TYPE_F
+
 /* Table 9: NFCC Features */
 typedef enum nci_nfcc_discovery {
     NCI_NFCC_DISCOVERY_NONE             = 0x00,

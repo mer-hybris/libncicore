@@ -1034,6 +1034,7 @@ nci_sm_object_init(
 
     /* Only poll modes by default */
     sm->op_mode = NFC_OP_MODE_RW | NFC_OP_MODE_PEER | NFC_OP_MODE_POLL;
+    sm->options = NCI_OPTIONS_DEFAULT;
     self->transitions = g_ptr_array_new_with_free_func((GDestroyNotify)
         nci_transition_unref);
     self->states = g_ptr_array_new_full(NCI_CORE_STATES, (GDestroyNotify)
