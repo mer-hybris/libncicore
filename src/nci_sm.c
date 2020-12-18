@@ -97,6 +97,29 @@ static guint nci_sm_signals[SIGNAL_COUNT] = { 0 };
 
 #define NCI_IS_INTERNAL_STATE(state) ((state) < NCI_RFST_IDLE)
 
+/* Config file name is extern for unit tests */
+const char* nci_sm_config_file = "/etc/libncicore.conf";
+static const char CONFIG_SECTION[] = "Configuration";
+static const char CONFIG_LIST_SEPARATORS[] = ";,";
+static const char CONFIG_ENTRY_TECHNOLOGIES[] = "Technologies";
+static const char CONFIG_TECHNOLOGY_TYPE_A[] = "A";
+static const char CONFIG_TECHNOLOGY_TYPE_B[] = "B";
+static const char CONFIG_TECHNOLOGY_TYPE_F[] = "F";
+static const char CONFIG_TECHNOLOGY_TYPE_V[] = "V";
+static const char CONFIG_TECHNOLOGY_POLL_A[] = "Poll-A";
+static const char CONFIG_TECHNOLOGY_POLL_B[] = "Poll-B";
+static const char CONFIG_TECHNOLOGY_POLL_F[] = "Poll-F";
+static const char CONFIG_TECHNOLOGY_POLL_V[] = "Poll-V";
+static const char CONFIG_TECHNOLOGY_LISTEN_A[] = "Listen-A";
+static const char CONFIG_TECHNOLOGY_LISTEN_B[] = "Listen-B";
+static const char CONFIG_TECHNOLOGY_LISTEN_F[] = "Listen-F";
+static const char CONFIG_TECHNOLOGY_LISTEN_V[] = "Listen-V";
+
+typedef struct nci_technolofy_option {
+    const char* name;
+    NCI_OPTIONS opt;
+} NciTechnologyOption;
+
 static inline NciSmObject* nci_sm_object(NciSm* sm) /* NULL safe */
     { return G_LIKELY(sm) ? NCI_SM(G_CAST(sm, NciSmObject, sm)) : NULL; }
 
@@ -398,6 +421,82 @@ nci_sm_add_signal_handler(
     return 0;
 }
 
+static
+void
+nci_sm_parse_config(
+    NciSm* sm,
+    GKeyFile* config)
+{
+    char* sval = g_key_file_get_string(config, CONFIG_SECTION,
+        CONFIG_ENTRY_TECHNOLOGIES, NULL);
+
+    if (sval) {
+        static const NciTechnologyOption nci_tech_options[] = {
+            /* A and B are always enabled */
+            { CONFIG_TECHNOLOGY_TYPE_A, NCI_OPTION_NONE },
+            { CONFIG_TECHNOLOGY_TYPE_B, NCI_OPTION_NONE },
+            { CONFIG_TECHNOLOGY_TYPE_F, NCI_OPTION_TYPE_F },
+            { CONFIG_TECHNOLOGY_TYPE_V, NCI_OPTION_TYPE_V },
+            { CONFIG_TECHNOLOGY_POLL_A, NCI_OPTION_NONE },
+            { CONFIG_TECHNOLOGY_POLL_B, NCI_OPTION_NONE },
+            { CONFIG_TECHNOLOGY_POLL_F, NCI_OPTION_POLL_F },
+            { CONFIG_TECHNOLOGY_POLL_V, NCI_OPTION_POLL_V },
+            { CONFIG_TECHNOLOGY_LISTEN_A, NCI_OPTION_NONE },
+            { CONFIG_TECHNOLOGY_LISTEN_B, NCI_OPTION_NONE },
+            { CONFIG_TECHNOLOGY_LISTEN_F, NCI_OPTION_LISTEN_F },
+            { CONFIG_TECHNOLOGY_LISTEN_V, NCI_OPTION_LISTEN_V }
+        };
+
+        char** techs = g_strsplit_set(sval, CONFIG_LIST_SEPARATORS, -1);
+        char** val = techs;
+
+        sm->options = NCI_OPTION_NONE;
+        for (val = techs; *val; val++) {
+            const NciTechnologyOption* opt = NULL;
+            guint i;
+
+            g_strstrip(*val);
+            for (i = 0; i < G_N_ELEMENTS(nci_tech_options); i++) {
+                if (!g_ascii_strcasecmp(*val, nci_tech_options[i].name)) {
+                    opt = nci_tech_options + i;
+                    break;
+                }
+            }
+
+            if (opt) {
+                GDEBUG("  %s", opt->name);
+                sm->options |= opt->opt;
+            } else {
+                GWARN("Unexpected technology '%s' in configuration", *val);
+            }
+        }
+        g_strfreev(techs);
+        g_free(sval);
+    }
+}
+
+static
+void
+nci_sm_load_config(
+    NciSm* sm)
+{
+    if (nci_sm_config_file &&
+        g_file_test(nci_sm_config_file, G_FILE_TEST_EXISTS)) {
+        GError* error = NULL;
+        GKeyFile* config = g_key_file_new();
+
+        if (g_key_file_load_from_file(config, nci_sm_config_file,
+            G_KEY_FILE_NONE, &error)) {
+            GDEBUG("Parsing %s", nci_sm_config_file);
+            nci_sm_parse_config(sm, config);
+        } else {
+            GERR("Error loading %s: %s", nci_sm_config_file, error->message);
+            g_error_free(error);
+        }
+        g_key_file_unref(config);
+    }
+}
+
 /*==========================================================================*
  * Interface
  *==========================================================================*/
@@ -639,6 +738,8 @@ nci_sm_new(
     /* And these are not reusable */
     nci_sm_add_new_transition(sm, NCI_RFST_IDLE,
         nci_transition_idle_to_discovery_new);
+
+    nci_sm_load_config(sm);
     return sm;
 }
 
@@ -1034,6 +1135,7 @@ nci_sm_object_init(
 
     /* Only poll modes by default */
     sm->op_mode = NFC_OP_MODE_RW | NFC_OP_MODE_PEER | NFC_OP_MODE_POLL;
+    sm->options = NCI_OPTIONS_DEFAULT;
     self->transitions = g_ptr_array_new_with_free_func((GDestroyNotify)
         nci_transition_unref);
     self->states = g_ptr_array_new_full(NCI_CORE_STATES, (GDestroyNotify)

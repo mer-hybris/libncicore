@@ -16,3 +16,11 @@ as well as a limited subset of NCI 2.0 features.
 This library doesn't provide any hardware access methods. It's up to
 the code linking with this library to implement interfaces described
 by nci_hal.h
+
+Optionally, NFC technologies supported by the chip can be specified
+in /etc/libncicore.conf file, e.g.
+
+  [Configuration]
+  Technologies = A,B,F
+
+By default all technologies are assumed to be supported.

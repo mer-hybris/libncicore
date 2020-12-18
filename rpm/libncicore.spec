@@ -6,7 +6,7 @@ License: BSD
 URL: https://github.com/mer-hybris/libncicore
 Source: %{name}-%{version}.tar.bz2
 BuildRequires:  pkgconfig(glib-2.0)
-BuildRequires:  pkgconfig(libglibutil)
+BuildRequires:  pkgconfig(libglibutil) >= 1.0.29
 Requires(post): /sbin/ldconfig
 Requires(postun): /sbin/ldconfig
 
