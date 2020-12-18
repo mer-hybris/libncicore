@@ -1,3 +1,10 @@
+libncicore (1.1.16) unstable; urgency=low
+
+  * Made supported technologies configurable
+  * Rolled back detection run time of NFC-F support
+
+ -- Slava Monich <slava.monich@jolla.com>  Fri, 18 Dec 2020 19:19:40 +0200
+
 libncicore (1.1.15) unstable; urgency=low
 
   * Detect NFC-F support at run time
