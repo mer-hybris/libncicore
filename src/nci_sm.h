@@ -47,9 +47,8 @@ typedef enum nci_options {
     NCI_OPTION_NONE                     = 0x00,
     NCI_OPTION_POLL_F                   = 0x01,
     NCI_OPTION_LISTEN_F                 = 0x02,
-    NCI_OPTION_LISTEN_F_NFC_DEP         = 0x04,
-    NCI_OPTION_POLL_V                   = 0x08,
-    NCI_OPTION_LISTEN_V                 = 0x10
+    NCI_OPTION_POLL_V                   = 0x04,
+    NCI_OPTION_LISTEN_V                 = 0x08
 } NCI_OPTIONS;
 
 #define NCI_OPTION_TYPE_F   (NCI_OPTION_POLL_F|NCI_OPTION_LISTEN_F)
@@ -456,6 +455,10 @@ nci_sm_handle_rf_deactivate_ntf(
     NciSm* sm,
     const GUtilData* payload)
     NCI_INTERNAL;
+
+/* And this one is currently only for unit tests */
+
+extern const char* nci_sm_config_file NCI_INTERNAL;
 
 #endif /* NCI_STATE_MACHINE_H */
 
