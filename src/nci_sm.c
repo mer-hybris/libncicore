@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019-2020 Jolla Ltd.
- * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2021 Jolla Ltd.
+ * Copyright (C) 2019-2021 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -1134,7 +1134,7 @@ nci_sm_object_init(
     NciSm* sm = &self->sm;
 
     /* Only poll modes by default */
-    sm->op_mode = NFC_OP_MODE_RW | NFC_OP_MODE_PEER | NFC_OP_MODE_POLL;
+    sm->op_mode = NFC_OP_MODE_RW | NFC_OP_MODE_POLL;
     sm->options = NCI_OPTIONS_DEFAULT;
     self->transitions = g_ptr_array_new_with_free_func((GDestroyNotify)
         nci_transition_unref);

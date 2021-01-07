@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019-2020 Jolla Ltd.
- * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2021 Jolla Ltd.
+ * Copyright (C) 2019-2021 Slava Monich <slava.monich@jolla.com>
  * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * You may use this file under the terms of BSD license as follows:
@@ -58,6 +58,64 @@ nci_listen_mode(
     }
     /* Assume Poll by default */
     return FALSE;
+}
+
+static
+gboolean
+nci_parse_find_config_param(
+    guint nparams,
+    const GUtilData* params,
+    guint8 id,
+    GUtilData* value)
+{
+    const guint8* ptr = params->bytes;
+    const guint8* end = ptr + params->size;
+
+    /*
+     * +-----------------------------------------+
+     * | ID  | 1 | The identifier                |
+     * | Len | 1 | The length of Val (m)         |
+     * | Val | m | The value of the parameter    |
+     * +-----------------------------------------+
+     */
+    while (nparams > 0 && (ptr + 2) <= end && (ptr + 2 + ptr[1]) <= end) {
+        if (ptr[0] == id) {
+            value->size = ptr[1];
+            value->bytes = ptr + 2;
+            return TRUE;
+        }
+        nparams--;
+        ptr += 2 + ptr[1];
+    }
+    return FALSE;
+}
+
+guint
+nci_parse_config_param_uint(
+    guint nparams,
+    const GUtilData* params,
+    guint8 id,
+    guint* value)
+{
+    GUtilData data;
+
+    if (nci_parse_find_config_param(nparams, params, id, &data) &&
+        data.size > 0 && data.size <= sizeof(guint)) {
+        gsize i;
+
+        /*
+         * 1.11 Coding Conventions
+         *
+         * All values greater than 1 octet are sent and
+         * received in Little Endian format.
+         */
+        for (*value = 0, i = 0; i < data.size; i++) {
+            *value += ((guint)data.bytes[i]) << (8 * i);
+        }
+        return data.size;
+    } else {
+        return 0;
+    }
 }
 
 const NciModeParam*

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019-2020 Jolla Ltd.
- * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2021 Jolla Ltd.
+ * Copyright (C) 2019-2021 Slava Monich <slava.monich@jolla.com>
  * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * You may use this file under the terms of BSD license as follows:
@@ -1290,11 +1290,13 @@ test_mode_param_copy(
     const TestModeParamSuccessData* test = test_data;
     const NCI_MODE mode = test->mode;
     NciModeParam param;
+    NciModeParam* copy;
+
     memset(&param, 0, sizeof(param));
     g_assert(nci_parse_mode_param(&param, mode, test->data.bytes,
         test->data.size));
 
-    NciModeParam* copy = nci_util_copy_mode_param(&param, mode);
+    copy = nci_util_copy_mode_param(&param, mode);
     test_mode_param_copy_check(&param, copy, mode);
     g_free(copy);
 }
@@ -1309,23 +1311,21 @@ test_discover_mode_param_copy(
     gconstpointer test_data)
 {
     const TestDiscoverSuccessData* test = test_data;
-    const NciModeParam* orig = test->ntf.param;
     const NCI_MODE mode = test->ntf.mode;
-    NciModeParam* copy = nci_util_copy_mode_param(orig, mode);
+    NciModeParam* copy;
 
-    test_mode_param_copy_check(orig, copy, mode);
+    copy = nci_util_copy_mode_param(test->ntf.param, mode);
+    test_mode_param_copy_check(test->ntf.param, copy, mode);
     g_free(copy);
 
-    orig = NULL;
-    copy = nci_util_copy_mode_param(orig, mode);
-    test_mode_param_copy_check(orig, copy, mode);
+    copy = nci_util_copy_mode_param(NULL, mode);
+    test_mode_param_copy_check(NULL, copy, mode);
     g_free(copy);
 }
 
 /*==========================================================================*
  * intf_activated_copy_params
  *==========================================================================*/
-
 
 static
 void
@@ -1335,27 +1335,86 @@ test_intf_activated_copy_params(
     const TestIntfActivatedSuccessData* test = test_data;
     NciIntfActivationNtf ntf;
     NciModeParam mode_param;
-    NciActivationParam activation_param;
+    NciActivationParam act_param;
+    NciModeParam* copy_mode;
+    NciActivationParam* copy_act;
 
     memset(&mode_param, 0, sizeof(mode_param));
-    memset(&activation_param, 0, sizeof(activation_param));
-    g_assert(nci_parse_intf_activated_ntf(&ntf, &mode_param, &activation_param,
+    memset(&act_param, 0, sizeof(act_param));
+    g_assert(nci_parse_intf_activated_ntf(&ntf, &mode_param, &act_param,
         test->data.bytes, test->data.size));
 
-    const NciModeParam* orig_mode = test->mode_param;
-    const NCI_MODE mode = ntf.mode;
-    const NCI_RF_INTERFACE intf = ntf.rf_intf;
-    const NciActivationParam* orig_act = test->activation_param;
-    NciModeParam* copy_mode = nci_util_copy_mode_param(orig_mode, mode);
-    NciActivationParam* copy_act = nci_util_copy_activation_param(orig_act, intf,
-        mode);
+    copy_mode = nci_util_copy_mode_param(test->mode_param, ntf.mode);
+    copy_act = nci_util_copy_activation_param(test->activation_param,
+        ntf.rf_intf, ntf.mode);
 
-    test_mode_param_copy_check(orig_mode, copy_mode, mode);
-    test_activation_param_copy_check(orig_act, copy_act, intf, mode);
+    test_mode_param_copy_check(test->mode_param, copy_mode, ntf.mode);
+    test_activation_param_copy_check(test->activation_param, copy_act,
+        ntf.rf_intf, ntf.mode);
+
     g_free(copy_mode);
     g_free(copy_act);
 }
 
+/*==========================================================================*
+ * parse_config_param_uint
+ *==========================================================================*/
+
+typedef struct test_parse_config_param_uint_data {
+    guint nparams;
+    GUtilData params;
+    guint id;
+    guint result;
+    guint value;
+} TestParseConfigParamUintData;
+
+static
+void
+test_parse_config_param(
+    gconstpointer test_data)
+{
+    const TestParseConfigParamUintData* test = test_data;
+    guint value = 0;
+    const guint out = nci_parse_config_param_uint(test->nparams,
+        &test->params, test->id, &value);
+
+    g_assert_cmpuint(out, == ,test->result);
+    g_assert_cmpuint(value, == ,test->value);
+}
+
+static const guint8 parse_config_param_uint_data_ok_1[] = {
+    0x01, 0x01, 0x01, 0x02, 0x01, 0x02
+};
+static const guint8 parse_config_param_uint_data_ok_2[] = {
+    0x01, 0x02, 0xf4, 0x01
+};
+static const guint8 parse_config_param_uint_data_short_1[] = {
+    0x01, 0x01, 0x01, 0x02, 0x01
+};
+static const guint8 parse_config_param_uint_data_short_2[] = {
+    0x01, 0x01, 0x01, 0x02
+};
+static const guint8 parse_config_param_uint_data_small_1[] = {
+    0x01, 0x01, 0x01, 0x02, 0x00
+};
+static const guint8 parse_config_param_uint_data_long[] = {
+    0x01, 0x09, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+    0x07, 0x08, 0x09
+};
+
+static const TestParseConfigParamUintData parse_config_param_uint_tests[] = {
+    {2, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_ok_1)}, 1, 1, 1},
+    {2, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_ok_1)}, 2, 1, 2},
+    {1, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_ok_1)}, 2, 0, 0},
+    {2, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_ok_1)}, 3, 0, 0},
+    {1, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_ok_2)}, 1, 2, 500},
+    {2, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_short_1)}, 2, 0, 0},
+    {2, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_short_2)}, 2, 0, 0},
+    {1, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_short_1)}, 1, 1, 1},
+    {1, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_short_2)}, 1, 1, 1},
+    {2, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_small_1)}, 2, 0, 0},
+    {1, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_long)}, 1, 0, 0}
+};
 
 /*==========================================================================*
  * Common
@@ -1429,6 +1488,14 @@ int main(int argc, char* argv[])
         char* path = g_strconcat(TEST_("discover/fail/"), test->name, NULL);
 
         g_test_add_data_func(path, test, test_discover_fail);
+        g_free(path);
+    }
+    for (i = 0; i < G_N_ELEMENTS(parse_config_param_uint_tests); i++) {
+        const TestParseConfigParamUintData* test =
+            parse_config_param_uint_tests + i;
+        char* path = g_strdup_printf(TEST_("config_param_uint/%u"), i + 1);
+
+        g_test_add_data_func(path, test, test_parse_config_param);
         g_free(path);
     }
     return g_test_run();
