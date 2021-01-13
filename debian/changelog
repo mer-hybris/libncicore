@@ -1,3 +1,9 @@
+libncicore (1.1.17) unstable; urgency=low
+
+  * Improved NFC-DEP compatibility
+
+ -- Slava Monich <slava.monich@jolla.com>  Wed, 13 Jan 2021 02:38:26 +0200
+
 libncicore (1.1.16) unstable; urgency=low
 
   * Made supported technologies configurable
