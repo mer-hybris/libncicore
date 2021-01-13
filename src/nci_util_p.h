@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019-2020 Jolla Ltd.
- * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2021 Jolla Ltd.
+ * Copyright (C) 2019-2021 Slava Monich <slava.monich@jolla.com>
  * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * You may use this file under the terms of BSD license as follows:
@@ -40,6 +40,14 @@
 gboolean
 nci_listen_mode(
     NCI_MODE mode)
+    NCI_INTERNAL;
+
+guint
+nci_parse_config_param_uint(
+    guint nparams,
+    const GUtilData* params,
+    guint8 id,
+    guint* value)
     NCI_INTERNAL;
 
 const NciModeParam*

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019-2020 Jolla Ltd.
- * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2021 Jolla Ltd.
+ * Copyright (C) 2019-2021 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -32,6 +32,7 @@
 
 #include "nci_transition.h"
 #include "nci_transition_impl.h"
+#include "nci_util_p.h"
 #include "nci_sar.h"
 #include "nci_sm.h"
 #include "nci_log.h"
@@ -109,65 +110,6 @@ G_DEFINE_TYPE(NciTransitionReset, nci_transition_reset, NCI_TYPE_TRANSITION)
 
 static
 gboolean
-nci_transition_reset_find_config_param(
-    guint nparams,
-    const GUtilData* params,
-    guint8 id,
-    GUtilData* value)
-{
-    const guint8* ptr = params->bytes;
-    const guint8* end = ptr + params->size;
-
-    /*
-     * +-----------------------------------------+
-     * | ID  | 1 | The identifier                |
-     * | Len | 1 | The length of Val (m)         |
-     * | Val | m | The value of the parameter    |
-     * +-----------------------------------------+
-     */
-    while (nparams > 0 && (ptr + 2) <= end && (ptr + 2 + ptr[1]) <= end) {
-        if (ptr[0] == id) {
-            value->size = ptr[1];
-            value->bytes = ptr + 2;
-            return TRUE;
-        }
-        nparams--;
-        ptr += 2 + ptr[1];
-    }
-    return FALSE;
-}
-
-static
-guint
-nci_transition_reset_get_param_value(
-    guint nparams,
-    const GUtilData* params,
-    guint8 id,
-    guint* value)
-{
-    GUtilData data;
-
-    if (nci_transition_reset_find_config_param(nparams, params, id, &data) &&
-        data.size > 0 && data.size <= sizeof(guint)) {
-        gsize i;
-
-        /*
-         * 1.11 Coding Conventions
-         *
-         * All values greater than 1 octet are sent and
-         * received in Little Endian format.
-         */
-        for (*value = 0, i = 0; i < data.size; i++) {
-            *value += ((guint)data.bytes[i]) << (8 * i);
-        }
-        return data.size;
-    } else {
-        return 0;
-    }
-}
-
-static
-gboolean
 nci_transition_reset_total_duration_ok(
     guint nparams,
     const GUtilData* params)
@@ -179,7 +121,7 @@ nci_transition_reset_total_duration_ok(
      * Table 41: Common Parameters for Discovery Configuration
      * TOTAL_DURATION
      */
-    if (nci_transition_reset_get_param_value(nparams, params,
+    if (nci_parse_config_param_uint(nparams, params,
         NCI_CONFIG_TOTAL_DURATION, &value) == 2 /* bytes */) {
         if (value == DEFAULT_TOTAL_DURATION) {
             GDEBUG("TOTAL_DURATION is %u ms", value);
@@ -192,45 +134,6 @@ nci_transition_reset_total_duration_ok(
     }
     return FALSE;
 }
-
-#if GUTIL_LOG_DEBUG
-static
-void
-nci_transition_reset_dump_invalid_config_params(
-    guint nparams,
-    const GUtilData* params)
-{
-    /*
-     * [NFCForum-TS-NCI-1.0]
-     * 4.3.2 Retrieve the Configuration
-     *
-     * If the DH tries to retrieve any parameter(s) that
-     * are not available in the NFCC, the NFCC SHALL respond
-     * with a CORE_GET_CONFIG_RSP with a Status field of
-     * STATUS_INVALID_PARAM, containing each unavailable
-     * Parameter ID with a Parameter Len field of value zero.
-     * In this case, the CORE_GET_CONFIG_RSP SHALL NOT include
-     * any parameter(s) that are available on the NFCC.
-     */
-    if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
-        const guint8* ptr = params->bytes;
-        const guint8* end = ptr + params->size;
-        GString* buf = g_string_new(NULL);
-        guint i;
-
-        for (i = 0; i < nparams && (ptr + 1) < end; i++, ptr += 2) {
-            g_string_append_printf(buf, " %02x", *ptr);
-        }
-        GDEBUG("%c CORE_GET_CONFIG_RSP invalid parameter(s):%s", DIR_IN,
-            buf->str);
-        g_string_free(buf, TRUE);
-    }
-}
-#  define DUMP_INVALID_CONFIG_PARAMS(n,params) \
-    nci_transition_reset_dump_invalid_config_params(n,params)
-#else
-#  define DUMP_INVALID_CONFIG_PARAMS(n,params) ((void)0)
-#endif
 
 static
 void
@@ -358,7 +261,7 @@ nci_transition_reset_get_total_duration_rsp(
                     return;
                 }
             } else if (cmd_status == NCI_STATUS_INVALID_PARAM) {
-                DUMP_INVALID_CONFIG_PARAMS(n, &data);
+                NCI_DUMP_INVALID_CONFIG_PARAMS(n, &data);
             } else {
                 GWARN("CORE_GET_CONFIG_CMD error 0x%02x (continuing anyway)",
                     cmd_status);

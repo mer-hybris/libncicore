@@ -48,6 +48,7 @@ PCVERSION = $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_RELEASE)
 
 SRC = \
   nci_core.c \
+  nci_log.c \
   nci_param.c \
   nci_param_w4_all_discoveries.c \
   nci_param_w4_host_select.c \

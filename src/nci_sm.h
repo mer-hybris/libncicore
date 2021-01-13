@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2019-2020 Jolla Ltd.
- * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2019-2021 Jolla Ltd.
+ * Copyright (C) 2019-2021 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -53,7 +53,7 @@ typedef enum nci_options {
 
 #define NCI_OPTION_TYPE_F   (NCI_OPTION_POLL_F|NCI_OPTION_LISTEN_F)
 #define NCI_OPTION_TYPE_V   (NCI_OPTION_POLL_V|NCI_OPTION_LISTEN_V)
-#define NCI_OPTIONS_DEFAULT NCI_OPTION_TYPE_F
+#define NCI_OPTIONS_DEFAULT NCI_OPTION_TYPE_F /* A and B support always on*/
 
 /* Table 9: NFCC Features */
 typedef enum nci_nfcc_discovery {
@@ -74,6 +74,17 @@ typedef enum nci_nfcc_power {
     NCI_NFCC_POWER_BATTERY_OFF          = 0x01,
     NCI_NFCC_POWER_SWITCH_OFF           = 0x02
 } NCI_NFCC_POWER;
+
+/* Table 31: LA_SEL_INFO coding */
+typedef enum nci_la_sel_info {
+    NCI_LA_SEL_INFO_ISO_DEP            = 0x20,
+    NCI_LA_SEL_INFO_NFC_DEP            = 0x40
+} NCI_LA_SEL_INFO;
+
+/* Table 36: Supported Protocols for Listen F */
+typedef enum nci_lf_protocol_type {
+    NCI_LF_PROTOCOL_TYPE_NFC_DEP       = 0x02
+} NCI_LF_PROTOCOL_TYPE;
 
 /* Table 43: Value Field for Mode */
 #define NCI_DISCOVER_MAP_MODE_POLL   (0x01)

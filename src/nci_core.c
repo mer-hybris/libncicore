@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018-2020 Jolla Ltd.
- * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2018-2021 Jolla Ltd.
+ * Copyright (C) 2018-2021 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -40,8 +40,6 @@
 #include <gutil_macros.h>
 
 #include <glib-object.h>
-
-GLOG_MODULE_DEFINE("nci");
 
 typedef struct nci_core_closure {
     GCClosure cclosure;

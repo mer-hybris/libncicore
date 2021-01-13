@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018-2021 Jolla Ltd.
- * Copyright (C) 2018-2021 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2021 Jolla Ltd.
+ * Copyright (C) 2021 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -30,27 +30,43 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef NCI_LOG_H
-#define NCI_LOG_H
+#include "nci_log.h"
 
-#include "nci_types_p.h"
-
-#define GLOG_MODULE_NAME NCI_LOG_MODULE
-#include <gutil_log.h>
+GLOG_MODULE_DEFINE("nci");
 
 #if GUTIL_LOG_DEBUG
 void
 nci_dump_invalid_config_params(
     guint nparams,
     const GUtilData* params)
-    NCI_INTERNAL;
-#  define NCI_DUMP_INVALID_CONFIG_PARAMS(n,params) \
-    nci_dump_invalid_config_params(n,params)
-#else
-#  define NCI_DUMP_INVALID_CONFIG_PARAMS(n,params) ((void)0)
-#endif
+{
+    /*
+     * [NFCForum-TS-NCI-1.0]
+     * 4.3.2 Retrieve the Configuration
+     *
+     * If the DH tries to retrieve any parameter(s) that
+     * are not available in the NFCC, the NFCC SHALL respond
+     * with a CORE_GET_CONFIG_RSP with a Status field of
+     * STATUS_INVALID_PARAM, containing each unavailable
+     * Parameter ID with a Parameter Len field of value zero.
+     * In this case, the CORE_GET_CONFIG_RSP SHALL NOT include
+     * any parameter(s) that are available on the NFCC.
+     */
+    if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+        const guint8* ptr = params->bytes;
+        const guint8* end = ptr + params->size;
+        GString* buf = g_string_new(NULL);
+        guint i;
 
-#endif /* NCI_LOG_H */
+        for (i = 0; i < nparams && (ptr + 1) < end; i++, ptr += 2) {
+            g_string_append_printf(buf, " %02x", *ptr);
+        }
+        GDEBUG("%c CORE_GET_CONFIG_RSP invalid parameter(s):%s", DIR_IN,
+            buf->str);
+        g_string_free(buf, TRUE);
+    }
+}
+#endif
 
 /*
  * Local Variables:
