@@ -78,66 +78,50 @@ G_DEFINE_TYPE(NciTransitionReset, nci_transition_reset, NCI_TYPE_TRANSITION)
  *            |                     ok
  *            |                     |
  *            v                     v
- *     +---------------------------------+
- *     | GET_CONFIG_CMD (TOTAL_DURATION) |
- *     +---------------------------------+
- *            |                     |
- *            ok                  error
- *            |                     |
- *            v                     |
- * +----------------------------+   |
- * | Check TOTAL_DURATION value |   |
- * +----------------------------+   |
- *        |          |              |
- *     correct     wrong            |
- *        |          |              |
- *        |          v              v
- *        |  +---------------------------------+
- *        |  | SET_CONFIG_CMD (TOTAL_DURATION) |
- *        |  +---------------------------------+
- *        |     |
- *        v     v
- *      +=========+
- *      | Success |
- *      +=========+
+ *          +-------------------------+
+ *          |      SET_CONFIG_CMD     |
+ *          +-------------------------+
+ *                       |
+ *                       v
+ *                  +=========+
+ *                  | Success |
+ *                  +=========+
  */
 
 #define DEFAULT_TOTAL_DURATION (500) /* ms */
+
+enum llcp_param {
+    LLCP_PARAM_VERSION = 1,
+    LLCP_PARAM_MIUX = 2,
+    LLCP_PARAM_WKS = 3,
+    LLCP_PARAM_LTO = 4,
+    LLCP_PARAM_RW = 5,
+    LLCP_PARAM_SN = 6,
+    LLCP_PARAM_OPT = 7,
+    LLCP_PARAM_SDREQ = 8,    /* LLCP 1.1 */
+    LLCP_PARAM_SDRES = 9     /* LLCP 1.1 */
+};
+
+static const guint8 NFC_DEP_LLCP_MAGIC[] = { 0x46, 0x66, 0x6d };
+static const guint8 NFC_DEP_PARAM_MIUX[] = {
+    LLCP_PARAM_MIUX, 0x02, 0x07, 0xff   /* 0x7ff + 128 = 2175 bytes */
+};
+static const guint8 NFC_DEP_PARAM_LTO[] = {
+    LLCP_PARAM_LTO, 0x01, 0x64          /* LTO: 1000 ms */
+};
+static const guint8 NFC_DEP_PARAM_OPT[] = {
+    LLCP_PARAM_OPT, 0x01, 0x03          /* OPT: CO+CL */
+};
+
+#define ARRAY_AND_SIZE(a) a, sizeof(a)
 
 /*==========================================================================*
  * Implementation
  *==========================================================================*/
 
 static
-gboolean
-nci_transition_reset_total_duration_ok(
-    guint nparams,
-    const GUtilData* params)
-{
-    guint value;
-
-    /*
-     * 6.1.11 Common Parameters
-     * Table 41: Common Parameters for Discovery Configuration
-     * TOTAL_DURATION
-     */
-    if (nci_parse_config_param_uint(nparams, params,
-        NCI_CONFIG_TOTAL_DURATION, &value) == 2 /* bytes */) {
-        if (value == DEFAULT_TOTAL_DURATION) {
-            GDEBUG("TOTAL_DURATION is %u ms", value);
-            return TRUE;
-        } else {
-            GDEBUG("TOTAL_DURATION is %u ms, fixing that", value);
-        }
-    } else {
-        GDEBUG("Could not determine TOTAL_DURATION");
-    }
-    return FALSE;
-}
-
-static
 void
-nci_transition_reset_set_total_duration_rsp(
+nci_transition_reset_set_config_rsp(
     NCI_REQUEST_STATUS status,
     const GUtilData* payload,
     NciTransition* self)
@@ -178,7 +162,7 @@ nci_transition_reset_set_total_duration_rsp(
 
 static
 void
-nci_transition_reset_set_total_duration(
+nci_transition_reset_set_config(
     NciTransition* self)
 {
     /*
@@ -197,108 +181,55 @@ nci_transition_reset_set_total_duration(
      * |        |      | Val | m | The value of the parameter    |
      * +=========================================================+
      */
-    static const guint8 cmd[] = {
-        3,
+    static const guint8 cmd_prefix[] = {
+        7, /* Includes LN_ATR_RES_GEN_BYTES and PN_ATR_REQ_GEN_BYTES */
         NCI_CONFIG_TOTAL_DURATION, 0x02,
         (guint8)(DEFAULT_TOTAL_DURATION & 0xff),
         (guint8)((DEFAULT_TOTAL_DURATION >> 8) & 0xff),
         NCI_CONFIG_PA_BAIL_OUT, 0x01, 0x00,
-        NCI_CONFIG_PB_BAIL_OUT, 0x01, 0x00
+        NCI_CONFIG_PB_BAIL_OUT, 0x01, 0x00,
+        NCI_CONFIG_LN_ATR_RES_CONFIG, 0x01, 0x30,
+        NCI_CONFIG_PN_ATR_REQ_CONFIG, 0x01, 0x30
     };
 
-    GDEBUG("%c CORE_SET_CONFIG_CMD (TOTAL_DURATION)", DIR_OUT);
-    nci_transition_send_command_static(self,
-        NCI_GID_CORE, NCI_OID_CORE_SET_CONFIG, cmd, sizeof(cmd),
-        nci_transition_reset_set_total_duration_rsp);
-}
-
-static
-void
-nci_transition_reset_get_total_duration_rsp(
-    NCI_REQUEST_STATUS status,
-    const GUtilData* payload,
-    NciTransition* self)
-{
     NciSm* sm = nci_transition_sm(self);
+    GByteArray* gb = g_byte_array_sized_new(20);
+    GByteArray* cmd = g_byte_array_sized_new(61);
+    GBytes* cmd_bytes;
+    guint8 tlv[4];
 
-    if (status == NCI_REQUEST_CANCELLED || !nci_transition_active(self)) {
-        GDEBUG("CORE_GET_CONFIG cancelled");
-        return;
-    } else if (status == NCI_REQUEST_TIMEOUT) {
-        GDEBUG("CORE_GET_CONFIG timed out");
-        nci_sm_stall(sm, NCI_STALL_ERROR);
-    } else if (sm) {
-        /*
-         * Table 11: Control Messages for Reading Current Configuration
-         *
-         * CORE_GET_CONFIG_RSP
-         *
-         * +=========================================================+
-         * | Offset | Size | Description                             |
-         * +=========================================================+
-         * | 0      | 1    | Status                                  |
-         * | 1      | 1    | The number of Parameters (n)            |
-         * | 2      | ...  | Parameters                              |
-         * |        |      +-----------------------------------------+
-         * |        |      | ID  | 1 | The identifier                |
-         * |        |      | Len | 1 | The length of Val (m)         |
-         * |        |      | Val | m | The value of the parameter    |
-         * +=========================================================+
-         */
-        if (status == NCI_REQUEST_SUCCESS && payload->size >= 2) {
-            const guint cmd_status = payload->bytes[0];
-            const guint n = payload->bytes[1];
-            GUtilData data;
+    /* Build ATR_REQ/ATR_RES General Bytes (LLCP Magic + TLVs) */
+    g_byte_array_append(gb, ARRAY_AND_SIZE(NFC_DEP_LLCP_MAGIC));
+    tlv[0] = LLCP_PARAM_VERSION;
+    tlv[1] = 1;
+    tlv[2] = sm->llc_version;
+    g_byte_array_append(gb, tlv, 3);
+    g_byte_array_append(gb, ARRAY_AND_SIZE(NFC_DEP_PARAM_MIUX));
+    tlv[0] = LLCP_PARAM_WKS;
+    tlv[1] = 2;
+    tlv[2] = (guint8)(sm->llc_wks >> 8);
+    tlv[3] = (guint8)(sm->llc_wks);
+    g_byte_array_append(gb, tlv, 4);
+    g_byte_array_append(gb, ARRAY_AND_SIZE(NFC_DEP_PARAM_LTO));
+    g_byte_array_append(gb, ARRAY_AND_SIZE(NFC_DEP_PARAM_OPT));
 
-            data.bytes = payload->bytes + 2;
-            data.size = payload->size - 2;
-            if (cmd_status == NCI_STATUS_OK) {
+    /* Append LN_ATR_RES_GEN_BYTES and PN_ATR_REQ_GEN_BYTES to the template */
+    g_byte_array_append(cmd, ARRAY_AND_SIZE(cmd_prefix));
+    tlv[0] = NCI_CONFIG_LN_ATR_RES_GEN_BYTES;
+    tlv[1] = (guint8)gb->len;
+    g_byte_array_append(cmd, tlv, 2); /* Only type and length */
+    g_byte_array_append(cmd, gb->data, gb->len);
+    tlv[0] = NCI_CONFIG_PN_ATR_REQ_GEN_BYTES;
+    g_byte_array_append(cmd, tlv, 2); /* Same length */
+    g_byte_array_append(cmd, gb->data, gb->len);
 
-                GDEBUG("%c CORE_GET_CONFIG_RSP ok", DIR_IN);
-                if (nci_transition_reset_total_duration_ok(n, &data)) {
-                    /* Done with transition */
-                    nci_transition_finish(self, NULL);
-                    return;
-                }
-            } else if (cmd_status == NCI_STATUS_INVALID_PARAM) {
-                NCI_DUMP_INVALID_CONFIG_PARAMS(n, &data);
-            } else {
-                GWARN("CORE_GET_CONFIG_CMD error 0x%02x (continuing anyway)",
-                    cmd_status);
-            }
-        } else {
-            GWARN("CORE_GET_CONFIG_CMD unexpected response");
-        }
-        nci_transition_reset_set_total_duration(self);
-    }
-}
-
-static
-void
-nci_transition_reset_get_total_duration(
-    NciTransition* self)
-{
-    /*
-     * Table 11: Control Messages for Reading Current Configuration
-     *
-     * CORE_GET_CONFIG_CMD
-     *
-     * +=========================================================+
-     * | Offset | Size | Description                             |
-     * +=========================================================+
-     * | 0      | 1    | The number of Parameter ID fields (n)   |
-     * | 1      | n    | Parameter ID                            |
-     * +=========================================================+
-     */
-    static const guint8 cmd[] = {
-        1,
-        NCI_CONFIG_TOTAL_DURATION,
-    };
-
-    GDEBUG("%c CORE_GET_CONFIG_CMD (TOTAL_DURATION)", DIR_OUT);
-    nci_transition_send_command_static(self,
-        NCI_GID_CORE, NCI_OID_CORE_GET_CONFIG, cmd, sizeof(cmd),
-        nci_transition_reset_get_total_duration_rsp);
+    g_byte_array_free(gb, TRUE);
+    cmd_bytes = g_byte_array_free_to_bytes(cmd);
+    GDEBUG("%c CORE_SET_CONFIG_CMD", DIR_OUT);
+    nci_transition_send_command(self,
+        NCI_GID_CORE, NCI_OID_CORE_SET_CONFIG, cmd_bytes,
+        nci_transition_reset_set_config_rsp);
+    g_bytes_unref(cmd_bytes);
 }
 
 static
@@ -385,7 +316,7 @@ nci_transition_reset_init_v1_rsp(
             nci_sar_set_max_logical_connections(sar, max_logical_conns);
             nci_sar_set_max_control_payload_size(sar, max_control_payload);
             nci_sar_set_max_data_payload_size(sar, 0 /* Reset to default */);
-            nci_transition_reset_get_total_duration(self);
+            nci_transition_reset_set_config(self);
             return;
         }
         GWARN("CORE_INIT (v1) failed (or is incomprehensible)");
@@ -479,7 +410,7 @@ nci_transition_reset_init_v2_rsp(
             nci_sar_set_max_logical_connections(sar, max_logical_conns);
             nci_sar_set_max_control_payload_size(sar, max_control_payload);
             nci_sar_set_max_data_payload_size(sar, 0 /* Reset to default */);
-            nci_transition_reset_get_total_duration(self);
+            nci_transition_reset_set_config(self);
             return;
         }
         GWARN("CORE_INIT (v1) failed (or is incomprehensible)");

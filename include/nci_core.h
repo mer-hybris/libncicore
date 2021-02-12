@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018-2020 Jolla Ltd.
- * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
+ * Copyright (C) 2018-2021 Jolla Ltd.
+ * Copyright (C) 2018-2021 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -47,6 +47,25 @@ typedef struct nci_core {
     NCI_STATE next_state;
     guint cmd_timeout;
 } NciCore;
+
+/* NCI parameters */
+
+typedef enum nci_core_param_key {
+    NCI_CORE_PARAM_LLC_VERSION,  /* uint8, default is 0x11 (v1.1) */
+    NCI_CORE_PARAM_LLC_WKS,      /* uint16, default is 0x0003 (SDP-only) */
+    NCI_CORE_PARAM_COUNT
+} NCI_CORE_PARAM; /* Since 1.1.18 */
+
+typedef union nci_core_param_value {
+    guint8 uint8;
+    guint16 uint16;
+    guint32 uint32;
+} NciCoreParamValue; /* Since 1.1.18 */
+
+typedef struct nci_core_param {
+    NCI_CORE_PARAM key;
+    NciCoreParamValue value;
+} NciCoreParam; /* Since 1.1.18 */
 
 typedef
 void
@@ -98,6 +117,12 @@ void
 nci_core_set_op_mode(
     NciCore* nci,
     NCI_OP_MODE op_mode); /* Since 1.1.0 */
+
+void
+nci_core_set_params(
+    NciCore* nci,
+    const NciCoreParam* const* params, /* NULL terminated list */
+    gboolean reset); /* Since 1.1.18 */
 
 guint
 nci_core_send_data_msg(
