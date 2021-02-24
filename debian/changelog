@@ -1,3 +1,10 @@
+libncicore (1.1.18) unstable; urgency=low
+
+  * Configure ATR_RES and ATR_REQ for NFC-DEP
+  * Tweaked NFC-DEP discovery modes
+
+ -- Slava Monich <slava.monich@jolla.com>  Wed, 24 Feb 2021 20:20:52 +0200
+
 libncicore (1.1.17) unstable; urgency=low
 
   * Improved NFC-DEP compatibility
