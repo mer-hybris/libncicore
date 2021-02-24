@@ -281,6 +281,8 @@ struct nci_sm {
     NCI_NFCC_ROUTING nfcc_routing;
     NCI_NFCC_POWER nfcc_power;
     NCI_OP_MODE op_mode;
+    guint8 llc_version;
+    guint16 llc_wks;
 };
 
 typedef

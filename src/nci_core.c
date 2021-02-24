@@ -111,6 +111,16 @@ static guint nci_core_signals[SIGNAL_COUNT] = { 0 };
 
 #define DEFAULT_TIMEOUT (2000) /* msec */
 
+static const NciCoreParamValue NCI_DEFAULT_LLC_VERSION = { .uint8 = 0x11 };
+static const NciCoreParamValue NCI_DEFAULT_LLC_WKS = { .uint16 = 0x0003 };
+
+typedef struct nci_core_param_desc {
+    NciCoreParamValue* (*get)(NciCoreObject*);
+    void (*set)(NciCoreObject*, const NciCoreParamValue*);
+    void (*reset)(NciCoreObject*);
+    gboolean (*equal)(const NciCoreParamValue*, const NciCoreParamValue*);
+} NciCoreParamDesc;
+
 static inline NciCoreObject* nci_core_object(NciCore* ptr)
 { return G_LIKELY(ptr) ? /* This one should be NULL safe */
              NCI_CORE(G_CAST(ptr, NciCoreObject, core)) : NULL; }
@@ -332,6 +342,150 @@ nci_core_add_signal_handler(
     return 0;
 }
 
+static
+void
+nci_core_restart_internal(
+    NciCoreObject* self)
+{
+    nci_core_cancel_command(self);
+    nci_sar_reset(self->io.sar);
+    nci_sm_enter_state(self->sm, NCI_STATE_INIT, NULL);
+    nci_sm_switch_to(self->sm, NCI_RFST_IDLE);
+}
+
+/*==========================================================================*
+ * Parameters
+ *==========================================================================*/
+
+static
+NciCoreParamValue*
+nci_core_param_uint8_new(
+    guint8 value)
+{
+    NciCoreParamValue* v = g_new0(NciCoreParamValue, 1);
+
+    v->uint8 = value;
+    return v;
+}
+
+static
+NciCoreParamValue*
+nci_core_param_uint16_new(
+    guint16 value)
+{
+    NciCoreParamValue* v = g_new0(NciCoreParamValue, 1);
+
+    v->uint16 = value;
+    return v;
+}
+
+static
+gboolean
+nci_core_param_equal_uint8(
+    const NciCoreParamValue* v1,
+    const NciCoreParamValue* v2)
+{
+    return v1->uint8 == v2->uint8;
+}
+
+static
+gboolean
+nci_core_param_equal_uint16(
+    const NciCoreParamValue* v1,
+    const NciCoreParamValue* v2)
+{
+    return v1->uint16 == v2->uint16;
+}
+
+static
+NciCoreParamValue*
+nci_core_param_get_llc_version(
+    NciCoreObject* core)
+{
+    return nci_core_param_uint8_new(core->sm->llc_version);
+}
+
+static
+void
+nci_core_param_set_llc_version(
+    NciCoreObject* core,
+    const NciCoreParamValue* value)
+{
+    const guint8 version = value->uint8;
+    NciSm* sm = core->sm;
+
+    if (sm->llc_version != version) {
+        sm->llc_version = version;
+        GDEBUG("LLC Version => 0x%02x", version);
+    }
+}
+
+static
+void
+nci_core_param_reset_llc_version(
+    NciCoreObject* core)
+{
+    nci_core_param_set_llc_version(core, &NCI_DEFAULT_LLC_VERSION);
+}
+
+static
+NciCoreParamValue*
+nci_core_param_get_llc_wks(
+    NciCoreObject* core)
+{
+    return nci_core_param_uint16_new(core->sm->llc_wks);
+}
+
+static
+void
+nci_core_param_set_llc_wks(
+    NciCoreObject* core,
+    const NciCoreParamValue* value)
+{
+    /*
+     * [NFCForum-TS-LLCP_1.1]
+     * 4.5.3 Well-Known Service List, WKS
+     *
+     * ...
+     * As the LLC Link Management Service is bound to SAP 00h, the least
+     * significant bit, representing SAP 00h, SHALL always be set to '1'
+     * by the sender and SHALL be ignored by the receiver.
+     */
+    const guint16 wks = value->uint16 | 0x01;
+    NciSm* sm = core->sm;
+
+    if (sm->llc_wks != wks) {
+        sm->llc_wks = wks;
+        GDEBUG("WKS => 0x%04x", wks);
+    }
+}
+
+static
+void
+nci_core_param_reset_llc_wks(
+    NciCoreObject* core)
+{
+    nci_core_param_set_llc_wks(core, &NCI_DEFAULT_LLC_WKS);
+}
+
+static const NciCoreParamDesc nci_core_params[] = {
+    {   /* NCI_PARAM_LLC_VERSION */
+        nci_core_param_get_llc_version,
+        nci_core_param_set_llc_version,
+        nci_core_param_reset_llc_version,
+        nci_core_param_equal_uint8
+    },{ /* NCI_PARAM_LLC_WKS */
+        nci_core_param_get_llc_wks,
+        nci_core_param_set_llc_wks,
+        nci_core_param_reset_llc_wks,
+        nci_core_param_equal_uint16
+    }
+};
+
+G_STATIC_ASSERT(NCI_CORE_PARAM_LLC_VERSION == 0);
+G_STATIC_ASSERT(NCI_CORE_PARAM_LLC_WKS == 1);
+G_STATIC_ASSERT(NCI_CORE_PARAM_COUNT == G_N_ELEMENTS(nci_core_params));
+
 /*==========================================================================*
  * NciSmIo callbacks
  *==========================================================================*/
@@ -479,9 +633,14 @@ nci_core_new(
         NciCoreObject* self = g_object_new(NCI_TYPE_CORE, NULL);
         NciCore* core = &self->core;
         NciSm* sm;
+        guint i;
 
         self->io.sar = nci_sar_new(hal, &self->sar_client);
         self->sm = sm = nci_sm_new(&self->io);
+
+        for (i = 0; i < G_N_ELEMENTS(nci_core_params); i++) {
+            nci_core_params[i].reset(self);
+        }
 
         core->current_state = sm->last_state->state;
         core->next_state = sm->next_state->state;
@@ -521,10 +680,7 @@ nci_core_restart(
     NciCoreObject* self = nci_core_object(core);
 
     if (G_LIKELY(self)) {
-        nci_core_cancel_command(self);
-        nci_sar_reset(self->io.sar);
-        nci_sm_enter_state(self->sm, NCI_STATE_INIT, NULL);
-        nci_sm_switch_to(self->sm, NCI_RFST_IDLE);
+        nci_core_restart_internal(self);
     }
 }
 
@@ -549,6 +705,61 @@ nci_core_set_op_mode(
 
     if (G_LIKELY(self)) {
         nci_sm_set_op_mode(self->sm, op_mode);
+    }
+}
+
+void
+nci_core_set_params(
+    NciCore* core,
+    const NciCoreParam* const* params, /* NULL terminated list */
+    gboolean reset) /* Since 1.1.18 */
+{
+    NciCoreObject* self = nci_core_object(core);
+
+    if (G_LIKELY(self) && G_LIKELY(params || reset)) {
+        NciCoreParamValue* old[G_N_ELEMENTS(nci_core_params)];
+        gboolean changed = FALSE;
+        int i;
+
+        /* Save current values */
+        for (i = 0; i < G_N_ELEMENTS(nci_core_params); i++) {
+            old[i] = nci_core_params[i].get(self);
+        }
+        /* Reset if requested */
+        if (reset) {
+            for (i = 0; i < G_N_ELEMENTS(nci_core_params); i++) {
+                nci_core_params[i].reset(self);
+            }
+        }
+        /* Apply new values */
+        if (params) {
+            const NciCoreParam* const* ptr = params;
+
+            while (*ptr) {
+                const NciCoreParam* p = *ptr++;
+                guint k = p->key;
+
+                if (k < G_N_ELEMENTS(nci_core_params)) {
+                    nci_core_params[k].set(self, &p->value);
+                }
+            }
+        }
+        /* Detect changes and at the same time free saved value */
+        for (i = 0; i < G_N_ELEMENTS(nci_core_params); i++) {
+            if (!changed) {
+                NciCoreParamValue* val = nci_core_params[i].get(self);
+
+                if (!nci_core_params[i].equal(val, old[i])) {
+                    changed = TRUE;
+                }
+                g_free(val);
+            }
+            g_free(old[i]);
+        }
+        /* Restart the state machine if changes were detected */
+        if (changed) {
+            nci_core_restart_internal(self);
+        }
     }
 }
 
