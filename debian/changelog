@@ -1,3 +1,9 @@
+libncicore (1.1.19) unstable; urgency=low
+
+  * Housekeeping
+
+ -- Slava Monich <slava.monich@jolla.com>  Thu, 02 Dec 2021 01:30:44 +0200
+
 libncicore (1.1.18) unstable; urgency=low
 
   * Configure ATR_RES and ATR_REQ for NFC-DEP
