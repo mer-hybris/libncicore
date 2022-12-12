@@ -1,3 +1,11 @@
+libncicore (1.1.20) unstable; urgency=low
+
+  * Updated dependencies
+  * Fixed build with GNU Make 4.3
+  * Bumped debhelper compat level to 7
+
+ -- Slava Monich <slava@monich.com>  Tue, 13 Dec 2022 00:36:32 +0200
+
 libncicore (1.1.19) unstable; urgency=low
 
   * Housekeeping

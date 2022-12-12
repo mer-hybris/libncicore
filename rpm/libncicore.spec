@@ -1,6 +1,6 @@
 Name: libncicore
 
-Version: 1.1.19
+Version: 1.1.20
 Release: 0
 Summary: NCI state machine
 License: BSD
@@ -38,7 +38,6 @@ This package contains the development library for %{name}.
 make  %{_smp_mflags} LIBDIR=%{_libdir} KEEP_SYMBOLS=1 release pkgconfig
 
 %install
-rm -rf %{buildroot}
 make LIBDIR=%{_libdir} DESTDIR=%{buildroot} install-dev
 
 %check
@@ -57,6 +56,7 @@ make test
 
 %files devel
 %defattr(-,root,root,-)
+%dir %{_includedir}/ncicore
 %{_libdir}/pkgconfig/*.pc
 %{_libdir}/%{name}.so
 %{_includedir}/ncicore/*.h
