@@ -33,7 +33,7 @@ STATIC_LIB = $(LIB_NAME).a
 #
 
 VERSION_FILE = $(INCLUDE_DIR)/nci_version.h
-get_version = $(shell grep -E "^ *\\\#define +NCI_CORE_VERSION_$1 +[0-9]+$$" $(VERSION_FILE) | sed "s/  */ /g" | cut -d " " -f 3)
+get_version = $(shell grep -E '^ *\#define +NCI_CORE_VERSION_$1 +[0-9]+$$' $(VERSION_FILE) | sed 's/  */ /g' | cut -d ' ' -f 3)
 
 VERSION_MAJOR = $(call get_version,MAJOR)
 VERSION_MINOR = $(call get_version,MINOR)
