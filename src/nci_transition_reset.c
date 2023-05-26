@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
- * Copyright (C) 2019-2021 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -361,12 +361,15 @@ nci_transition_reset_init_v2_rsp(
          * | 10     | 1    | Number of Static HCI Connection Credits |
          * | 11     | 2    | Max NFC-V RF Frame Size                 |
          * | 13     | 1    | Number of Supported RF Interfaces (n)   |
-         * | 14     | 2*n  | Supported RF Interfaces and Extensions  |
+         * | 14     | ...  | Supported RF Interfaces and Extensions  |
+         * |        |      +-----------------------------------------+
+         * |        |      | Interface  | 1 | RF Interfaces          |
+         * |        |      | Ext Count  | 1 | Number of exts (x)     |
+         * |        |      | Extensions | x | Supported extensions   |
          * +=========================================================+
          */
         if (len >= 14 && pkt[0] == NCI_STATUS_OK &&
             len == (2 * (n = pkt[13]) + 14)) {
-            const guint8* rf_interfaces = pkt + 14;
             guint8 max_logical_conns = pkt[5];
             guint8 max_control_payload = pkt[8];
             guint i;
@@ -375,13 +378,19 @@ nci_transition_reset_init_v2_rsp(
                 g_bytes_unref(sm->rf_interfaces);
                 sm->rf_interfaces = NULL;
             }
-            if (n > 0) {
-                guint8* ifs = g_new(guint8, n);
 
-                for (i = 0; i < n; i++) {
-                    ifs[i] = rf_interfaces[2 * i];
+            if (n > 0) {
+                const guint8* ptr = pkt + 14;
+                const guint8* end = pkt + len;
+                GByteArray* ifs = g_byte_array_sized_new(n/2);
+
+                /* Respect both interface count and packet boundaries */
+                for (i = 0;
+                     i < n && (ptr + 1) < end && ptr + 2 + ptr[1] <= end;
+                     i++, ptr += 2 + ptr[1]) {
+                    g_byte_array_append(ifs, ptr, 1);
                 }
-                sm->rf_interfaces = g_bytes_new_take(ifs, n);
+                sm->rf_interfaces = g_byte_array_free_to_bytes(ifs);
             }
 
             sm->nfcc_discovery = pkt[1];
@@ -396,8 +405,13 @@ nci_transition_reset_init_v2_rsp(
             if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
                 GString* buf = g_string_new(NULL);
 
-                for (i = 0; i < n; i++) {
-                    g_string_append_printf(buf, " %02x", rf_interfaces[2 * i]);
+                if (sm->rf_interfaces) {
+                    gsize k;
+                    const guint8* ifs = g_bytes_get_data(sm->rf_interfaces, &k);
+
+                    for (i = 0; i < k; i++) {
+                        g_string_append_printf(buf, " %02x", ifs[i]);
+                    }
                 }
                 GDEBUG("  Supported interfaces =%s", buf->str);
                 g_string_free(buf, TRUE);
