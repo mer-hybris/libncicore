@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2020-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2020-2021 Jolla Ltd.
- * Copyright (C) 2020-2022 Slava Monich <slava@monich.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -36,23 +36,27 @@
 /* This file exists since version 1.0.6 */
 
 /* libncicore version */
-#define NCI_CORE_VERSION_MAJOR 1
-#define NCI_CORE_VERSION_MINOR 1
-#define NCI_CORE_VERSION_NANO  20
+#define NCI_CORE_VERSION_MAJOR   1
+#define NCI_CORE_VERSION_MINOR   1
+#define NCI_CORE_VERSION_RELEASE 20
 
 #define NCI_CORE_VERSION_WORD(v1,v2,v3) \
     ((((v1) & 0x7f) << 24) | \
      (((v2) & 0xfff) << 12) | \
       ((v3) & 0xfff))
 
-#define NCI_CORE_VERSION_GET_MAJOR(v) (((v) >> 24) & 0x7f)
-#define NCI_CORE_VERSION_GET_MINOR(v) (((v) >> 12) & 0xfff)
-#define NCI_CORE_VERSION_GET_NANO(v)  ((v) & 0xfff)
+#define NCI_CORE_VERSION_GET_MAJOR(v)  (((v) >> 24) & 0x7f)
+#define NCI_CORE_VERSION_GET_MINOR(v)  (((v) >> 12) & 0xfff)
+#define NCI_CORE_VERSION_GET_RELEASE(v) ((v) & 0xfff)
 
 /* Current version as a single word */
 #define NCI_CORE_VERSION \
    NCI_CORE_VERSION_WORD(NCI_CORE_VERSION_MAJOR, \
-      NCI_CORE_VERSION_MINOR, NCI_CORE_VERSION_NANO)
+      NCI_CORE_VERSION_MINOR, NCI_CORE_VERSION_RELEASE)
+
+/* Compatibility with libncicore <= 1.1.20 (RELEASE was called NANO) */
+#define NCI_CORE_VERSION_NANO        NCI_CORE_VERSION_RELEASE
+#define NCI_CORE_VERSION_GET_NANO(v) NCI_CORE_VERSION_GET_RELEASE(v)
 
 #endif /* NCI_CORE_VERSION_H */
 
