@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2018-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2018-2020 Jolla Ltd.
- * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -157,7 +157,7 @@ typedef union nci_mode_param {
     NciModeParamListenF listen_f; /* Since 1.1.2 */
 } NciModeParam;
 
-/* Table 76: Activation Parameters for NFC-A/ISO-DEP Poll Mode */
+/* Activation Parameters for NFC-A/ISO-DEP Poll Mode */
 typedef struct nci_activation_param_iso_dep_poll_a {
     guint fsc;     /* FSC (FSCI converted to bytes) */
     GUtilData t1;  /* T1 to Tk (otherwise called historical bytes) */
@@ -174,12 +174,25 @@ typedef struct nci_activation_param_iso_dep_poll_a {
     guint8 tc;     /* Interface byte TC (optional) */
 } NciActivationParamIsoDepPollA;
 
-/* Table 75: Activation Parameters for NFC-B/ISO-DEP Poll Mode */
+/* Activation Parameters for NFC-B/ISO-DEP Poll Mode */
 typedef struct nci_activation_param_iso_dep_poll_b {
     guint mbli;     /* Maximum Buffer Length Index */
     guint did;      /* Device ID */
     GUtilData hlr;  /* Higher Layer Response */
 } NciActivationParamIsoDepPollB; /* Since 1.1.5 */
+
+/* Activation Parameters for NFC-A/ISO-DEP Listen Mode */
+typedef struct nci_activation_param_iso_dep_listen_a {
+    guint fsd;      /* Frame Size (bytes) */
+    guint did;      /* Device ID */
+} NciActivationParamIsoDepListenA; /* Since 1.1.21 */
+
+/* Activation Parameters for NFC-B/ISO-DEP Listen Mode */
+typedef struct nci_activation_param_iso_dep_listen_b {
+    guint8 nfcid0[4];
+    guint8 param[4];  /* Params 1-4 */
+    GUtilData hlc;    /* Higher Layer Command */
+} NciActivationParamIsoDepListenB; /* Since 1.1.21 */
 
 /* Table 82: Activation Parameters for NFC-DEP Poll Mode */
 typedef struct nci_activation_param_nfc_dep_poll {
@@ -206,9 +219,11 @@ typedef struct nci_activation_param_nfc_dep_listen {
 
 typedef union nci_activation_param {
     NciActivationParamIsoDepPollA iso_dep_poll_a;
-    NciActivationParamIsoDepPollB iso_dep_poll_b;  /* Since 1.1.5 */
-    NciActivationParamNfcDepPoll nfc_dep_poll;     /* Since 1.0.8 */
-    NciActivationParamNfcDepListen nfc_dep_listen; /* Since 1.0.8 */
+    NciActivationParamIsoDepPollB iso_dep_poll_b;      /* Since 1.1.5 */
+    NciActivationParamIsoDepListenA iso_dep_listen_a;  /* Since 1.1.21 */
+    NciActivationParamIsoDepListenB iso_dep_listen_b;  /* Since 1.1.21 */
+    NciActivationParamNfcDepPoll nfc_dep_poll;         /* Since 1.0.8 */
+    NciActivationParamNfcDepListen nfc_dep_listen;     /* Since 1.0.8 */
 } NciActivationParam;
 
 /* See Table 61: Notification for RF Interface activation */

@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
- * Copyright (C) 2019-2021 Slava Monich <slava.monich@jolla.com>
  * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * You may use this file under the terms of BSD license as follows:
@@ -35,6 +35,7 @@
 #include "nci_log.h"
 
 #include <gutil_macros.h>
+#include <gutil_misc.h>
 
 gboolean
 nci_listen_mode(
@@ -441,7 +442,7 @@ nci_parse_iso_dep_poll_a_param(
         if (t0 & NFC_T4A_ATS_T0_B) tb = ats_ptr++;
         if (t0 & NFC_T4A_ATS_T0_C) tc = ats_ptr++;
         if (ats_ptr <= ats_end) {
-            /* NFCForum-TS-DigitalProtocol-1.01
+            /* NFCForum-TS-DigitalProtocol-1.0
              * Table 66: FSCI to FSC Conversion */
             const guint8 fsci = (t0 & NFC_T4A_ATS_T0_FSCI_MASK);
             static const guint fsc_table[] = {
@@ -494,12 +495,51 @@ nci_parse_iso_dep_poll_a_param(
 
 static
 gboolean
+nci_parse_iso_dep_listen_a_param(
+    NciActivationParamIsoDepListenA* param,
+    const guint8* bytes,
+    guint len)
+{
+    /*
+     * NFCForum-TS-NCI-1.0
+     * Table 78: Activation Parameters for NFC-A/ISO-DEP Listen Mode
+     *
+     * +=========================================================+
+     * | Offset | Size | Description                             |
+     * +=========================================================+
+     * | 0      | 1    | Byte 2 (PARAM) of the RATS Command      |
+     * +=========================================================+
+     */
+    if (len > 0) {
+        /* NFCForum-TS-DigitalProtocol-1.0
+         * Table 63: FSDI to FSD Conversion */
+        const guint b2 = bytes[0];
+        const guint8 fsdi = (b2 >> 4);
+        static const guint fsd_table[] = {
+            16, 24, 32, 40, 48, 64, 96, 128, 256
+        };
+
+        param->fsd = (fsdi < G_N_ELEMENTS(fsd_table)) ?
+            fsd_table[fsdi] :
+            fsd_table[G_N_ELEMENTS(fsd_table) - 1];
+        param->did = b2 & 0x0f;
+
+        GDEBUG("ISO-DEP");
+        GDEBUG("  RatsCmd.fsd = %u", param->fsd);
+        GDEBUG("  RatsCmd.did = %u", param->did);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static
+gboolean
 nci_parse_iso_dep_poll_b_param(
     NciActivationParamIsoDepPollB* param,
     const guint8* bytes,
     guint len)
 {
-    /* NFCFrum-TS-NCI-1.0
+    /* NFCForum-TS-NCI-1.0
      * Table 75: Activation parameters for NFC-B/ISO-DEP Poll Mode
      *
      * +============================================================+
@@ -514,7 +554,7 @@ nci_parse_iso_dep_poll_b_param(
     const guint attrib_length = bytes[0];
 
     if (attrib_length >= 1) {
-        /* NFCForum-TS-DigitalProtocol-1.01
+        /* NFCForum-TS-DigitalProtocol-1.0
          * Table 79: ATTRIB Response Format */
 
 #define NFC_T4B_MBLI_MASK (0xF0) /* MBLI Mask */
@@ -545,6 +585,66 @@ nci_parse_iso_dep_poll_b_param(
                 GDEBUG("  HigherLayer Response =%s", buf->str);
                 g_string_free(buf, TRUE);
             }
+        }
+#endif
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static
+gboolean
+nci_parse_iso_dep_listen_b_param(
+    NciActivationParamIsoDepListenB* param,
+    const guint8* bytes,
+    guint len)
+{
+    /* NFCForum-TS-NCI-1.0
+     * Table 79: Activation parameters for NFC-B/ISO-DEP Listen Mode
+     *
+     * +============================================================+
+     * | Offset | Size | Description                                |
+     * +============================================================+
+     * | 0      | 1    | Length of ATTRIB Command Parameter (n)     |
+     * | 1      | n    | ATTRIB Command starting with Byte 2        |
+     * +============================================================+
+     */
+
+    /* ATTRIB Command */
+    const guint cmdlen = bytes[0];
+
+    if (cmdlen >= 8 && len > cmdlen) {
+        /* NFCForum-TS-DigitalProtocol-1.0
+         * Table 71: ATTRIB Command Format */
+        memcpy(param->nfcid0, bytes + 1, sizeof(param->nfcid0));
+        memcpy(param->param, bytes + 5, 4);
+        if (cmdlen > 8) {
+            param->hlc.bytes = bytes + 9;
+            param->hlc.size = cmdlen - 8;
+        } else {
+            memset(&param->hlc, 0, sizeof(param->hlc));
+        }
+#if GUTIL_LOG_DEBUG
+        if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+            GString* buf = g_string_new(NULL);
+            guint i;
+
+            GDEBUG("ISO-DEP");
+            for (i = 0; i < sizeof(param->nfcid0); i++) {
+                g_string_append_printf(buf, " %02x", param->nfcid0[i]);
+            }
+            GDEBUG("  Attrib.nfcid0 =%s", buf->str);
+            g_string_set_size(buf, 0);
+            for (i = 0; i < sizeof(param->nfcid0); i++) {
+                g_string_append_printf(buf, " %02x", param->param[i]);
+            }
+            GDEBUG("  Attrib.params =%s", buf->str);
+            g_string_set_size(buf, 0);
+            for (i = 0; i < param->hlc.size; i++) {
+                g_string_append_printf(buf, " %02x", param->hlc.bytes[i]);
+            }
+            GDEBUG("  Attrib.hlc =%s", buf->str);
+            g_string_free(buf, TRUE);
         }
 #endif
         return TRUE;
@@ -606,10 +706,8 @@ nci_parse_nfc_dep_poll_param(
             GDEBUG("  AtrRes.to = 0x%02x", param->to);
             GDEBUG("  AtrRes.pp = 0x%02x", param->pp);
             g_string_set_size(buf, 0);
-            if (param->g.size > 0) {
-                for (i = 0; i < param->g.size; i++) {
-                    g_string_append_printf(buf, " %02x", param->g.bytes[i]);
-                }
+            for (i = 0; i < param->g.size; i++) {
+                g_string_append_printf(buf, " %02x", param->g.bytes[i]);
             }
             GDEBUG("  AtrRes.g =%s", buf->str);
             g_string_free(buf, TRUE);
@@ -672,10 +770,8 @@ nci_parse_nfc_dep_listen_param(
             GDEBUG("  AtrReq.br = 0x%02x", param->br);
             GDEBUG("  AtrReq.pp = 0x%02x", param->pp);
             g_string_set_size(buf, 0);
-            if (param->g.size > 0) {
-                for (i = 0; i < param->g.size; i++) {
-                    g_string_append_printf(buf, " %02x", param->g.bytes[i]);
-                }
+            for (i = 0; i < param->g.size; i++) {
+                g_string_append_printf(buf, " %02x", param->g.bytes[i]);
             }
             GDEBUG("  AtrReq.g =%s", buf->str);
             g_string_free(buf, TRUE);
@@ -706,6 +802,14 @@ nci_parse_activation_param(
             }
             GDEBUG("Failed to parse parameters for NFC-A/ISO-DEP poll mode");
             break;
+        case NCI_MODE_PASSIVE_LISTEN_A:
+        case NCI_MODE_ACTIVE_LISTEN_A:
+            if (nci_parse_iso_dep_listen_a_param(&param->iso_dep_listen_a,
+                bytes, len)) {
+                return param;
+            }
+            GDEBUG("Failed to parse parameters for NFC-A/ISO-DEP listen mode");
+            break;
         case NCI_MODE_PASSIVE_POLL_B:
             if (nci_parse_iso_dep_poll_b_param(&param->iso_dep_poll_b,
                 bytes, len)) {
@@ -713,13 +817,17 @@ nci_parse_activation_param(
             }
             GDEBUG("Failed to parse parameters for NFC-B/ISO-DEP poll mode");
             break;
+        case NCI_MODE_PASSIVE_LISTEN_B:
+            if (nci_parse_iso_dep_listen_b_param(&param->iso_dep_listen_b,
+                bytes, len)) {
+                return param;
+            }
+            GDEBUG("Failed to parse parameters for NFC-B/ISO-DEP listen mode");
+            break;
         case NCI_MODE_PASSIVE_POLL_F:
         case NCI_MODE_ACTIVE_POLL_F:
         case NCI_MODE_PASSIVE_POLL_V:
-        case NCI_MODE_PASSIVE_LISTEN_A:
-        case NCI_MODE_PASSIVE_LISTEN_B:
         case NCI_MODE_PASSIVE_LISTEN_F:
-        case NCI_MODE_ACTIVE_LISTEN_A:
         case NCI_MODE_ACTIVE_LISTEN_F:
         case NCI_MODE_PASSIVE_LISTEN_V:
             break;
@@ -805,8 +913,7 @@ nci_parse_intf_activated_ntf(
 
         if (len >= 11 + n + m) {
             const guint8* act_param_bytes = m ? (pkt + (11 + n)) : NULL;
-            gboolean listen_mode = FALSE;
-            gboolean active_mode = FALSE;
+            gboolean mode_param_required = FALSE;
 
             ntf->discovery_id = pkt[0];
             ntf->rf_intf = pkt[1];
@@ -862,44 +969,42 @@ nci_parse_intf_activated_ntf(
             }
 #endif /* GUTIL_LOG_DEBUG */
 
-            /* NCI 1.0 defines no parameters for A/B/F Listen modes */
+            /* Only require mode parameters defined in NCI 1.0 */
             switch (ntf->mode) {
-            case NCI_MODE_ACTIVE_LISTEN_A:
-            case NCI_MODE_ACTIVE_LISTEN_F:
-                active_mode = TRUE;
-                /* fallthrough */
-            case NCI_MODE_PASSIVE_LISTEN_A:
-            case NCI_MODE_PASSIVE_LISTEN_B:
-            case NCI_MODE_PASSIVE_LISTEN_F:
-                listen_mode = TRUE;
-                break;
             case NCI_MODE_ACTIVE_POLL_A:
-            case NCI_MODE_ACTIVE_POLL_F:
-                active_mode = TRUE;
-                break;
-            case NCI_MODE_PASSIVE_LISTEN_V:
             case NCI_MODE_PASSIVE_POLL_A:
             case NCI_MODE_PASSIVE_POLL_B:
+            case NCI_MODE_ACTIVE_POLL_F:
             case NCI_MODE_PASSIVE_POLL_F:
+            case NCI_MODE_ACTIVE_LISTEN_F:
+            case NCI_MODE_PASSIVE_LISTEN_F:
+                mode_param_required = TRUE;
+                break;
             case NCI_MODE_PASSIVE_POLL_V:
+            case NCI_MODE_ACTIVE_LISTEN_A:
+            case NCI_MODE_PASSIVE_LISTEN_A:
+            case NCI_MODE_PASSIVE_LISTEN_B:
+            case NCI_MODE_PASSIVE_LISTEN_V:
                 break;
             }
 
-            /* Require RF Tech Parameters for Passive Poll modes */
-            if (ntf->mode_param_bytes || listen_mode || active_mode) {
+            if (ntf->mode_param_bytes) {
+                memset(mode_param, 0, sizeof(*mode_param));
                 ntf->mode_param = nci_parse_mode_param(mode_param, ntf->mode,
                     ntf->mode_param_bytes, n);
-                if (ntf->mode_param || !ntf->mode_param_bytes) {
-                    if (act_param_bytes) {
-                        memset(activation_param, 0, sizeof(*activation_param));
-                        ntf->activation_param_len = m;
-                        ntf->activation_param_bytes = act_param_bytes;
-                        ntf->activation_param =
-                            nci_parse_activation_param(activation_param,
-                                ntf->rf_intf, ntf->mode, act_param_bytes, m);
-                    }
-                    return TRUE;
+            }
+
+            if (ntf->mode_param || !mode_param_required ||
+                (!ntf->mode_param_bytes && !mode_param_required)) {
+                if (act_param_bytes) {
+                    memset(activation_param, 0, sizeof(*activation_param));
+                    ntf->activation_param_len = m;
+                    ntf->activation_param_bytes = act_param_bytes;
+                    ntf->activation_param =
+                        nci_parse_activation_param(activation_param,
+                            ntf->rf_intf, ntf->mode, act_param_bytes, m);
                 }
+                return TRUE;
             }
             GDEBUG("Missing RF Tech Parameters");
         }
@@ -1133,6 +1238,7 @@ nci_util_copy_activation_param(
         gsize size = sizeof(NciActivationParam);
         const NciActivationParamIsoDepPollA* iso_dep_poll_a = NULL;
         const NciActivationParamIsoDepPollB* iso_dep_poll_b = NULL;
+        const NciActivationParamIsoDepListenB* iso_dep_listen_b = NULL;
         const NciActivationParamNfcDepPoll* nfc_dep_poll = NULL;
         const NciActivationParamNfcDepListen* nfc_dep_listen = NULL;
 
@@ -1156,6 +1262,9 @@ nci_util_copy_activation_param(
                     copy->iso_dep_poll_a.t1.bytes = dest;
                 }
                 return copy;
+            case NCI_MODE_PASSIVE_LISTEN_A:
+            case NCI_MODE_ACTIVE_LISTEN_A:
+                return gutil_memdup(param, size);
             case NCI_MODE_PASSIVE_POLL_B:
                 iso_dep_poll_b = &param->iso_dep_poll_b;
                 if (iso_dep_poll_b->hlr.size) {
@@ -1172,13 +1281,26 @@ nci_util_copy_activation_param(
                     copy->iso_dep_poll_b.hlr.bytes = dest;
                 }
                 return copy;
+            case NCI_MODE_PASSIVE_LISTEN_B:
+                iso_dep_listen_b = &param->iso_dep_listen_b;
+                if (iso_dep_listen_b->hlc.size) {
+                    size = G_ALIGN8(size);
+                    size += G_ALIGN8(iso_dep_listen_b->hlc.size);
+                }
+                copy = g_malloc0(size);
+                memcpy(copy, param, sizeof(NciActivationParam));
+                if (iso_dep_listen_b->hlc.size) {
+                    guint8* dest = (guint8*)copy +
+                        G_ALIGN8(sizeof(NciActivationParam));
+                    memcpy(dest, iso_dep_listen_b->hlc.bytes,
+                        iso_dep_listen_b->hlc.size);
+                    copy->iso_dep_listen_b.hlc.bytes = dest;
+                }
+                return copy;
             case NCI_MODE_PASSIVE_POLL_F:
             case NCI_MODE_ACTIVE_POLL_F:
             case NCI_MODE_PASSIVE_POLL_V:
-            case NCI_MODE_PASSIVE_LISTEN_A:
-            case NCI_MODE_PASSIVE_LISTEN_B:
             case NCI_MODE_PASSIVE_LISTEN_F:
-            case NCI_MODE_ACTIVE_LISTEN_A:
             case NCI_MODE_ACTIVE_LISTEN_F:
             case NCI_MODE_PASSIVE_LISTEN_V:
                 break;
