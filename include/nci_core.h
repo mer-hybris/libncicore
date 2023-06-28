@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2018-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2018-2021 Jolla Ltd.
- * Copyright (C) 2018-2021 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -123,6 +123,15 @@ nci_core_set_params(
     NciCore* nci,
     const NciCoreParam* const* params, /* NULL terminated list */
     gboolean reset); /* Since 1.1.18 */
+
+NCI_TECH
+nci_core_get_tech(
+    NciCore* nci);  /* Since 1.1.21 */
+
+NCI_TECH
+nci_core_set_tech(
+    NciCore* nci,
+    NCI_TECH tech);  /* Since 1.1.21 */
 
 guint
 nci_core_send_data_msg(

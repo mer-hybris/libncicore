@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
- * Copyright (C) 2019-2021 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -124,6 +124,12 @@ G_DEFINE_TYPE(NciTransitionIdleToDiscovery, nci_transition_idle_to_discovery,
 
 #define ARRAY_AND_SIZE(a) a, sizeof(a)
 
+typedef struct nci_tech_mode {
+    NCI_TECH tech;
+    NCI_MODE mode;
+    const char* name;
+} NciCoreTechMode;
+
 /*==========================================================================*
  * Implementation
  *==========================================================================*/
@@ -192,15 +198,8 @@ nci_transition_idle_to_discovery_discover(
 {
     NciSm* sm = nci_transition_sm(self);
     GByteArray* cmd = g_byte_array_sized_new(9);
-    const gboolean peer_poll = (sm->op_mode &
-        (NFC_OP_MODE_PEER|NFC_OP_MODE_POLL)) ==
-        (NFC_OP_MODE_PEER|NFC_OP_MODE_POLL);
-    const gboolean peer_listen = (sm->op_mode &
-        (NFC_OP_MODE_PEER|NFC_OP_MODE_LISTEN)) ==
-        (NFC_OP_MODE_PEER|NFC_OP_MODE_LISTEN);
-    const gboolean ce_listen = (sm->op_mode &
-        (NFC_OP_MODE_CE|NFC_OP_MODE_LISTEN)) ==
-        (NFC_OP_MODE_CE|NFC_OP_MODE_LISTEN);
+    NCI_TECH techs = NCI_TECH_NONE;
+    guint i;
 
     /*
      * Table 52: Control Messages to Start Discovery
@@ -222,8 +221,57 @@ nci_transition_idle_to_discovery_discover(
         0x00, /* Number of Configurations */
     };
 
-    GDEBUG("%c RF_DISCOVER_CMD", DIR_OUT);
-    g_byte_array_append(cmd, ARRAY_AND_SIZE(cmd_header));
+    static const NciCoreTechMode tech_modes[] = {
+        {
+            NCI_TECH_A_POLL_ACTIVE,
+            NCI_MODE_ACTIVE_POLL_A,
+            "ActivePollA"
+        },{
+            NCI_TECH_A_POLL_PASSIVE,
+            NCI_MODE_PASSIVE_POLL_A,
+            "PassivePollA"
+        },{
+            NCI_TECH_B_POLL,
+            NCI_MODE_PASSIVE_POLL_B,
+            "PassivePollB"
+        },{
+            NCI_TECH_F_POLL_ACTIVE,
+            NCI_MODE_ACTIVE_POLL_F,
+            "ActivePollF"
+        },{
+            NCI_TECH_F_POLL_PASSIVE,
+            NCI_MODE_PASSIVE_POLL_F,
+            "PassivePollF"
+        },{
+            NCI_TECH_A_LISTEN_ACTIVE,
+            NCI_MODE_ACTIVE_LISTEN_A,
+            "ActiveListenA"
+        },{
+            NCI_TECH_A_LISTEN_PASSIVE,
+            NCI_MODE_PASSIVE_LISTEN_A,
+            "PassiveListenA"
+        },{
+            NCI_TECH_B_LISTEN,
+            NCI_MODE_PASSIVE_LISTEN_B,
+            "PassiveListenB"
+        },{
+            NCI_TECH_F_LISTEN_ACTIVE,
+            NCI_MODE_ACTIVE_LISTEN_F,
+            "ActiveListenF"
+        },{
+            NCI_TECH_F_LISTEN_PASSIVE,
+            NCI_MODE_PASSIVE_LISTEN_F,
+            "PassiveListenF"
+        },{
+            NCI_TECH_V_POLL,
+            NCI_MODE_PASSIVE_POLL_V,
+            "PassivePollV"
+        },{
+            NCI_TECH_V_LISTEN,
+            NCI_MODE_PASSIVE_LISTEN_V,
+            "PassiveListenV"
+        }
+    };
 
     /*
      * RW Modes: Poll A/B/F/V
@@ -231,73 +279,45 @@ nci_transition_idle_to_discovery_discover(
      * CE Modes: Listen A/B
      */
 
-    /* Poll side */
-    if ((sm->op_mode & NFC_OP_MODE_RW) || peer_poll) {
-        static const guint8 poll_ab[] = {
-            NCI_MODE_ACTIVE_POLL_A, 1,
-            NCI_MODE_PASSIVE_POLL_A, 1,
-            NCI_MODE_PASSIVE_POLL_B, 1,
-        };
+    if (sm->op_mode & NFC_OP_MODE_RW) {
+        techs |= NCI_TECH_A_POLL |
+            NCI_TECH_B_POLL |
+            NCI_TECH_F_POLL |
+            NCI_TECH_V_POLL;
+    }
 
-        GDEBUG("  ActivePollA");
-        GDEBUG("  PassivePollA");
-        GDEBUG("  PassivePollB");
-        cmd->data[0] += 3; /* Number of entries */
-        g_byte_array_append(cmd, ARRAY_AND_SIZE(poll_ab));
-
-        if (sm->options & NCI_OPTION_POLL_F) {
-            static const guint8 poll_f[] = {
-                NCI_MODE_ACTIVE_POLL_F, 1,
-                NCI_MODE_PASSIVE_POLL_F, 1
-            };
-
-            /* NFC-DEP or T3T */
-            GDEBUG("  ActivePollF");
-            GDEBUG("  PassivePollF");
-            cmd->data[0] += 2; /* Number of entries */
-            g_byte_array_append(cmd, ARRAY_AND_SIZE(poll_f));
+    if (sm->op_mode & NFC_OP_MODE_PEER) {
+        if (sm->op_mode & NFC_OP_MODE_POLL) {
+            techs |= NCI_TECH_A_POLL | NCI_TECH_F_POLL;
         }
-
-        if (sm->options & NCI_OPTION_POLL_V) {
-            static const guint8 poll_v[] = {
-                NCI_MODE_PASSIVE_POLL_V, 1
-            };
-
-            GDEBUG("  PassivePollV");
-            cmd->data[0] += 1; /* Number of entries */
-            g_byte_array_append(cmd, ARRAY_AND_SIZE(poll_v));
+        if (sm->op_mode & NFC_OP_MODE_LISTEN) {
+            techs |= NCI_TECH_A_LISTEN | NCI_TECH_F_LISTEN;
         }
     }
 
-    /* Listen side */
-    if (peer_listen || ce_listen) {
-        static const guint8 listen_ab[] = {
-            NCI_MODE_PASSIVE_LISTEN_A, 1
-        };
-
-        GDEBUG("  PassiveListenA");
-        cmd->data[0] += 1; /* Number of entries */
-        g_byte_array_append(cmd, ARRAY_AND_SIZE(listen_ab));
+    if (sm->op_mode & NFC_OP_MODE_CE) {
+        techs |= NCI_TECH_A_LISTEN | NCI_TECH_B_LISTEN;
     }
-    if (ce_listen) {
-        static const guint8 listen_ab[] = {
-            NCI_MODE_ACTIVE_LISTEN_A, 1,
-            NCI_MODE_PASSIVE_LISTEN_B, 1
-        };
 
-        GDEBUG("  ActiveListenA");
-        GDEBUG("  PassiveListenB");
-        cmd->data[0] += 2; /* Number of entries */
-        g_byte_array_append(cmd, ARRAY_AND_SIZE(listen_ab));
-    }
-    if (peer_listen && (sm->options & NCI_OPTION_LISTEN_F)) {
-        static const guint8 listen_f[] = {
-            NCI_MODE_PASSIVE_LISTEN_F, 1
-        };
+    /* Mask off the disabled techs */
+    techs &= sm->techs;
 
-        GDEBUG("  PassiveListenF");
-        cmd->data[0] += 1; /* Number of entries */
-        g_byte_array_append(cmd, ARRAY_AND_SIZE(listen_f));
+    /* Build the payload */
+    GDEBUG("%c RF_DISCOVER_CMD", DIR_OUT);
+    g_byte_array_append(cmd, ARRAY_AND_SIZE(cmd_header));
+    for (i = 0; i < G_N_ELEMENTS(tech_modes) && techs; i++) {
+        const NciCoreTechMode* tm = tech_modes + i;
+
+        if (techs & (tm->tech)) {
+            guint8 entry[2];
+
+            GDEBUG("  %s", tm->name);
+            cmd->data[0]++;      /* Number of entries */
+            entry[0] = tm->mode; /* RF Technology and Mode */
+            entry[1] = 1;        /* Frequency (1 = every period) */
+            g_byte_array_append(cmd, ARRAY_AND_SIZE(entry));
+            techs &= ~tm->tech;
+        }
     }
 
     nci_transition_idle_to_discovery_send_byte_array(self,
@@ -375,28 +395,44 @@ nci_transition_idle_to_discover_map(
         0x00, /* Number of Mapping Configurations */
     };
 
+    /*
+     * Type 1-2: Poll A
+     * Type 3: Poll F
+     * IsoDep: Poll A/B (RW Modes), Listen A/B (CE Modes)
+     * NfcDep: Poll/Listen A/F
+     */
+
     GDEBUG("%c RF_DISCOVER_MAP_CMD", DIR_OUT);
     g_byte_array_append(cmd, ARRAY_AND_SIZE(cmd_header));
     if (sm->op_mode & NFC_OP_MODE_RW) {
-        static const guint8 entries[] = {
-            NCI_PROTOCOL_T1T,
-            NCI_DISCOVER_MAP_MODE_POLL,
-            NCI_RF_INTERFACE_FRAME,
+        if (sm->techs & NCI_TECH_A_POLL) {
+            static const guint8 entries[] = {
+                NCI_PROTOCOL_T1T,
+                NCI_DISCOVER_MAP_MODE_POLL,
+                NCI_RF_INTERFACE_FRAME,
 
-            NCI_PROTOCOL_T2T,
-            NCI_DISCOVER_MAP_MODE_POLL,
-            NCI_RF_INTERFACE_FRAME,
+                NCI_PROTOCOL_T2T,
+                NCI_DISCOVER_MAP_MODE_POLL,
+                NCI_RF_INTERFACE_FRAME
+            };
 
-            NCI_PROTOCOL_ISO_DEP,
-            NCI_DISCOVER_MAP_MODE_POLL,
-            NCI_RF_INTERFACE_ISO_DEP
-        };
+            GDEBUG("  T1T/Poll/Frame");
+            GDEBUG("  T2T/Poll/Frame");
+            cmd->data[0] += 2; /* Number of entries */
+            g_byte_array_append(cmd, ARRAY_AND_SIZE(entries));
+        }
+        if (sm->techs & (NCI_TECH_A_POLL | NCI_TECH_B_POLL)) {
+            static const guint8 entries[] = {
+                NCI_PROTOCOL_ISO_DEP,
+                NCI_DISCOVER_MAP_MODE_POLL,
+                NCI_RF_INTERFACE_ISO_DEP
+            };
 
-        GDEBUG("  T1T/Poll/Frame");
-        GDEBUG("  T2T/Poll/Frame");
-        cmd->data[0] += 3; /* Number of entries */
-        g_byte_array_append(cmd, ARRAY_AND_SIZE(entries));
-        if (sm->options & NCI_OPTION_POLL_F) {
+            GDEBUG("  IsoDep/Poll/IsoDep");
+            cmd->data[0] += 1; /* Number of entries */
+            g_byte_array_append(cmd, ARRAY_AND_SIZE(entries));
+        }
+        if (sm->techs & NCI_TECH_F_POLL) {
             static const guint8 t3t_entry[] = {
                 NCI_PROTOCOL_T3T,
                 NCI_DISCOVER_MAP_MODE_POLL,
@@ -407,11 +443,11 @@ nci_transition_idle_to_discover_map(
             cmd->data[0] += 1; /* Number of entries */
             g_byte_array_append(cmd, ARRAY_AND_SIZE(t3t_entry));
         }
-        GDEBUG("  IsoDep/Poll/IsoDep");
     }
 
     if (sm->op_mode & NFC_OP_MODE_PEER) {
-        if (sm->op_mode & NFC_OP_MODE_POLL) {
+        if ((sm->op_mode & NFC_OP_MODE_POLL) &&
+            (sm->techs & (NCI_TECH_A_POLL | NCI_TECH_F_POLL))) {
             static const guint8 entries[] = {
                 NCI_PROTOCOL_NFC_DEP,
                 NCI_DISCOVER_MAP_MODE_POLL,
@@ -422,7 +458,8 @@ nci_transition_idle_to_discover_map(
             cmd->data[0] += 1; /* Number of entries */
             g_byte_array_append(cmd, ARRAY_AND_SIZE(entries));
         }
-        if (sm->op_mode & NFC_OP_MODE_LISTEN) {
+        if ((sm->op_mode & NFC_OP_MODE_LISTEN) &&
+            (sm->techs & (NCI_TECH_A_LISTEN | NCI_TECH_F_LISTEN))) {
             static const guint8 entries[] = {
                 NCI_PROTOCOL_NFC_DEP,
                 NCI_DISCOVER_MAP_MODE_LISTEN,
@@ -435,7 +472,8 @@ nci_transition_idle_to_discover_map(
         }
     }
 
-    if (sm->op_mode & NFC_OP_MODE_CE) {
+    if ((sm->op_mode & NFC_OP_MODE_CE) &&
+        (sm->techs & (NCI_TECH_A_LISTEN | NCI_TECH_B_LISTEN))) {
         static const guint8 entries[] = {
             NCI_PROTOCOL_ISO_DEP,
             NCI_DISCOVER_MAP_MODE_LISTEN,
@@ -499,10 +537,17 @@ nci_transition_idle_to_discovery_protocol_routing_entries(
     GByteArray* cmd)
 {
     /*
+     * Type 1-2: Poll A
+     * Type 3: Poll F
+     * IsoDep: Poll A/B (RW Modes), Listen A/B (CE Modes)
+     * NfcDep: Poll/Listen A/F
+     *
      * Placing NFC-DEP and ISO-DEP entries to the head of the list
      * gives them higher priority.
      */
-    if (sm->op_mode & NFC_OP_MODE_PEER) {
+    if ((sm->op_mode & NFC_OP_MODE_PEER) &&
+        (sm->op_mode & (NFC_OP_MODE_POLL | NFC_OP_MODE_LISTEN)) &&
+        (sm->techs & (NCI_TECH_A | NCI_TECH_F))) {
         static const guint8 nfc_dep[] = {
             NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
             3,
@@ -515,7 +560,8 @@ nci_transition_idle_to_discovery_protocol_routing_entries(
             (sm, cmd, nfc_dep, "NFC-DEP");
     }
 
-    if (sm->op_mode & (NFC_OP_MODE_CE | NFC_OP_MODE_RW)) {
+    if ((sm->op_mode & (NFC_OP_MODE_CE | NFC_OP_MODE_RW)) &
+        (sm->techs & (NCI_TECH_A | NCI_TECH_B))) {
         static const guint8 iso_dep[] = {
             NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
             3,
@@ -529,24 +575,28 @@ nci_transition_idle_to_discovery_protocol_routing_entries(
     }
 
     if (sm->op_mode & NFC_OP_MODE_RW) {
-        static const guint8 t1[] = {
-            NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
-            3,
-            NCI_NFCEE_ID_DH,
-            NCI_ROUTING_ENTRY_POWER_ON,
-            NCI_PROTOCOL_T1T
-        };
-        static const guint8 t2[] = {
-            NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
-            3,
-            NCI_NFCEE_ID_DH,
-            NCI_ROUTING_ENTRY_POWER_ON,
-            NCI_PROTOCOL_T2T
-        };
+        if (sm->techs & NCI_TECH_A_POLL) {
+            static const guint8 t1[] = {
+                NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
+                3,
+                NCI_NFCEE_ID_DH,
+                NCI_ROUTING_ENTRY_POWER_ON,
+                NCI_PROTOCOL_T1T
+            };
+            static const guint8 t2[] = {
+                NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
+                3,
+                NCI_NFCEE_ID_DH,
+                NCI_ROUTING_ENTRY_POWER_ON,
+                NCI_PROTOCOL_T2T
+            };
 
-        nci_transition_idle_to_discovery_add_routing_entry(sm, cmd, t1, "T1T");
-        nci_transition_idle_to_discovery_add_routing_entry(sm, cmd, t2, "T2T");
-        if (sm->options & NCI_OPTION_POLL_F) {
+            nci_transition_idle_to_discovery_add_routing_entry
+                (sm, cmd, t1, "T1T");
+            nci_transition_idle_to_discovery_add_routing_entry
+                (sm, cmd, t2, "T2T");
+        }
+        if (sm->techs & NCI_TECH_F_POLL) {
             static const guint8 t3[] = {
                 NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
                 3,
@@ -593,7 +643,7 @@ nci_transition_idle_to_discovery_tech_routing_entries(
      * Placing NFC-F to the head of the list may (or may not) give it
      * higher priority.
      */
-    if ((sm->options & NCI_OPTION_LISTEN_F) &&
+    if ((sm->techs & NCI_TECH_F_LISTEN) &&
         (sm->op_mode & (NFC_OP_MODE_RW|NFC_OP_MODE_PEER))) {
         static const guint8 nfcf[] = {
             NCI_ROUTING_ENTRY_TYPE_TECHNOLOGY,
@@ -607,7 +657,7 @@ nci_transition_idle_to_discovery_tech_routing_entries(
             (sm, cmd, nfcf, "NFC-F");
     }
 
-    if ((sm->options & NCI_OPTION_LISTEN_V) &&
+    if ((sm->techs & NCI_TECH_V_LISTEN) &&
         (sm->op_mode & NFC_OP_MODE_RW)) {
         static const guint8 nfcv[] = {
             NCI_ROUTING_ENTRY_TYPE_TECHNOLOGY,
@@ -621,8 +671,15 @@ nci_transition_idle_to_discovery_tech_routing_entries(
             (sm, cmd, nfcv, "NFC-V");
     }
 
-    nci_transition_idle_to_discovery_add_routing_entry(sm, cmd, nfcb, "NFC-B");
-    nci_transition_idle_to_discovery_add_routing_entry(sm, cmd, nfca, "NFC-A");
+    if (sm->techs & NCI_TECH_B) {
+        nci_transition_idle_to_discovery_add_routing_entry
+            (sm, cmd, nfcb, "NFC-B");
+    }
+
+    if (sm->techs & NCI_TECH_A) {
+        nci_transition_idle_to_discovery_add_routing_entry
+            (sm, cmd, nfca, "NFC-A");
+    }
 }
 
 static
@@ -633,30 +690,6 @@ nci_transition_idle_to_discovery_mixed_routing_entries(
 {
     nci_transition_idle_to_discovery_protocol_routing_entries(sm, cmd);
     nci_transition_idle_to_discovery_tech_routing_entries(sm, cmd);
-}
-
-static
-void
-nci_transition_idle_to_discovery_default_routing_entries(
-    NciSm* sm,
-    GByteArray* cmd)
-{
-    static const guint8 nfca[] = {
-        NCI_ROUTING_ENTRY_TYPE_TECHNOLOGY,
-        3,
-        NCI_NFCEE_ID_DH,
-        NCI_ROUTING_ENTRY_POWER_ON,
-        NCI_RF_TECHNOLOGY_A
-    };
-
-    /*
-     * [NFCForum-TS-NCI-1.0]
-     * 6.3.2 Configure Listen Mode Routing
-     *
-     * ...
-     * This Control Message SHALL be at least one Routing Entry.
-     */
-    nci_transition_idle_to_discovery_add_routing_entry(sm, cmd, nfca, "NFC-A");
 }
 
 static
@@ -686,17 +719,6 @@ nci_transition_idle_to_discovery_last_set_routing_rsp(
         /* Ignore errors */
         nci_transition_idle_to_discover_map(self);
     }
-}
-
-static
-void
-nci_transition_idle_to_discovery_set_default_routing_rsp(
-    NCI_REQUEST_STATUS status,
-    const GUtilData* payload,
-    NciTransition* self)
-{
-    nci_transition_idle_to_discovery_last_set_routing_rsp(self, status,
-        payload, "RF_SET_LISTEN_MODE_ROUTING (Default)");
 }
 
 static
@@ -842,34 +864,35 @@ nci_transition_idle_to_discovery_configure_routing(
 {
     NciSm* sm = nci_transition_sm(self);
 
-    if (sm->max_routing_table_size) {
-        if (sm->op_mode & NFC_OP_MODE_LISTEN) {
-            /* Listen modes enabled */
-            switch (sm->nfcc_routing &
-                (NCI_NFCC_ROUTING_PROTOCOL_BASED |
-                 NCI_NFCC_ROUTING_TECHNOLOGY_BASED)) {
-            case NCI_NFCC_ROUTING_PROTOCOL_BASED |
-                 NCI_NFCC_ROUTING_TECHNOLOGY_BASED:
-                nci_transition_idle_to_discovery_set_routing(self, "Mixed",
-                    nci_transition_idle_to_discovery_mixed_routing_entries,
-                    nci_transition_idle_to_discovery_set_mixed_routing_rsp);
-                return;
-            case NCI_NFCC_ROUTING_PROTOCOL_BASED:
-                nci_transition_idle_to_discovery_set_routing(self, "Protocol",
-                    nci_transition_idle_to_discovery_protocol_routing_entries,
-                    nci_transition_idle_to_discovery_last_protocol_routing_rsp);
-                return;
-            case NCI_NFCC_ROUTING_TECHNOLOGY_BASED:
-                nci_transition_idle_to_discovery_set_routing(self, "Technology",
-                    nci_transition_idle_to_discovery_tech_routing_entries,
-                    nci_transition_idle_to_discovery_set_tech_routing_rsp);
-                return;
-            }
-        } else {
-            /* Listen modes disabled */
-            nci_transition_idle_to_discovery_set_routing(self, "Default",
-                nci_transition_idle_to_discovery_default_routing_entries,
-                nci_transition_idle_to_discovery_set_default_routing_rsp);
+    /*
+     * 6.3 Listen Mode Routing Configuration
+     *
+     * If, as part of the Discovery Process, the DH wants the NFCC to
+     * enter Listen Mode and the NFCC has indicated support for listen
+     * mode routing, the DH SHALL configure the Listen Mode Routing Table.
+     */
+    if (sm->max_routing_table_size &&
+        ((sm->op_mode & NFC_OP_MODE_CE) ||
+         (sm->op_mode & (NFC_OP_MODE_PEER|NFC_OP_MODE_LISTEN)) ==
+         (NFC_OP_MODE_PEER|NFC_OP_MODE_LISTEN))) {
+        switch (sm->nfcc_routing &
+            (NCI_NFCC_ROUTING_PROTOCOL_BASED |
+             NCI_NFCC_ROUTING_TECHNOLOGY_BASED)) {
+        case NCI_NFCC_ROUTING_PROTOCOL_BASED |
+            NCI_NFCC_ROUTING_TECHNOLOGY_BASED:
+            nci_transition_idle_to_discovery_set_routing(self, "Mixed",
+                nci_transition_idle_to_discovery_mixed_routing_entries,
+                nci_transition_idle_to_discovery_set_mixed_routing_rsp);
+            return;
+        case NCI_NFCC_ROUTING_PROTOCOL_BASED:
+            nci_transition_idle_to_discovery_set_routing(self, "Protocol",
+                nci_transition_idle_to_discovery_protocol_routing_entries,
+                nci_transition_idle_to_discovery_last_protocol_routing_rsp);
+            return;
+        case NCI_NFCC_ROUTING_TECHNOLOGY_BASED:
+            nci_transition_idle_to_discovery_set_routing(self, "Technology",
+                nci_transition_idle_to_discovery_tech_routing_entries,
+                nci_transition_idle_to_discovery_set_tech_routing_rsp);
             return;
         }
     }
@@ -998,7 +1021,8 @@ nci_transition_idle_to_discovery_la_sel_info_expected(
         /* Need ISO-DEP in listen mode */
         expected |= NCI_LA_SEL_INFO_ISO_DEP;
     }
-    if ((sm->op_mode & NFC_OP_MODE_PEER) == NFC_OP_MODE_PEER) {
+    if ((sm->op_mode & (NFC_OP_MODE_LISTEN | NFC_OP_MODE_PEER)) ==
+        (NFC_OP_MODE_LISTEN | NFC_OP_MODE_PEER)) {
         /* Need NFC-DEP in listen mode */
         expected |= NCI_LA_SEL_INFO_NFC_DEP;
     }
@@ -1034,8 +1058,9 @@ nci_transition_idle_to_discovery_lf_protocol_type_expected(
      * response to a SENSF_REQ having a System Code of FFFFh. Otherwise
      * the DH SHALL set the b1 of this field to 0.
      */
-    if ((sm->op_mode & NFC_OP_MODE_PEER) == NFC_OP_MODE_PEER &&
-        (sm->options & NCI_OPTION_LISTEN_F)) {
+    if ((sm->op_mode & (NFC_OP_MODE_LISTEN | NFC_OP_MODE_PEER)) ==
+        (NFC_OP_MODE_LISTEN | NFC_OP_MODE_PEER) &&
+        (sm->techs & NCI_TECH_F_LISTEN)) {
         /* Need NFC-DEP in Listen F mode */
         return NCI_LF_PROTOCOL_TYPE_NFC_DEP;
     } else {
@@ -1133,7 +1158,7 @@ nci_transition_idle_to_discovery_get_config_rsp(
  * Interface
  *==========================================================================*/
 
-NciTransition* 
+NciTransition*
 nci_transition_idle_to_discovery_new(
     NciSm* sm)
 {

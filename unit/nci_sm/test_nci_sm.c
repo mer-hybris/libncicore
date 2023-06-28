@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2020 Jolla Ltd.
- * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -231,6 +231,7 @@ test_null(
 
     nci_sm_free(null);
     nci_sm_set_op_mode(null, NFC_OP_MODE_NONE);
+    g_assert_cmpint(nci_sm_set_tech(NULL, NCI_TECH_A), == ,NCI_TECH_NONE);
     nci_sm_handle_ntf(null, 0, 0, NULL);
     nci_sm_add_state(null, NULL);
     nci_sm_add_state(sm, NULL);
@@ -476,7 +477,7 @@ test_add_state(
 
     nci_sm_remove_handlers(sm, &id, 1);
     g_assert(!id);
-    
+
     nci_sm_free(sm);
     g_assert(!state->active);
     g_assert(test->left == 1);
