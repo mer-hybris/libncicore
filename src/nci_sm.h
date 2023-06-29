@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
- * Copyright (C) 2019-2021 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -42,18 +42,6 @@ typedef enum nci_interface_version {
     NCI_INTERFACE_VERSION_1,
     NCI_INTERFACE_VERSION_2
 } NCI_INTERFACE_VERSION;
-
-typedef enum nci_options {
-    NCI_OPTION_NONE                     = 0x00,
-    NCI_OPTION_POLL_F                   = 0x01,
-    NCI_OPTION_LISTEN_F                 = 0x02,
-    NCI_OPTION_POLL_V                   = 0x04,
-    NCI_OPTION_LISTEN_V                 = 0x08
-} NCI_OPTIONS;
-
-#define NCI_OPTION_TYPE_F   (NCI_OPTION_POLL_F|NCI_OPTION_LISTEN_F)
-#define NCI_OPTION_TYPE_V   (NCI_OPTION_POLL_V|NCI_OPTION_LISTEN_V)
-#define NCI_OPTIONS_DEFAULT NCI_OPTION_TYPE_F /* A and B support always on*/
 
 /* Table 9: NFCC Features */
 typedef enum nci_nfcc_discovery {
@@ -275,7 +263,7 @@ struct nci_sm {
     NciState* next_state;
     GBytes* rf_interfaces;
     guint max_routing_table_size;
-    NCI_OPTIONS options;
+    NCI_TECH techs;
     NCI_INTERFACE_VERSION version;
     NCI_NFCC_DISCOVERY nfcc_discovery;
     NCI_NFCC_ROUTING nfcc_routing;
@@ -335,6 +323,12 @@ void
 nci_sm_set_op_mode(
     NciSm* sm,
     NCI_OP_MODE op_mode)
+    NCI_INTERNAL;
+
+NCI_TECH
+nci_sm_set_tech(
+    NciSm* sm,
+    NCI_TECH tech)
     NCI_INTERNAL;
 
 void

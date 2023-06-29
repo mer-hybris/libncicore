@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2018-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2018-2021 Jolla Ltd.
- * Copyright (C) 2018-2021 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -761,6 +761,25 @@ nci_core_set_params(
             nci_core_restart_internal(self);
         }
     }
+}
+
+NCI_TECH
+nci_core_get_tech(
+    NciCore* core)  /* Since 1.1.21 */
+{
+    NciCoreObject* self = nci_core_object(core);
+
+    return G_LIKELY(self) ? self->sm->techs : NCI_TECH_NONE;
+}
+
+NCI_TECH
+nci_core_set_tech(
+    NciCore* core,
+    NCI_TECH tech)  /* Since 1.1.21 */
+{
+    NciCoreObject* self = nci_core_object(core);
+
+    return G_LIKELY(self) ? nci_sm_set_tech(self->sm, tech) : NCI_TECH_NONE;
 }
 
 guint

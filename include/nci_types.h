@@ -256,6 +256,33 @@ typedef struct nci_discovery_ntf {
     gboolean last;
 } NciDiscoveryNtf;
 
+/* This is essentially NCI_MODE as a bitmask */
+
+typedef enum nci_tech {
+    NCI_TECH_NONE             = 0x0000,
+    NCI_TECH_A_POLL_PASSIVE   = 0x0001,
+    NCI_TECH_A_POLL_ACTIVE    = 0x0002,
+    NCI_TECH_A_LISTEN_PASSIVE = 0x0004,
+    NCI_TECH_A_LISTEN_ACTIVE  = 0x0008,
+    NCI_TECH_B_POLL           = 0x0010,
+    NCI_TECH_B_LISTEN         = 0x0040,
+    NCI_TECH_F_POLL_PASSIVE   = 0x0100,
+    NCI_TECH_F_POLL_ACTIVE    = 0x0200,
+    NCI_TECH_F_LISTEN_PASSIVE = 0x0400,
+    NCI_TECH_F_LISTEN_ACTIVE  = 0x0800,
+    NCI_TECH_V_POLL           = 0x1000,
+    NCI_TECH_V_LISTEN         = 0x4000
+} NCI_TECH; /* Since 1.1.21 */
+
+#define NCI_TECH_A_POLL   (NCI_TECH_A_POLL_PASSIVE|NCI_TECH_A_POLL_ACTIVE)
+#define NCI_TECH_A_LISTEN (NCI_TECH_A_LISTEN_PASSIVE|NCI_TECH_A_LISTEN_ACTIVE)
+#define NCI_TECH_A        (NCI_TECH_A_POLL|NCI_TECH_A_LISTEN)
+#define NCI_TECH_B        (NCI_TECH_B_POLL|NCI_TECH_B_LISTEN)
+#define NCI_TECH_F_POLL   (NCI_TECH_F_POLL_PASSIVE|NCI_TECH_F_POLL_ACTIVE)
+#define NCI_TECH_F_LISTEN (NCI_TECH_F_LISTEN_PASSIVE|NCI_TECH_F_LISTEN_ACTIVE)
+#define NCI_TECH_F        (NCI_TECH_F_POLL|NCI_TECH_F_LISTEN)
+#define NCI_TECH_V        (NCI_TECH_V_POLL|NCI_TECH_V_LISTEN)
+
 /* NCI states */
 
 typedef enum nci_state_id {
@@ -290,8 +317,15 @@ typedef enum nci_state_id {
  * +----------------------------+--------------------------+
  *
  * That hopefully explains why certain combinations don't make
- * sense, specifically (NFC_OP_MODE_RW | NFC_OP_MODE_LISTEN)
- * and (NFC_OP_MODE_CE | NFC_OP_MODE_POLL).
+ * sense, specifically (NFC_OP_MODE_RW | NFC_OP_MODE_LISTEN) and
+ * (NFC_OP_MODE_CE | NFC_OP_MODE_POLL).
+ *
+ * Note that NFC_OP_MODE_RW enables all appropriate poll modes
+ * even without NFC_OP_MODE_POLL and NFC_OP_MODE_CE enables the
+ * listen modes even without NFC_OP_MODE_LISTEN.
+ *
+ * NFC_OP_MODE_PEER, however, doesn't have any effect if neither
+ * NFC_OP_MODE_POLL nor NFC_OP_MODE_LISTEN is set.
  */
 
 typedef enum nci_op_mode {

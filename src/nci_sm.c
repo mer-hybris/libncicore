@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
- * Copyright (C) 2019-2021 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -97,28 +97,31 @@ static guint nci_sm_signals[SIGNAL_COUNT] = { 0 };
 
 #define NCI_IS_INTERNAL_STATE(state) ((state) < NCI_RFST_IDLE)
 
+#define NCI_TECH_DEFAULT (NCI_TECH_A|NCI_TECH_B|NCI_TECH_F)
+#define NCI_TECH_ALL     (NCI_TECH_A|NCI_TECH_B|NCI_TECH_F|NCI_TECH_V)
+
 /* Config file name is extern for unit tests */
 const char* nci_sm_config_file = "/etc/libncicore.conf";
 static const char CONFIG_SECTION[] = "Configuration";
 static const char CONFIG_LIST_SEPARATORS[] = ";,";
 static const char CONFIG_ENTRY_TECHNOLOGIES[] = "Technologies";
-static const char CONFIG_TECHNOLOGY_TYPE_A[] = "A";
-static const char CONFIG_TECHNOLOGY_TYPE_B[] = "B";
-static const char CONFIG_TECHNOLOGY_TYPE_F[] = "F";
-static const char CONFIG_TECHNOLOGY_TYPE_V[] = "V";
-static const char CONFIG_TECHNOLOGY_POLL_A[] = "Poll-A";
-static const char CONFIG_TECHNOLOGY_POLL_B[] = "Poll-B";
-static const char CONFIG_TECHNOLOGY_POLL_F[] = "Poll-F";
-static const char CONFIG_TECHNOLOGY_POLL_V[] = "Poll-V";
-static const char CONFIG_TECHNOLOGY_LISTEN_A[] = "Listen-A";
-static const char CONFIG_TECHNOLOGY_LISTEN_B[] = "Listen-B";
-static const char CONFIG_TECHNOLOGY_LISTEN_F[] = "Listen-F";
-static const char CONFIG_TECHNOLOGY_LISTEN_V[] = "Listen-V";
+static const char CONFIG_TECH_TYPE_A[] = "A";
+static const char CONFIG_TECH_TYPE_B[] = "B";
+static const char CONFIG_TECH_TYPE_F[] = "F";
+static const char CONFIG_TECH_TYPE_V[] = "V";
+static const char CONFIG_TECH_POLL_A[] = "Poll-A";
+static const char CONFIG_TECH_POLL_B[] = "Poll-B";
+static const char CONFIG_TECH_POLL_F[] = "Poll-F";
+static const char CONFIG_TECH_POLL_V[] = "Poll-V";
+static const char CONFIG_TECH_LISTEN_A[] = "Listen-A";
+static const char CONFIG_TECH_LISTEN_B[] = "Listen-B";
+static const char CONFIG_TECH_LISTEN_F[] = "Listen-F";
+static const char CONFIG_TECH_LISTEN_V[] = "Listen-V";
 
-typedef struct nci_technolofy_option {
+typedef struct nci_tech_option {
     const char* name;
-    NCI_OPTIONS opt;
-} NciTechnologyOption;
+    NCI_TECH tech;
+} NciTechOption;
 
 static inline NciSmObject* nci_sm_object(NciSm* sm) /* NULL safe */
     { return G_LIKELY(sm) ? NCI_SM(G_CAST(sm, NciSmObject, sm)) : NULL; }
@@ -431,28 +434,27 @@ nci_sm_parse_config(
         CONFIG_ENTRY_TECHNOLOGIES, NULL);
 
     if (sval) {
-        static const NciTechnologyOption nci_tech_options[] = {
-            /* A and B are always enabled */
-            { CONFIG_TECHNOLOGY_TYPE_A, NCI_OPTION_NONE },
-            { CONFIG_TECHNOLOGY_TYPE_B, NCI_OPTION_NONE },
-            { CONFIG_TECHNOLOGY_TYPE_F, NCI_OPTION_TYPE_F },
-            { CONFIG_TECHNOLOGY_TYPE_V, NCI_OPTION_TYPE_V },
-            { CONFIG_TECHNOLOGY_POLL_A, NCI_OPTION_NONE },
-            { CONFIG_TECHNOLOGY_POLL_B, NCI_OPTION_NONE },
-            { CONFIG_TECHNOLOGY_POLL_F, NCI_OPTION_POLL_F },
-            { CONFIG_TECHNOLOGY_POLL_V, NCI_OPTION_POLL_V },
-            { CONFIG_TECHNOLOGY_LISTEN_A, NCI_OPTION_NONE },
-            { CONFIG_TECHNOLOGY_LISTEN_B, NCI_OPTION_NONE },
-            { CONFIG_TECHNOLOGY_LISTEN_F, NCI_OPTION_LISTEN_F },
-            { CONFIG_TECHNOLOGY_LISTEN_V, NCI_OPTION_LISTEN_V }
+        static const NciTechOption nci_tech_options[] = {
+            { CONFIG_TECH_TYPE_A, NCI_TECH_A },
+            { CONFIG_TECH_TYPE_B, NCI_TECH_B },
+            { CONFIG_TECH_TYPE_F, NCI_TECH_F },
+            { CONFIG_TECH_TYPE_V, NCI_TECH_V },
+            { CONFIG_TECH_POLL_A, NCI_TECH_A_POLL },
+            { CONFIG_TECH_POLL_B, NCI_TECH_B_POLL },
+            { CONFIG_TECH_POLL_F, NCI_TECH_F_POLL },
+            { CONFIG_TECH_POLL_V, NCI_TECH_V_POLL },
+            { CONFIG_TECH_LISTEN_A, NCI_TECH_A_LISTEN },
+            { CONFIG_TECH_LISTEN_B, NCI_TECH_B_LISTEN },
+            { CONFIG_TECH_LISTEN_F, NCI_TECH_F_LISTEN },
+            { CONFIG_TECH_LISTEN_V, NCI_TECH_V_LISTEN }
         };
 
         char** techs = g_strsplit_set(sval, CONFIG_LIST_SEPARATORS, -1);
         char** val = techs;
 
-        sm->options = NCI_OPTION_NONE;
+        sm->techs = NCI_TECH_NONE;
         for (val = techs; *val; val++) {
-            const NciTechnologyOption* opt = NULL;
+            const NciTechOption* opt = NULL;
             guint i;
 
             g_strstrip(*val);
@@ -465,10 +467,13 @@ nci_sm_parse_config(
 
             if (opt) {
                 GDEBUG("  %s", opt->name);
-                sm->options |= opt->opt;
+                sm->techs |= opt->tech;
             } else {
                 GWARN("Unexpected technology '%s' in configuration", *val);
             }
+        }
+        if (!sm->techs) {
+            sm->techs = NCI_TECH_DEFAULT;
         }
         g_strfreev(techs);
         g_free(sval);
@@ -766,9 +771,32 @@ nci_sm_set_op_mode(
          * must be done in RFST_IDLE state. Therefore, we need to switch to
          * RFST_IDLE if we are not there yet.
          */
+        GDEBUG("Mode 0x%02x => 0x%02x", sm->op_mode, op_mode);
         sm->op_mode = op_mode;
         nci_sm_switch_to(sm, NCI_RFST_IDLE);
     }
+}
+
+NCI_TECH
+nci_sm_set_tech(
+    NciSm* sm,
+    NCI_TECH tech)
+{
+    const NCI_TECH valid_techs = (tech & NCI_TECH_ALL);
+
+    if (G_LIKELY(sm) && sm->techs != valid_techs) {
+        /*
+         * If we are really changing the mode, we need to reconfigure NFCC
+         * with RF_DISCOVER_MAP_CMD and RF_SET_LISTEN_MODE_ROUTING_CMD, which
+         * must be done in RFST_IDLE state. Therefore, we need to switch to
+         * RFST_IDLE if we are not there yet.
+         */
+        GDEBUG("Tech 0x%04x => 0x%04x", sm->techs, valid_techs);
+        sm->techs = valid_techs;
+        nci_sm_switch_to(sm, NCI_RFST_IDLE);
+        return valid_techs;
+    }
+    return NCI_TECH_NONE;
 }
 
 void
@@ -1135,7 +1163,7 @@ nci_sm_object_init(
 
     /* Only poll modes by default */
     sm->op_mode = NFC_OP_MODE_RW | NFC_OP_MODE_POLL;
-    sm->options = NCI_OPTIONS_DEFAULT;
+    sm->techs = NCI_TECH_DEFAULT;
     self->transitions = g_ptr_array_new_with_free_func((GDestroyNotify)
         nci_transition_unref);
     self->states = g_ptr_array_new_full(NCI_CORE_STATES, (GDestroyNotify)
