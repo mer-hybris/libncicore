@@ -573,42 +573,6 @@ nci_transition_idle_to_discovery_protocol_routing_entries(
         nci_transition_idle_to_discovery_add_routing_entry
             (sm, cmd, iso_dep, "ISO-DEP");
     }
-
-    if (sm->op_mode & NFC_OP_MODE_RW) {
-        if (sm->techs & NCI_TECH_A_POLL) {
-            static const guint8 t1[] = {
-                NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
-                3,
-                NCI_NFCEE_ID_DH,
-                NCI_ROUTING_ENTRY_POWER_ON,
-                NCI_PROTOCOL_T1T
-            };
-            static const guint8 t2[] = {
-                NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
-                3,
-                NCI_NFCEE_ID_DH,
-                NCI_ROUTING_ENTRY_POWER_ON,
-                NCI_PROTOCOL_T2T
-            };
-
-            nci_transition_idle_to_discovery_add_routing_entry
-                (sm, cmd, t1, "T1T");
-            nci_transition_idle_to_discovery_add_routing_entry
-                (sm, cmd, t2, "T2T");
-        }
-        if (sm->techs & NCI_TECH_F_POLL) {
-            static const guint8 t3[] = {
-                NCI_ROUTING_ENTRY_TYPE_PROTOCOL,
-                3,
-                NCI_NFCEE_ID_DH,
-                NCI_ROUTING_ENTRY_POWER_ON,
-                NCI_PROTOCOL_T3T
-            };
-
-            nci_transition_idle_to_discovery_add_routing_entry
-                (sm, cmd, t3, "T3T");
-        }
-    }
 }
 
 static
