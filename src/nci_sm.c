@@ -98,7 +98,6 @@ static guint nci_sm_signals[SIGNAL_COUNT] = { 0 };
 #define NCI_IS_INTERNAL_STATE(state) ((state) < NCI_RFST_IDLE)
 
 #define NCI_TECH_DEFAULT (NCI_TECH_A|NCI_TECH_B|NCI_TECH_F)
-#define NCI_TECH_ALL     (NCI_TECH_A|NCI_TECH_B|NCI_TECH_F|NCI_TECH_V)
 
 /* Config file name is extern for unit tests */
 const char* nci_sm_config_file = "/etc/libncicore.conf";
@@ -970,6 +969,7 @@ nci_sm_supports_protocol(
 {
     switch (protocol) {
     case NCI_PROTOCOL_T2T:
+    case NCI_PROTOCOL_T5T:
         return sm && (sm->op_mode & NFC_OP_MODE_RW);
     case NCI_PROTOCOL_ISO_DEP:
         return sm && (sm->op_mode & (NFC_OP_MODE_RW | NFC_OP_MODE_CE));

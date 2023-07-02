@@ -621,20 +621,6 @@ nci_transition_idle_to_discovery_tech_routing_entries(
             (sm, cmd, nfcf, "NFC-F");
     }
 
-    if ((sm->techs & NCI_TECH_V_LISTEN) &&
-        (sm->op_mode & NFC_OP_MODE_RW)) {
-        static const guint8 nfcv[] = {
-            NCI_ROUTING_ENTRY_TYPE_TECHNOLOGY,
-            3,
-            NCI_NFCEE_ID_DH,
-            NCI_ROUTING_ENTRY_POWER_ON,
-            NCI_RF_TECHNOLOGY_V
-        };
-
-        nci_transition_idle_to_discovery_add_routing_entry
-            (sm, cmd, nfcv, "NFC-V");
-    }
-
     if (sm->techs & NCI_TECH_B) {
         nci_transition_idle_to_discovery_add_routing_entry
             (sm, cmd, nfcb, "NFC-B");

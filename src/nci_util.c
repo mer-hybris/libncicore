@@ -326,6 +326,37 @@ nci_parse_mode_param(
         GDEBUG("No parameters for NFC-F listen mode");
         return NULL;
     case NCI_MODE_PASSIVE_POLL_V:
+        /*
+         * NFC Controller Interface (NCI)
+         * Technical Specification
+         * Version 2.0
+         *
+         * Table 74: Specific Parameters for NFC-V Poll Mode
+         *
+         * +==============================================================+
+         * | Offset | Size | Description                                  |
+         * +==============================================================+
+         * | 0      | 1    | RES_FLAG - 1st Byte of INVENTORY_RES         |
+         * | 1      | 1    | DSFID - 2nd Byte of INVENTORY_RES            |
+         * | 2      | 8    | UID - 3rd Byte to last Byte of INVENTORY_RES |
+         * +==============================================================+
+         */
+        if (len >= 10) {
+            NciModeParamPollV* pv = &param->poll_v;
+
+            pv->res_flag = bytes[0];
+            pv->dsfid = bytes[1];
+            memcpy(pv->uid, bytes + 2, 8);
+            GDEBUG("NFC-V");
+            GDEBUG("  PollV.res_flag = 0x%02x", pv->res_flag);
+            GDEBUG("  PollV.dsfid = 0x%02x", pv->dsfid);
+            GDEBUG("  PollV.uid = %02x %02x %02x %02x %02x %02x %02x %02x",
+                pv->uid[0], pv->uid[1], pv->uid[2], pv->uid[3],
+                pv->uid[4], pv->uid[5], pv->uid[6], pv->uid[7]);
+           return param;
+        }
+        GDEBUG("Failed to parse parameters for NFC-V poll mode");
+        return NULL;
     case NCI_MODE_PASSIVE_LISTEN_V:
         break;
     case NCI_MODE_PASSIVE_LISTEN_A:
@@ -1030,6 +1061,7 @@ nci_mode_param_copy_impl(
         case NCI_MODE_PASSIVE_POLL_A:
         case NCI_MODE_ACTIVE_POLL_F:
         case NCI_MODE_PASSIVE_POLL_F:
+        case NCI_MODE_PASSIVE_POLL_V:
             memcpy(dest, src, size);
             return size;
         case NCI_MODE_PASSIVE_POLL_B:
@@ -1057,7 +1089,6 @@ nci_mode_param_copy_impl(
                 size += G_ALIGN8(listen_f->nfcid2.size);
             }
             return size;
-        case NCI_MODE_PASSIVE_POLL_V:   /* fallthrough */
         case NCI_MODE_PASSIVE_LISTEN_V:
             break;
         case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
@@ -1088,6 +1119,7 @@ nci_mode_param_size(
         case NCI_MODE_PASSIVE_POLL_A:
         case NCI_MODE_ACTIVE_POLL_F:
         case NCI_MODE_PASSIVE_POLL_F:
+        case NCI_MODE_PASSIVE_POLL_V:
             size = sizeof(NciModeParam);
             break;
         case NCI_MODE_PASSIVE_POLL_B:
@@ -1107,7 +1139,6 @@ nci_mode_param_size(
                 size += G_ALIGN8(listen_f->nfcid2.size);
             }
             break;
-        case NCI_MODE_PASSIVE_POLL_V:   /* fallthrough */
         case NCI_MODE_PASSIVE_LISTEN_V:
         case NCI_MODE_PASSIVE_LISTEN_A:
         case NCI_MODE_PASSIVE_LISTEN_B:
@@ -1207,12 +1238,12 @@ nci_util_copy_mode_param(
         case NCI_MODE_PASSIVE_POLL_B:
         case NCI_MODE_ACTIVE_LISTEN_F:
         case NCI_MODE_PASSIVE_LISTEN_F:
+        case NCI_MODE_PASSIVE_POLL_V:
             if (size) {
                 copy = g_malloc0(size);
                 nci_mode_param_copy_impl(copy, param, mode);
             }
             return copy;
-        case NCI_MODE_PASSIVE_POLL_V:       /* fallthrough */
         case NCI_MODE_PASSIVE_LISTEN_V:
             break;
         case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
