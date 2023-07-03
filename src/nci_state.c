@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2020 Jolla Ltd.
- * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -30,8 +30,6 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define GLIB_DISABLE_DEPRECATION_WARNINGS
-
 #include "nci_state_impl.h"
 #include "nci_sm.h"
 #include "nci_transition.h"
@@ -42,9 +40,14 @@ struct nci_state_priv {
     GHashTable* transitions;
 };
 
-G_DEFINE_TYPE(NciState, nci_state, G_TYPE_OBJECT)
-#define NCI_STATE_GET_CLASS(obj) G_TYPE_INSTANCE_GET_CLASS((obj), \
-        NCI_TYPE_STATE, NciStateClass)
+#define PARENT_TYPE G_TYPE_OBJECT
+#define PARENT_CLASS nci_state_parent_class
+#define THIS(obj) NCI_STATE(obj)
+#define THIS_TYPE NCI_TYPE_STATE
+#define GET_THIS_CLASS(obj) G_TYPE_INSTANCE_GET_CLASS(obj, THIS_TYPE, \
+        NciStateClass)
+
+G_DEFINE_TYPE(NciState, nci_state, PARENT_TYPE)
 
 /*==========================================================================*
  * Implementation
@@ -56,7 +59,7 @@ nci_state_transition_gone(
     gpointer state,
     GObject* dead_transition)
 {
-    NciState* self = NCI_STATE(state);
+    NciState* self = THIS(state);
     NciStatePriv* priv = self->priv;
     GHashTableIter it;
     gpointer value;
@@ -93,7 +96,7 @@ nci_state_ref(
     NciState* self)
 {
     if (G_LIKELY(self)) {
-        g_object_ref(NCI_STATE(self));
+        g_object_ref(THIS(self));
     }
     return self;
 }
@@ -103,7 +106,7 @@ nci_state_unref(
     NciState* self)
 {
     if (G_LIKELY(self)) {
-        g_object_unref(NCI_STATE(self));
+        g_object_unref(THIS(self));
     }
 }
 
@@ -118,7 +121,7 @@ nci_state_new(
     NCI_STATE state,
     const char* name)
 {
-    NciState* self = g_object_new(NCI_TYPE_STATE, NULL);
+    NciState* self = g_object_new(THIS_TYPE, NULL);
 
     nci_state_init_base(self, sm, state, name);
     return self;
@@ -193,7 +196,7 @@ NciSm*
 nci_state_sm(
     NciState* self)
 {
-    return G_LIKELY(self) ? self->priv->sm : NULL; 
+    return G_LIKELY(self) ? self->priv->sm : NULL;
 }
 
 void
@@ -230,7 +233,7 @@ nci_state_enter(
     void* param)
 {
     if (G_LIKELY(self)) {
-        NCI_STATE_GET_CLASS(self)->enter(self, param);
+        GET_THIS_CLASS(self)->enter(self, param);
     }
 }
 
@@ -240,7 +243,7 @@ nci_state_reenter(
     void* param)
 {
     if (G_LIKELY(self)) {
-        NCI_STATE_GET_CLASS(self)->reenter(self, param);
+        GET_THIS_CLASS(self)->reenter(self, param);
     }
 }
 
@@ -249,7 +252,7 @@ nci_state_leave(
     NciState* self)
 {
     if (G_LIKELY(self)) {
-        NCI_STATE_GET_CLASS(self)->leave(self);
+        GET_THIS_CLASS(self)->leave(self);
     }
 }
 
@@ -261,7 +264,7 @@ nci_state_handle_ntf(
     const GUtilData* payload)
 {
     if (G_LIKELY(self)) {
-        NCI_STATE_GET_CLASS(self)->handle_ntf(self, gid, oid, payload);
+        GET_THIS_CLASS(self)->handle_ntf(self, gid, oid, payload);
     }
 }
 
@@ -331,8 +334,8 @@ void
 nci_state_init(
     NciState* self)
 {
-    NciStatePriv* priv =  G_TYPE_INSTANCE_GET_PRIVATE(self,
-        NCI_TYPE_STATE, NciStatePriv);
+    NciStatePriv* priv = G_TYPE_INSTANCE_GET_PRIVATE(self, THIS_TYPE, \
+        NciStatePriv);
 
     self->priv = priv;
     priv->transitions = g_hash_table_new(g_direct_hash, g_direct_equal);
@@ -343,7 +346,7 @@ void
 nci_state_finalize(
     GObject* object)
 {
-    NciState* self = NCI_STATE(object);
+    NciState* self = THIS(object);
     NciStatePriv* priv = self->priv;
     GHashTableIter it;
     gpointer value;
@@ -355,7 +358,7 @@ nci_state_finalize(
         g_hash_table_iter_remove(&it);
     }
     g_hash_table_destroy(priv->transitions);
-    G_OBJECT_CLASS(nci_state_parent_class)->finalize(object);
+    G_OBJECT_CLASS(PARENT_CLASS)->finalize(object);
 }
 
 static

@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2020 Jolla Ltd.
- * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -30,8 +30,6 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define GLIB_DISABLE_DEPRECATION_WARNINGS
-
 #include "nci_transition.h"
 #include "nci_transition_impl.h"
 #include "nci_state.h"
@@ -42,9 +40,14 @@ struct nci_transition_priv {
     NciSm* sm; /* Weak reference */
 };
 
+#define PARENT_TYPE G_TYPE_OBJECT
+#define PARENT_CLASS nci_transition_parent_class
+#define THIS(obj) NCI_TRANSITION(obj)
+#define THIS_TYPE NCI_TYPE_TRANSITION
+#define GET_THIS_CLASS(obj) G_TYPE_INSTANCE_GET_CLASS(obj, THIS_TYPE, \
+        NciTransitionClass)
+
 G_DEFINE_ABSTRACT_TYPE(NciTransition, nci_transition, G_TYPE_OBJECT)
-#define NCI_TRANSITION_GET_CLASS(obj) G_TYPE_INSTANCE_GET_CLASS((obj), \
-        NCI_TYPE_TRANSITION, NciTransitionClass)
 
 /*==========================================================================*
  * Interface
@@ -55,7 +58,7 @@ nci_transition_ref(
     NciTransition* self)
 {
     if (G_LIKELY(self)) {
-        g_object_ref(NCI_TRANSITION(self));
+        g_object_ref(THIS(self));
     }
     return self;
 }
@@ -65,7 +68,7 @@ nci_transition_unref(
     NciTransition* self)
 {
     if (G_LIKELY(self)) {
-        g_object_unref(NCI_TRANSITION(self));
+        g_object_unref(THIS(self));
     }
 }
 
@@ -119,7 +122,7 @@ nci_transition_start(
     NciTransition* self)
 {
     if (G_LIKELY(self)) {
-        if (NCI_TRANSITION_GET_CLASS(self)->start(self)) {
+        if (GET_THIS_CLASS(self)->start(self)) {
             return TRUE;
         }
     }
@@ -131,7 +134,7 @@ nci_transition_finished(
     NciTransition* self)
 {
     if (G_LIKELY(self)) {
-        NCI_TRANSITION_GET_CLASS(self)->finished(self);
+        GET_THIS_CLASS(self)->finished(self);
     }
 }
 
@@ -143,7 +146,7 @@ nci_transition_handle_ntf(
     const GUtilData* payload)
 {
     if (G_LIKELY(self)) {
-        NCI_TRANSITION_GET_CLASS(self)->handle_ntf(self, gid, oid, payload);
+        GET_THIS_CLASS(self)->handle_ntf(self, gid, oid, payload);
     }
 }
 
@@ -247,10 +250,8 @@ void
 nci_transition_init(
     NciTransition* self)
 {
-    NciTransitionPriv* priv =  G_TYPE_INSTANCE_GET_PRIVATE(self,
-        NCI_TYPE_TRANSITION, NciTransitionPriv);
-
-    self->priv = priv;
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE(self, THIS_TYPE,
+        NciTransitionPriv);
 }
 
 static
@@ -258,12 +259,12 @@ void
 nci_transition_finalize(
     GObject* object)
 {
-    NciTransition* self = NCI_TRANSITION(object);
+    NciTransition* self = THIS(object);
     NciTransitionPriv* priv = self->priv;
 
     nci_state_unref(self->dest);
     nci_sm_remove_weak_pointer(&priv->sm);
-    G_OBJECT_CLASS(nci_transition_parent_class)->finalize(object);
+    G_OBJECT_CLASS(PARENT_CLASS)->finalize(object);
 }
 
 static

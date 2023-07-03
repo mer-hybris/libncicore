@@ -90,6 +90,8 @@ WARNINGS = -Wall -Wstrict-aliasing -Wunused-result
 INCLUDES = -I$(INCLUDE_DIR)
 BASE_FLAGS = -fPIC
 FULL_CFLAGS = $(BASE_FLAGS) $(CFLAGS) $(DEFINES) $(WARNINGS) $(INCLUDES) \
+  -DGLIB_VERSION_MAX_ALLOWED=GLIB_VERSION_2_32 \
+  -DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_MAX_ALLOWED \
   -MMD -MP $(shell pkg-config --cflags $(PKGS))
 FULL_LDFLAGS = $(BASE_FLAGS) $(LDFLAGS) -shared -Wl,-soname -Wl,$(LIB_SONAME) \
   -Wl,--version-script=$(LIB_NAME).map
