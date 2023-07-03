@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2020 Jolla Ltd.
- * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -170,6 +170,7 @@ nci_state_w4_host_select_entered(
             case NCI_PROTOCOL_T1T:
             case NCI_PROTOCOL_T2T:
             case NCI_PROTOCOL_T3T:
+            case NCI_PROTOCOL_T5T:
             case NCI_PROTOCOL_PROPRIETARY:
             case NCI_PROTOCOL_UNDETERMINED:
                 /* Choose NCI_RF_INTERFACE_FRAME */
