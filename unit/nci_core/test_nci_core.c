@@ -334,7 +334,7 @@ static const guint8 RF_DISCOVER_MAP_CMD_RW_CE[] = {
     0x03, 0x01, 0x01, /* T3T/Poll/Frame */
     0x04, 0x02, 0x02  /* IsoDep/Listen/IsoDep */
 };
-static const guint8 RF_DISCOVER_MAP_CMD_RW_POLL_A[] = {
+static const guint8 RF_DISCOVER_MAP_CMD_RW_POLL[] = {
     0x21, 0x00, 0x0a, 0x03,
     0x01, 0x01, 0x01, /* T1T/Poll/Frame */
     0x02, 0x01, 0x01, /* T2T/Poll/Frame */
@@ -410,6 +410,13 @@ static const guint8 RF_DISCOVER_CMD_RW_A_B_F[] = {
     0x01, 0x01, /* PassivePollB */
     0x05, 0x01, /* ActivePollF */
     0x02, 0x01  /* PassivePollF */
+};
+static const guint8 RF_DISCOVER_CMD_RW_A_B_V[] = {
+    0x21, 0x03, 0x09, 0x04,
+    0x03, 0x01, /* ActivePollA */
+    0x00, 0x01, /* PassivePollA */
+    0x01, 0x01, /* PassivePollB */
+    0x06, 0x01  /* PassivePollV */
 };
 static const guint8 RF_DISCOVER_CMD_RW_PEER_A_B_F[] = {
     0x21, 0x03, 0x13, 0x09,
@@ -532,6 +539,11 @@ static const guint8 RF_INTF_ACTIVATED_NTF_T4A_BROKEN_ACT_PARAM2[] = {
     0x61, 0x05, 0x15, 0x01, 0x02, 0x04, 0x00, 0xff,
     0x01, 0x09, 0x04, 0x00, 0x04, 0x37, 0xf4, 0x95,
     0x95, 0x01, 0x20, 0x00, 0x00, 0x00, 0x01, 0x00 /* Missing params */,
+};
+static const guint8 RF_INTF_ACTIVATED_NTF_T5T[] = {
+    0x61, 0x05, 0x15, 0x01, 0x01, 0x06, 0x06, 0xff,
+    0x01, 0x0a, 0x00, 0x00, 0xc4, 0x23, 0x6e, 0x01,
+    0x08, 0x01, 0x04, 0xe0, 0x06, 0x01, 0x01, 0x00
 };
 static const guint8 RF_INTF_ACTIVATED_NTF_NFCDEP_LISTEN_A[] = {
     0x61, 0x05, 0x2e, 0x01, 0x03, 0x05, 0x83, 0xfb,
@@ -3338,6 +3350,37 @@ static const TestSmEntry test_nci_sm_dscvr_poll_act_error4[] = {
     TEST_NCI_SM_END()
 };
 
+static const TestSmEntry test_nci_sm_dscvr_poll_act_t5t[] = {
+    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_ASSERT_STATES(NCI_STATE_INIT, NCI_RFST_DISCOVERY),
+
+    TEST_NCI_SM_EXPECT_CMD(CORE_RESET_CMD),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_V2_RSP),
+    TEST_NCI_SM_QUEUE_NTF(CORE_RESET_V2_NTF),
+    TEST_NCI_SM_EXPECT_CMD(CORE_INIT_CMD_V2),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_V2_RSP),
+    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DEFAULT),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
+
+    TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DISCOVERY_RW),
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW_POLL),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_RW_A_B_V),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
+    TEST_NCI_SM_QUEUE_NTF(CORE_CONN_CREDITS_NTF),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* T5T/NFC-V Poll Mode activation */
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_T5T),
+    TEST_NCI_SM_WAIT_ACTIVATION(NCI_RF_INTERFACE_FRAME,
+        NCI_PROTOCOL_T5T, NCI_MODE_PASSIVE_POLL_V),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_POLL_ACTIVE),
+    TEST_NCI_SM_END()
+};
+
 static const TestSmEntry test_nci_sm_dscvr_poll_deact_t4a_badparam1[] = {
     TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
     TEST_NCI_SM_ASSERT_STATES(NCI_STATE_INIT, NCI_RFST_DISCOVERY),
@@ -3998,7 +4041,7 @@ static const TestSmEntry test_nci_sm_set_mode_a[] = {
     TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
     TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
     TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DISCOVERY_RW),
-    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW_POLL_A),
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW_POLL),
     TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
     TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_RW_A),
     TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
@@ -4211,6 +4254,9 @@ static const char test_nci_config_ab_data_empty[] =
 static const char test_nci_config_ab_data[] =
     CONFIG_SECTION "\n"
     CONFIG_ENTRY_TECHNOLOGIES " = A,B\n";
+static const char test_nci_config_abv_data[] =
+    CONFIG_SECTION "\n"
+    CONFIG_ENTRY_TECHNOLOGIES " = A,B,V\n";
 static const char test_nci_config_ab_data_x[] =
     CONFIG_SECTION "\n"
     CONFIG_ENTRY_TECHNOLOGIES " = A,B,X\n"; /* X is ignored */
@@ -4279,6 +4325,8 @@ static const TestNciSmData nci_sm_tests[] = {
     { "discovery-poll-activate-error2",  test_nci_sm_dscvr_poll_act_error2 },
     { "discovery-poll-activate-error3",  test_nci_sm_dscvr_poll_act_error3 },
     { "discovery-poll-activate-error4",  test_nci_sm_dscvr_poll_act_error4 },
+    { "discovery-poll-activate-t5t",  test_nci_sm_dscvr_poll_act_t5t,
+       test_nci_config_abv_data },
     { "discovery-poll-deactivate-t4a-bad-act-param1",
        test_nci_sm_dscvr_poll_deact_t4a_badparam1 },
     { "discovery-poll-deactivate-t4a-bad-act-param2",
