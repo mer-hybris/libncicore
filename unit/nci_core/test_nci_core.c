@@ -300,8 +300,8 @@ static const guint8 RF_DISCOVER_MAP_CMD_RW[] = {
     0x21, 0x00, 0x0d, 0x04,
     0x01, 0x01, 0x01, /* T1T/Poll/Frame */
     0x02, 0x01, 0x01, /* T2T/Poll/Frame */
-    0x04, 0x01, 0x02, /* IsoDep/Poll/IsoDep */
-    0x03, 0x01, 0x01  /* T3T/Poll/Frame */
+    0x03, 0x01, 0x01, /* T3T/Poll/Frame */
+    0x04, 0x01, 0x02  /* IsoDep/Poll/IsoDep */
 };
 static const guint8 RF_DISCOVER_MAP_CMD_RW_A_B[] = {
     0x21, 0x00, 0x0a, 0x03,
@@ -321,8 +321,8 @@ static const guint8 RF_DISCOVER_MAP_CMD_RW_PEER[] = {
     0x21, 0x00, 0x13, 0x06,
     0x01, 0x01, 0x01, /* T1T/Poll/Frame */
     0x02, 0x01, 0x01, /* T2T/Poll/Frame */
-    0x04, 0x01, 0x02, /* IsoDep/Poll/IsoDep */
     0x03, 0x01, 0x01, /* T3T/Poll/Frame */
+    0x04, 0x01, 0x02, /* IsoDep/Poll/IsoDep */
     0x05, 0x01, 0x03, /* NfcDep/Poll/NfcDep */
     0x05, 0x02, 0x03  /* NfcDep/Listen/NfcDep */
 };
@@ -330,14 +330,21 @@ static const guint8 RF_DISCOVER_MAP_CMD_RW_CE[] = {
     0x21, 0x00, 0x10, 0x05,
     0x01, 0x01, 0x01, /* T1T/Poll/Frame */
     0x02, 0x01, 0x01, /* T2T/Poll/Frame */
-    0x04, 0x01, 0x02, /* IsoDep/Poll/IsoDep */
     0x03, 0x01, 0x01, /* T3T/Poll/Frame */
+    0x04, 0x01, 0x02, /* IsoDep/Poll/IsoDep */
     0x04, 0x02, 0x02  /* IsoDep/Listen/IsoDep */
 };
 static const guint8 RF_DISCOVER_MAP_CMD_RW_POLL[] = {
     0x21, 0x00, 0x0a, 0x03,
     0x01, 0x01, 0x01, /* T1T/Poll/Frame */
     0x02, 0x01, 0x01, /* T2T/Poll/Frame */
+    0x04, 0x01, 0x02  /* IsoDep/Poll/IsoDep */
+};
+static const guint8 RF_DISCOVER_MAP_CMD_RW_POLL_A_B_V[] = {
+    0x21, 0x00, 0x0d, 0x04,
+    0x01, 0x01, 0x01, /* T1T/Poll/Frame */
+    0x02, 0x01, 0x01, /* T2T/Poll/Frame */
+    0x06, 0x01, 0x01, /* T2T/Poll/Frame */
     0x04, 0x01, 0x02  /* IsoDep/Poll/IsoDep */
 };
 static const guint8 RF_DISCOVER_MAP_CMD_RW_CE_A_B[] = {
@@ -351,8 +358,8 @@ static const guint8 RF_DISCOVER_MAP_CMD_CE_PEER[] = {
     0x21, 0x00, 0x16, 0x07,
     0x01, 0x01, 0x01, /* T1T/Poll/Frame */
     0x02, 0x01, 0x01, /* T2T/Poll/Frame */
-    0x04, 0x01, 0x02, /* IsoDep/Poll/IsoDep */
     0x03, 0x01, 0x01, /* T3T/Poll/Frame */
+    0x04, 0x01, 0x02, /* IsoDep/Poll/IsoDep */
     0x05, 0x01, 0x03, /* NfcDep/Poll/NfcDep */
     0x05, 0x02, 0x03, /* NfcDep/Listen/NfcDep */
     0x04, 0x02, 0x02  /* IsoDep/Listen/IsoDep */
@@ -3366,7 +3373,7 @@ static const TestSmEntry test_nci_sm_dscvr_poll_act_t5t[] = {
     TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
     TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
     TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DISCOVERY_RW),
-    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW_POLL),
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW_POLL_A_B_V),
     TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
     TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_RW_A_B_V),
     TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),

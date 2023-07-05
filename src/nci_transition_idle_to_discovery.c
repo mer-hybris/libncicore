@@ -421,17 +421,6 @@ nci_transition_idle_to_discover_map(
             cmd->data[0] += 2; /* Number of entries */
             g_byte_array_append(cmd, ARRAY_AND_SIZE(entries));
         }
-        if (sm->techs & (NCI_TECH_A_POLL | NCI_TECH_B_POLL)) {
-            static const guint8 entries[] = {
-                NCI_PROTOCOL_ISO_DEP,
-                NCI_DISCOVER_MAP_MODE_POLL,
-                NCI_RF_INTERFACE_ISO_DEP
-            };
-
-            GDEBUG("  IsoDep/Poll/IsoDep");
-            cmd->data[0] += 1; /* Number of entries */
-            g_byte_array_append(cmd, ARRAY_AND_SIZE(entries));
-        }
         if (sm->techs & NCI_TECH_F_POLL) {
             static const guint8 t3t_entry[] = {
                 NCI_PROTOCOL_T3T,
@@ -442,6 +431,28 @@ nci_transition_idle_to_discover_map(
             GDEBUG("  T3T/Poll/Frame");
             cmd->data[0] += 1; /* Number of entries */
             g_byte_array_append(cmd, ARRAY_AND_SIZE(t3t_entry));
+        }
+        if (sm->techs & NCI_TECH_V_POLL) {
+            static const guint8 t5t_entry[] = {
+                NCI_PROTOCOL_T5T,
+                NCI_DISCOVER_MAP_MODE_POLL,
+                NCI_RF_INTERFACE_FRAME
+            };
+
+            GDEBUG("  T5T/Poll/Frame");
+            cmd->data[0] += 1; /* Number of entries */
+            g_byte_array_append(cmd, ARRAY_AND_SIZE(t5t_entry));
+        }
+        if (sm->techs & (NCI_TECH_A_POLL | NCI_TECH_B_POLL)) {
+            static const guint8 entries[] = {
+                NCI_PROTOCOL_ISO_DEP,
+                NCI_DISCOVER_MAP_MODE_POLL,
+                NCI_RF_INTERFACE_ISO_DEP
+            };
+
+            GDEBUG("  IsoDep/Poll/IsoDep");
+            cmd->data[0] += 1; /* Number of entries */
+            g_byte_array_append(cmd, ARRAY_AND_SIZE(entries));
         }
     }
 
