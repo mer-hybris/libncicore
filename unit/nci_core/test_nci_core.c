@@ -254,6 +254,12 @@ static const guint8 RF_SET_LISTEN_MODE_ROUTING_CMD_MIXED_A_B[] = {
     0x00, 0x03, 0x00, 0x01, 0x01, /* NFC-B */
     0x00, 0x03, 0x00, 0x01, 0x00  /* NFC-A */
 };
+static const guint8 RF_SET_LISTEN_MODE_ROUTING_CMD_MIXED_CE_B_A[] = {
+    0x21, 0x01, 0x11, 0x00, 0x03,
+    0x01, 0x03, 0x00, 0x01, 0x04, /* ISO-DEP */
+    0x00, 0x03, 0x00, 0x01, 0x01, /* NFC-B */
+    0x00, 0x03, 0x00, 0x01, 0x00  /* NFC-A */
+};
 static const guint8 RF_SET_LISTEN_MODE_ROUTING_CMD_MIXED_F_B_A[] = {
     0x21, 0x01, 0x16, 0x00, 0x04,
     0x01, 0x03, 0x00, 0x01, 0x04, /* ISO-DEP */
@@ -328,11 +334,18 @@ static const guint8 RF_DISCOVER_MAP_CMD_RW_CE[] = {
     0x03, 0x01, 0x01, /* T3T/Poll/Frame */
     0x04, 0x02, 0x02  /* IsoDep/Listen/IsoDep */
 };
-static const guint8 RF_DISCOVER_MAP_CMD_RW_CE_POLL_A[] = {
+static const guint8 RF_DISCOVER_MAP_CMD_RW_POLL_A[] = {
     0x21, 0x00, 0x0a, 0x03,
     0x01, 0x01, 0x01, /* T1T/Poll/Frame */
     0x02, 0x01, 0x01, /* T2T/Poll/Frame */
+    0x04, 0x01, 0x02  /* IsoDep/Poll/IsoDep */
+};
+static const guint8 RF_DISCOVER_MAP_CMD_RW_CE_A_B[] = {
+    0x21, 0x00, 0x0d, 0x04,
+    0x01, 0x01, 0x01, /* T1T/Poll/Frame */
+    0x02, 0x01, 0x01, /* T2T/Poll/Frame */
     0x04, 0x01, 0x02, /* IsoDep/Poll/IsoDep */
+    0x04, 0x02, 0x02  /* IsoDep/Listen/IsoDep */
 };
 static const guint8 RF_DISCOVER_MAP_CMD_CE_PEER[] = {
     0x21, 0x00, 0x16, 0x07,
@@ -656,6 +669,20 @@ static const guint8 RF_DISCOVER_SELECT_1_ISODEP_CMD[] = {
 static const guint8 RF_DISCOVER_SELECT_RSP[] = {
     0x41, 0x04, 0x01, 0x00
 };
+static const guint8 APDU_SELECT_NDEF_APP_NTF[] = {
+    0x00, 0x00, 0x0d, 0x00, 0xa4, 0x04, 0x00, 0x07,
+    0xd2, 0x76, 0x00, 0x00, 0x85, 0x01, 0x01, 0x00
+};
+static const guint8 APDU_SELECT_NDEF_APP[] = {
+    0x00, 0xa4, 0x04, 0x00, 0x07, 0xd2, 0x76, 0x00,
+    0x00, 0x85, 0x01, 0x01, 0x00
+};
+static const guint8 APDU_OK[] = {
+    0x90, 0x00
+};
+static const guint8 APDU_OK_CMD[] = {
+    0x00, 0x00, 0x02, 0x90, 0x00
+};
 
 static
 void
@@ -852,22 +879,34 @@ test_hal_io_read_cb(
 
 static
 void
+test_dump_data(
+    char dir,
+    const GUtilData* data)
+{
+    const guint8* ptr = data->bytes;
+    gsize len = data->size;
+
+    while (len > 0) {
+        char buf[GUTIL_HEXDUMP_BUFSIZE];
+        const guint consumed = gutil_hexdump(buf, ptr, len);
+
+        gutil_log(NULL, GLOG_LEVEL_DEBUG, "%c %s", dir, buf);
+        ptr += consumed;
+        len -= consumed;
+        dir = ' ';
+    }
+}
+
+static
+void
 test_dump_bytes(
     char dir,
     GBytes* bytes)
 {
-    gsize len;
-    const guint8* data = g_bytes_get_data(bytes, &len);
-    char buf[GUTIL_HEXDUMP_BUFSIZE];
+    GUtilData data;
 
-    while (len > 0) {
-        const guint consumed = gutil_hexdump(buf, data, len);
-
-        gutil_log(NULL, GLOG_LEVEL_DEBUG, "%c %s", dir, buf);
-        data += consumed;
-        len -= consumed;
-        dir = ' ';
-    }
+    data.bytes = g_bytes_get_data(bytes, &data.size);
+    test_dump_data(dir, &data);
 }
 
 static
@@ -1325,6 +1364,7 @@ typedef struct test_nci_sm_entry_queue_read TestSmEntryQueueRead;
 typedef struct test_nci_sm_entry_assert_states TestSmEntryAssertStates;
 typedef struct test_nci_sm_entry_state TestSmEntryState;
 typedef struct test_nci_sm_entry_activation TestEntryActivation;
+typedef struct test_nci_sm_entry_handle_data TestEntryHandleData;
 
 typedef struct test_nci_sm_data {
     const char* name;
@@ -1379,6 +1419,10 @@ struct test_nci_sm_entry {
             NCI_PROTOCOL protocol;
             NCI_MODE mode;
         } activation;
+        struct test_nci_sm_entry_handle_data {
+            GUtilData request;
+            GUtilData response;
+        } handle_data;
     } data;
 };
 
@@ -1427,6 +1471,10 @@ struct test_nci_sm_entry {
 #define TEST_NCI_SM_WAIT_ACTIVATION(intf,prot,mod) { \
     .func = test_nci_sm_wait_activation, \
     .data.activation = { .rf_intf = intf, .protocol = prot, .mode = mod } }
+#define TEST_NCI_SM_HANDLE_DATA(req,resp) {  \
+    .func = test_nci_sm_handle_data, \
+    .data.handle_data = { .request = { req, sizeof(req) }, \
+                          .response = { resp, sizeof(resp) } }}
 #define TEST_NCI_SM_END() { .func = NULL }
 
 static
@@ -1635,6 +1683,54 @@ test_nci_sm_wait_activation(
 
     GDEBUG("Waiting for %u/%u/%u activation", wait->rf_intf,
         wait->protocol, wait->mode);
+    test_hal_io_flush_ntf(test->hal);
+    g_main_loop_run(test->loop);
+    nci_core_remove_handler(nci, id);
+}
+
+static
+void
+test_nci_sm_handle_data_cb(
+    NciCore* nci,
+    guint8 cid,
+    const void* payload,
+    guint len,
+    void* user_data)
+{
+    TestNciSm* test = user_data;
+    const TestEntryHandleData* data = &test->entry->data.handle_data;
+    GUtilData incoming;
+    GBytes* response;
+
+    incoming.bytes = payload;
+    incoming.size = len;
+    if (!gutil_data_equal(&incoming, &data->request)) {
+        GDEBUG("Unexpected read:");
+        test_dump_data('>', &incoming);
+        GDEBUG("Doesn't match this:");
+        test_dump_data('>', &data->request);
+        g_assert_not_reached();
+    }
+
+    test_dump_data('>', &incoming);
+    test_dump_data('<', &data->response);
+    response = g_bytes_new_static(data->response.bytes, data->response.size);
+    g_assert(nci_core_send_data_msg(test->nci, NCI_STATIC_RF_CONN_ID, response,
+        NULL, NULL, NULL));
+    test_quit_later(test->loop);
+    g_bytes_unref(response);
+}
+
+static
+void
+test_nci_sm_handle_data(
+    TestNciSm* test)
+{
+    NciCore* nci = test->nci;
+    gulong id = nci_core_add_data_packet_handler(nci,
+        test_nci_sm_handle_data_cb, test);
+
+    GDEBUG("Waiting for incoming packet");
     test_hal_io_flush_ntf(test->hal);
     g_main_loop_run(test->loop);
     nci_core_remove_handler(nci, id);
@@ -3902,7 +3998,7 @@ static const TestSmEntry test_nci_sm_set_mode_a[] = {
     TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
     TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
     TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DISCOVERY_RW),
-    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW_CE_POLL_A),
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW_POLL_A),
     TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
     TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_RW_A),
     TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
@@ -3912,6 +4008,53 @@ static const TestSmEntry test_nci_sm_set_mode_a[] = {
     /* Setting the esame tech again has no effect */
     TEST_NCI_SM_SET_TECH(NCI_TECH_A),
     TEST_NCI_SM_ASSERT_STATES(NCI_RFST_DISCOVERY, NCI_RFST_DISCOVERY),
+
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_sm_read_ce_ndef_ab[] = {
+    TEST_NCI_SM_SET_OP_MODE(NFC_OP_MODE_RW | NFC_OP_MODE_CE),
+    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_ASSERT_STATES(NCI_STATE_INIT, NCI_RFST_DISCOVERY),
+
+    TEST_NCI_SM_EXPECT_CMD(CORE_RESET_CMD),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_V2_RSP),
+    TEST_NCI_SM_QUEUE_NTF(CORE_RESET_V2_NTF),
+    TEST_NCI_SM_EXPECT_CMD(CORE_INIT_CMD_V2),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_V2_RSP),
+    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DEFAULT),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
+
+    TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DISCOVERY_RW),
+    TEST_NCI_SM_EXPECT_CMD(RF_SET_LISTEN_MODE_ROUTING_CMD_MIXED_CE_B_A),
+    TEST_NCI_SM_QUEUE_RSP(RF_SET_LISTEN_MODE_ROUTING_RSP),
+
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW_CE_A_B),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_ALL_A_B),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
+    TEST_NCI_SM_QUEUE_NTF(CORE_CONN_CREDITS_NTF),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+
+    /* NFC-A/ISO-DEP Listen Mode activation */
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_CE_A),
+    TEST_NCI_SM_WAIT_ACTIVATION(NCI_RF_INTERFACE_ISO_DEP,
+        NCI_PROTOCOL_ISO_DEP, NCI_MODE_PASSIVE_LISTEN_A),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_LISTEN_ACTIVE),
+
+    /* Select NDEF app */
+    TEST_NCI_SM_QUEUE_NTF(APDU_SELECT_NDEF_APP_NTF),
+    TEST_NCI_SM_HANDLE_DATA(APDU_SELECT_NDEF_APP, APDU_OK),
+    TEST_NCI_SM_EXPECT_CMD(APDU_OK_CMD),
+    TEST_NCI_SM_SYNC(),
+    TEST_NCI_SM_QUEUE_NTF(CORE_CONN_CREDITS_NTF),
+
+    /* Sleep, EP Request */
+    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_SLEEP_EP_REQUEST),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_LISTEN_SLEEP),
 
     TEST_NCI_SM_END()
 };
@@ -4153,6 +4296,7 @@ static const TestNciSmData nci_sm_tests[] = {
     { "ce-poll_a_prot_routing", test_nci_sm_iso_dep_ce_prot_routing },
     { "discovery-rw_ce", test_nci_sm_discovery_rw_ce },
     { "set_mode-a", test_nci_sm_set_mode_a },
+    { "read-ce-ndef-ab", test_nci_sm_read_ce_ndef_ab, test_nci_config_ab_data },
     { "config_default", test_nci_config_abf, test_nci_config_ab_data_default },
     { "config_empty", test_nci_config_abf, test_nci_config_ab_data_empty },
     { "config_junk", test_nci_config_abf, test_nci_config_ab_data_junk },
