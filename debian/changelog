@@ -1,3 +1,15 @@
+libncicore (1.1.21) unstable; urgency=low
+
+  * Fixed parsing of CORE_INIT_RSP v2 interface list
+  * Renamed NANO version into RELEASE
+  * Added support for listen mode activation parameters
+  * Allow configuring supported NFC technologies at run time
+  * Don't add bogus protocols to the listen mode routing table
+  * Added support for Type 5 tags and NFC-V
+  * Require glib 2.32
+
+ -- Slava Monich <slava@monich.com>  Thu, 06 Jul 2023 02:44:59 +0300
+
 libncicore (1.1.20) unstable; urgency=low
 
   * Updated dependencies
