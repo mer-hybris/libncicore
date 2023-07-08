@@ -55,6 +55,72 @@ test_null(
 }
 
 /*==========================================================================*
+ * nfcid1_dynamic
+ *==========================================================================*/
+
+static
+void
+test_nfcid1_dynamic(
+    void)
+{
+    static const NciNfcid1 nfcid1_dynamic_1 = { 0, { 0x00 } };
+    static const NciNfcid1 nfcid1_dynamic_2 = { 4, { 0x08, 0x00, 0x00, 0x00 } };
+    static const NciNfcid1 nfcid1_dynamic_3 = { 4, { 0x08, 0x01, 0x02, 0x03 } };
+
+    static const NciNfcid1 nfcid1_static_1 = { 4, { 0x01, 0x02, 0x03, 0x04 } };
+    static const NciNfcid1 nfcid1_static_2 = { 7, { 0 }};
+
+    g_assert(nci_nfcid1_dynamic(&nfcid1_dynamic_1));
+    g_assert(nci_nfcid1_dynamic(&nfcid1_dynamic_2));
+    g_assert(nci_nfcid1_dynamic(&nfcid1_dynamic_3));
+
+    g_assert(!nci_nfcid1_dynamic(&nfcid1_static_1));
+    g_assert(!nci_nfcid1_dynamic(&nfcid1_static_2));
+}
+
+/*==========================================================================*
+ * nfcid1_equal
+ *==========================================================================*/
+
+static
+void
+test_nfcid1_equal(
+    void)
+{
+    static const NciNfcid1 id1 = { 0, { 0x00 } };
+    static const NciNfcid1 id2 = { 4, { 0x08, 0x00, 0x00, 0x00 } };
+    static const NciNfcid1 id3 = { 4, { 0x08, 0x01, 0x02, 0x03 } };
+    static const NciNfcid1 id4 = { 4, { 0x01, 0x02, 0x03, 0x04 } };
+    static const NciNfcid1 id5 = { 4, { 0x02, 0x03, 0x04, 0x05 } };
+    static const NciNfcid1 id6 = { 7, { 0 }};
+    static const NciNfcid1 id7 = { 7, { 1 }};
+
+    /* Always equal to themselves */
+    g_assert(nci_nfcid1_equal(&id1, &id1));
+    g_assert(nci_nfcid1_equal(&id2, &id3));
+    g_assert(nci_nfcid1_equal(&id3, &id3));
+    g_assert(nci_nfcid1_equal(&id4, &id4));
+    g_assert(nci_nfcid1_equal(&id5, &id5));
+    g_assert(nci_nfcid1_equal(&id6, &id6));
+    g_assert(nci_nfcid1_equal(&id7, &id7));
+
+    /* All dynamic forms are equal */
+    g_assert(nci_nfcid1_equal(&id1, &id2));
+    g_assert(nci_nfcid1_equal(&id2, &id3));
+    g_assert(nci_nfcid1_equal(&id1, &id3));
+    g_assert(nci_nfcid1_equal(&id2, &id1));
+    g_assert(nci_nfcid1_equal(&id3, &id2));
+    g_assert(nci_nfcid1_equal(&id3, &id1));
+
+    g_assert(!nci_nfcid1_equal(&id1, &id4));
+    g_assert(!nci_nfcid1_equal(&id2, &id4));
+    g_assert(!nci_nfcid1_equal(&id3, &id4));
+    g_assert(!nci_nfcid1_equal(&id4, &id5));
+    g_assert(!nci_nfcid1_equal(&id5, &id6));
+    g_assert(!nci_nfcid1_equal(&id6, &id7));
+}
+
+/*==========================================================================*
  * listen_mode
  *==========================================================================*/
 
@@ -107,7 +173,6 @@ test_mode_param_success(
         test->data.bytes, test->data.size));
     g_assert(!memcmp(&param, &test->expected, sizeof(param)));
 }
-
 
 static const guint8 mode_param_success_data_minimal[] =
     { 0x04, 0x00, 0x00, 0x00 };
@@ -1501,6 +1566,8 @@ int main(int argc, char* argv[])
     g_test_init(&argc, &argv, NULL);
     test_init(&test_opt, argc, argv);
     g_test_add_func(TEST_("null"), test_null);
+    g_test_add_func(TEST_("nfcid1_dynamic"), test_nfcid1_dynamic);
+    g_test_add_func(TEST_("nfcid1_equal"), test_nfcid1_equal);
     g_test_add_func(TEST_("listen_mode"), test_listen_mode);
     for (i = 0; i < G_N_ELEMENTS(mode_param_success_tests); i++) {
         const TestModeParamSuccessData* test = mode_param_success_tests + i;

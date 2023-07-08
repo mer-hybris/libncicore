@@ -265,6 +265,12 @@ typedef struct nci_discovery_ntf {
     gboolean last;
 } NciDiscoveryNtf;
 
+/* NFCID1 can be 4, 7, or 10 bytes long. */
+typedef struct nci_nfcid {
+    guint8 len;
+    guint8 bytes[10];
+} NciNfcid1; /* Since 1.1.22 */
+
 /* This is essentially NCI_MODE as a bitmask */
 
 typedef enum nci_tech {

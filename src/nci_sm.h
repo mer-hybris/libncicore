@@ -271,6 +271,7 @@ struct nci_sm {
     NCI_OP_MODE op_mode;
     guint8 llc_version;
     guint16 llc_wks;
+    NciNfcid1 la_nfcid1; /* NFCID1 in Listen A mode */
 };
 
 typedef
@@ -329,6 +330,12 @@ NCI_TECH
 nci_sm_set_tech(
     NciSm* sm,
     NCI_TECH tech)
+    NCI_INTERNAL;
+
+void
+nci_sm_set_la_nfcid1(
+    NciSm* sm,
+    const NciNfcid1* nfcid1)
     NCI_INTERNAL;
 
 void

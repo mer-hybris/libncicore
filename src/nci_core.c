@@ -34,6 +34,7 @@
 #include "nci_sar.h"
 #include "nci_sm.h"
 #include "nci_state.h"
+#include "nci_util_p.h"
 #include "nci_log.h"
 
 #include <gutil_misc.h>
@@ -399,6 +400,29 @@ nci_core_param_equal_uint16(
 
 static
 NciCoreParamValue*
+nci_core_param_nfcid_new(
+    const NciNfcid1* nfcid)
+{
+    NciCoreParamValue* v = g_new0(NciCoreParamValue, 1);
+
+    if (nfcid->len <= sizeof(nfcid->bytes)) {
+        v->nfcid1.len = nfcid->len;
+        memcpy(v->nfcid1.bytes, nfcid->bytes, nfcid->len);
+    }
+    return v;
+}
+
+static
+gboolean
+nci_core_param_equal_nfcid(
+    const NciCoreParamValue* v1,
+    const NciCoreParamValue* v2)
+{
+    return nci_nfcid1_equal(&v1->nfcid1, &v2->nfcid1);
+}
+
+static
+NciCoreParamValue*
 nci_core_param_get_llc_version(
     NciCoreObject* core)
 {
@@ -468,6 +492,31 @@ nci_core_param_reset_llc_wks(
     nci_core_param_set_llc_wks(core, &NCI_DEFAULT_LLC_WKS);
 }
 
+static
+NciCoreParamValue*
+nci_core_param_get_la_nfcid1(
+    NciCoreObject* core)
+{
+    return nci_core_param_nfcid_new(&core->sm->la_nfcid1);
+}
+
+static
+void
+nci_core_param_set_la_nfcid1(
+    NciCoreObject* core,
+    const NciCoreParamValue* value)
+{
+    nci_sm_set_la_nfcid1(core->sm, &value->nfcid1);
+}
+
+static
+void
+nci_core_param_reset_la_nfcid1(
+    NciCoreObject* core)
+{
+    nci_sm_set_la_nfcid1(core->sm, NULL);
+}
+
 static const NciCoreParamDesc nci_core_params[] = {
     {   /* NCI_PARAM_LLC_VERSION */
         nci_core_param_get_llc_version,
@@ -479,11 +528,17 @@ static const NciCoreParamDesc nci_core_params[] = {
         nci_core_param_set_llc_wks,
         nci_core_param_reset_llc_wks,
         nci_core_param_equal_uint16
+    },{ /* NCI_CORE_PARAM_LA_NFCID1 */
+        nci_core_param_get_la_nfcid1,
+        nci_core_param_set_la_nfcid1,
+        nci_core_param_reset_la_nfcid1,
+        nci_core_param_equal_nfcid
     }
 };
 
 G_STATIC_ASSERT(NCI_CORE_PARAM_LLC_VERSION == 0);
 G_STATIC_ASSERT(NCI_CORE_PARAM_LLC_WKS == 1);
+G_STATIC_ASSERT(NCI_CORE_PARAM_LA_NFCID1 == 2);
 G_STATIC_ASSERT(NCI_CORE_PARAM_COUNT == G_N_ELEMENTS(nci_core_params));
 
 /*==========================================================================*

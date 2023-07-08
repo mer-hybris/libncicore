@@ -231,6 +231,7 @@ test_null(
 
     nci_sm_free(null);
     nci_sm_set_op_mode(null, NFC_OP_MODE_NONE);
+    nci_sm_set_la_nfcid1(null, NULL);
     g_assert_cmpint(nci_sm_set_tech(NULL, NCI_TECH_A), == ,NCI_TECH_NONE);
     nci_sm_handle_ntf(null, 0, 0, NULL);
     nci_sm_add_state(null, NULL);

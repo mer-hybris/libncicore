@@ -36,13 +36,16 @@
 #include "nci_sm.h"
 #include "nci_log.h"
 
+#include <gutil_misc.h>
+
 /*==========================================================================*
  * NCI_RFST_IDLE -> NCI_RFST_DISCOVERY transition
  *
  * +---------------------+
  * | CORE_GET_CONFIG_CMD |
- * | 1. LA_SEL_INFO      |
- * | 2. LF_PROTOCOL_TYPE |
+ * | 1. LF_LA_NFCID1     |
+ * | 2. LA_SEL_INFO      |
+ * | 3. LF_PROTOCOL_TYPE |
  * +---------------------+
  *      |            |
  *    error          ok
@@ -129,6 +132,13 @@ typedef struct nci_tech_mode {
     NCI_MODE mode;
     const char* name;
 } NciCoreTechMode;
+
+typedef enum core_set_config_flags {
+    CORE_SET_CONFIG_FLAGS_NONE = 0,
+    CORE_SET_CONFIG_LA_NFCID1 = 0x01,
+    CORE_SET_CONFIG_LA_SEL_INFO = 0x02,
+    CORE_SET_CONFIG_LF_PROTOCOL_TYPE = 0x04
+} CORE_SET_CONFIG_FLAGS;
 
 /*==========================================================================*
  * Implementation
@@ -905,9 +915,13 @@ static
 void
 nci_transition_idle_to_discovery_set_config(
     NciTransition* self,
+    CORE_SET_CONFIG_FLAGS set_config,
+    const NciNfcid1* la_nfcid1,
     guint8 la_sel_info,
     guint8 lf_protocol_type)
 {
+    GByteArray* cmd = g_byte_array_sized_new(7);
+
     /*
      * Table 10: Control Messages for Setting Configuration Parameters
      *
@@ -924,22 +938,66 @@ nci_transition_idle_to_discovery_set_config(
      * |        |      | Val | m | The value of the parameter    |
      * +=========================================================+
      */
-    const gsize len = 7;
-    guint8* cmd = g_new(guint8, len);
-    GBytes* bytes = g_bytes_new_take(cmd, len);
 
-    cmd[0] = 2;
-    cmd[1] = NCI_CONFIG_LA_SEL_INFO;
-    cmd[2] = 1;
-    cmd[3] = la_sel_info;
-    cmd[4] = NCI_CONFIG_LF_PROTOCOL_TYPE;
-    cmd[5] = 1;
-    cmd[6] = lf_protocol_type;
+    static const guint8 cmd_header[] = {
+        0x00, /* Number of Configurations */
+    };
 
-    GDEBUG("%c CORE_SET_CONFIG_CMD (LA_SEL_INFO,LF_PROTOCOL_TYPE)", DIR_OUT);
-    nci_transition_send_command(self, NCI_GID_CORE, NCI_OID_CORE_SET_CONFIG,
-        bytes, nci_transition_idle_to_discovery_set_config_rsp);
-    g_bytes_unref(bytes);
+    GDEBUG("%c CORE_SET_CONFIG_CMD", DIR_OUT);
+    g_byte_array_append(cmd, ARRAY_AND_SIZE(cmd_header));
+
+    if (set_config & CORE_SET_CONFIG_LA_NFCID1) {
+        guint8 entry[6];
+
+        GDEBUG("  LA_NFCID1");
+        entry[0] = NCI_CONFIG_LA_NFCID1;
+        if (la_nfcid1->len) {
+            entry[1] = la_nfcid1->len;
+            g_byte_array_append(cmd, entry, 2);
+            g_byte_array_append(cmd, la_nfcid1->bytes, la_nfcid1->len);
+        } else {
+            /*
+             * As specified in [DIGITAL], in case of a single size NFCID1
+             * (4 Bytes), a value of nfcid10 set to 08h indicates that
+             * nfcid11 to nfcid13 SHALL be dynamically generated. In
+             * such a situation the NFCC SHALL ignore the nfcid11 to
+             * nfcid13 values and generate them dynamically.
+             */
+            entry[1] = 4;
+            entry[2] = 0x08;
+            entry[3] = 0;
+            entry[4] = 0;
+            entry[5] = 0;
+            g_byte_array_append(cmd, ARRAY_AND_SIZE(entry));
+        }
+        cmd->data[0]++;      /* Number of entries */
+    }
+
+    if (set_config & CORE_SET_CONFIG_LA_SEL_INFO) {
+        guint8 entry[3];
+
+        GDEBUG("  LA_SEL_INFO");
+        entry[0] = NCI_CONFIG_LA_SEL_INFO;
+        entry[1] = 1;
+        entry[2] = la_sel_info;
+        g_byte_array_append(cmd, ARRAY_AND_SIZE(entry));
+        cmd->data[0]++;      /* Number of entries */
+    }
+
+    if (set_config & CORE_SET_CONFIG_LF_PROTOCOL_TYPE) {
+        guint8 entry[3];
+
+        GDEBUG("  LF_PROTOCOL_TYPE");
+        entry[0] = NCI_CONFIG_LF_PROTOCOL_TYPE;
+        entry[1] = 1;
+        entry[2] = lf_protocol_type;
+        g_byte_array_append(cmd, ARRAY_AND_SIZE(entry));
+        cmd->data[0]++;      /* Number of entries */
+    }
+
+    nci_transition_idle_to_discovery_send_byte_array(self,
+        NCI_GID_CORE, NCI_OID_CORE_SET_CONFIG, cmd,
+        nci_transition_idle_to_discovery_set_config_rsp);
 }
 
 static
@@ -958,16 +1016,96 @@ nci_transition_idle_to_discovery_config_byte_ok(
         const guint8 byte = (guint8)value;
 
         if ((byte & mask) == *expected) {
-            GDEBUG("%s 0x%02x is ok", name, value);
+            GDEBUG("  %s 0x%02x ok", name, value);
             return TRUE;
         } else {
             *expected |= byte & ~mask;
-            GDEBUG("%s 0x%02x needs to be 0x%02x", name, byte, *expected);
+            GDEBUG("  %s 0x%02x needs to be 0x%02x", name, byte, *expected);
         }
     } else {
-        GDEBUG("Could not determine %s", name);
+        GDEBUG("  %s not found", name);
     }
     return FALSE;
+}
+
+static
+gboolean
+nci_transition_idle_to_discovery_config_nfcid1_ok(
+    guint nparams,
+    const GUtilData* params,
+    guint8 id,
+    const char* name,
+    const NciNfcid1* nfcid1)
+{
+    NciNfcid1 value;
+
+    if (nci_parse_config_param_nfcid1(nparams, params, id, &value)) {
+        if (nci_nfcid1_equal(&value, nfcid1)) {
+#if GUTIL_LOG_DEBUG
+            if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+                char* hex = gutil_bin2hex(value.bytes, value.len, FALSE);
+
+                GDEBUG("  %s %s ok", name, hex);
+                g_free(hex);
+            }
+#endif
+            return TRUE;
+        } else {
+#if GUTIL_LOG_DEBUG
+            if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+                char* hex1 = gutil_bin2hex(value.bytes, value.len, FALSE);
+                char* hex2 = gutil_bin2hex(nfcid1->bytes, nfcid1->len, FALSE);
+
+                GDEBUG("  %s %s needs to be %s", name, hex1, hex2);
+                g_free(hex1);
+                g_free(hex2);
+            }
+#endif
+        }
+    } else {
+        GDEBUG("  %s not found", name);
+    }
+    return FALSE;
+}
+
+static
+NciNfcid1
+nci_transition_idle_to_discovery_la_nfcid1_expected(
+    NciSm* sm)
+{
+    const NciNfcid1* la_nfcid1 = &sm->la_nfcid1;
+    NciNfcid1 nfcid1;
+
+    switch (la_nfcid1->len) {
+    case 4: case 7: case 10:
+        memcpy(nfcid1.bytes, la_nfcid1->bytes, nfcid1.len = la_nfcid1->len);
+        memset(nfcid1.bytes + nfcid1.len, 0, sizeof(nfcid1.bytes) - nfcid1.len);
+        break;
+    default:
+        /*
+         * As specified in [DIGITAL], in case of a single size NFCID1
+         * (4 Bytes), a value of nfcid10 set to 08h indicates that nfcid11
+         * to nfcid13 SHALL be dynamically generated. In such a situation
+         * the NFCC SHALL ignore the nfcid11 to nfcid13 values and generate
+         * them dynamically.
+         */
+        nfcid1.len = 4;
+        nfcid1.bytes[0] = 0x08;
+        memset(nfcid1.bytes + 1, 0, sizeof(nfcid1.bytes) - 1);
+        break;
+    }
+    return nfcid1;
+}
+
+static
+gboolean
+nci_transition_idle_to_discovery_la_nfcid1_ok(
+    guint nparams,
+    const GUtilData* params,
+    const NciNfcid1* expected)
+{
+    return nci_transition_idle_to_discovery_config_nfcid1_ok(nparams, params,
+        NCI_CONFIG_LA_NFCID1, "LA_NFCID1", expected);
 }
 
 static
@@ -977,9 +1115,8 @@ nci_transition_idle_to_discovery_la_sel_info_expected(
 {
     guint expected = 0;
 
-    if ((sm->op_mode & (NFC_OP_MODE_LISTEN | NFC_OP_MODE_CE)) ==
-        (NFC_OP_MODE_LISTEN | NFC_OP_MODE_CE)) {
-        /* Need ISO-DEP in listen mode */
+    if (sm->op_mode & NFC_OP_MODE_CE) {
+        /* Need ISO-DEP in listen mode for Card Emulation */
         expected |= NCI_LA_SEL_INFO_ISO_DEP;
     }
     if ((sm->op_mode & (NFC_OP_MODE_LISTEN | NFC_OP_MODE_PEER)) ==
@@ -1057,10 +1194,16 @@ nci_transition_idle_to_discovery_get_config_rsp(
         GDEBUG("CORE_GET_CONFIG timed out");
         nci_sm_stall(sm, NCI_STALL_ERROR);
     } else if (sm) {
+        CORE_SET_CONFIG_FLAGS set_config =
+            CORE_SET_CONFIG_LA_SEL_INFO |
+            CORE_SET_CONFIG_LA_NFCID1 |
+            CORE_SET_CONFIG_LF_PROTOCOL_TYPE;
         guint8 la_sel_info =
             nci_transition_idle_to_discovery_la_sel_info_expected(sm);
         guint8 lf_protocol_type =
             nci_transition_idle_to_discovery_lf_protocol_type_expected(sm);
+        NciNfcid1 la_nfcid1 =
+            nci_transition_idle_to_discovery_la_nfcid1_expected(sm);
 
         /*
          * Table 11: Control Messages for Reading Current Configuration
@@ -1087,16 +1230,20 @@ nci_transition_idle_to_discovery_get_config_rsp(
             data.bytes = payload->bytes + 2;
             data.size = payload->size - 2;
             if (cmd_status == NCI_STATUS_OK) {
-                gboolean la_sel_info_ok, lf_protocol_type_ok;
-
                 GDEBUG("%c CORE_GET_CONFIG_RSP ok", DIR_IN);
-                la_sel_info_ok =
-                    nci_transition_idle_to_discovery_la_sel_info_ok
-                        (n,  &data, &la_sel_info);
-                lf_protocol_type_ok =
-                    nci_transition_idle_to_discovery_lf_protocol_type_ok
-                        (n,  &data, &lf_protocol_type);
-                if (la_sel_info_ok && lf_protocol_type_ok) {
+                if (nci_transition_idle_to_discovery_la_nfcid1_ok(n,
+                    &data, &la_nfcid1)) {
+                    set_config &= ~CORE_SET_CONFIG_LA_NFCID1;
+                }
+                if (nci_transition_idle_to_discovery_la_sel_info_ok(n,
+                    &data, &la_sel_info)) {
+                    set_config &= ~CORE_SET_CONFIG_LA_SEL_INFO;
+                }
+                if (nci_transition_idle_to_discovery_lf_protocol_type_ok(n,
+                    &data, &lf_protocol_type)) {
+                    set_config &= ~CORE_SET_CONFIG_LF_PROTOCOL_TYPE;
+                }
+                if (!set_config) {
                     /* No need to set parameters */
                     nci_transition_idle_to_discovery_configure_routing(self);
                     return;
@@ -1110,8 +1257,8 @@ nci_transition_idle_to_discovery_get_config_rsp(
         } else {
             GWARN("CORE_GET_CONFIG_CMD unexpected response");
         }
-        nci_transition_idle_to_discovery_set_config(self,
-            la_sel_info, lf_protocol_type);
+        nci_transition_idle_to_discovery_set_config(self, set_config,
+            &la_nfcid1, la_sel_info, lf_protocol_type);
     }
 }
 
@@ -1156,14 +1303,16 @@ nci_transition_idle_to_discovery_start(
      * +=========================================================+
      */
     static const guint8 cmd[] = {
-        2,
+        3,
+        NCI_CONFIG_LA_NFCID1,
         NCI_CONFIG_LA_SEL_INFO,
         NCI_CONFIG_LF_PROTOCOL_TYPE
     };
 
-    GDEBUG("%c CORE_GET_CONFIG_CMD (LA_SEL_INFO,LF_PROTOCOL_TYPE)", DIR_OUT);
+    GDEBUG("%c CORE_GET_CONFIG_CMD (LA_NFCID1,LA_SEL_INFO,LF_PROTOCOL_TYPE)",
+        DIR_OUT);
     return nci_transition_send_command_static(self,
-        NCI_GID_CORE, NCI_OID_CORE_GET_CONFIG, cmd, sizeof(cmd),
+        NCI_GID_CORE, NCI_OID_CORE_GET_CONFIG, ARRAY_AND_SIZE(cmd),
         nci_transition_idle_to_discovery_get_config_rsp);
 }
 

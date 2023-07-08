@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
- * Copyright (C) 2019-2021 Slava Monich <slava.monich@jolla.com>
  * Copyright (C) 2020 Open Mobile Platform LLC.
  *
  * You may use this file under the terms of BSD license as follows:
@@ -38,6 +38,17 @@
 #include "nci_types_p.h"
 
 gboolean
+nci_nfcid1_dynamic(
+    const NciNfcid1* id)
+    NCI_INTERNAL;
+
+gboolean
+nci_nfcid1_equal(
+    const NciNfcid1* id1,
+    const NciNfcid1* id2)
+    NCI_INTERNAL;
+
+gboolean
 nci_listen_mode(
     NCI_MODE mode)
     NCI_INTERNAL;
@@ -48,6 +59,14 @@ nci_parse_config_param_uint(
     const GUtilData* params,
     guint8 id,
     guint* value)
+    NCI_INTERNAL;
+
+gboolean
+nci_parse_config_param_nfcid1(
+    guint nparams,
+    const GUtilData* params,
+    guint8 id,
+    NciNfcid1* value)
     NCI_INTERNAL;
 
 const NciModeParam*
