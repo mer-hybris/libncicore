@@ -50,6 +50,7 @@ static TestOpt test_opt;
 #define TMP_DIR_TEMPLATE "test-nci-core-XXXXXX"
 #define CONFIG_SECTION "[Configuration]"
 #define CONFIG_ENTRY_TECHNOLOGIES "Technologies"
+#define CONFIG_ENTRY_LA_NFCID1 "LA_NFCID1"
 
 static const guint8 CORE_RESET_CMD[] = {
     0x20, 0x00, 0x01, 0x00
@@ -188,34 +189,45 @@ static const guint8 CORE_SET_CONFIG_RSP_ERROR[] = {
     0x40, 0x02, 0x02, NCI_STATUS_REJECTED, 0x00
 };
 static const guint8 CORE_GET_CONFIG_CMD_DISCOVERY[] = {
-    0x20, 0x03, 0x03, 0x02, 0x32, 0x50 /* LA_SEL_INFO, LF_PROTOCOL_TYPE */
+    /* LA_NFCID1, LA_SEL_INFO, LF_PROTOCOL_TYPE */
+    0x20, 0x03, 0x04, 0x03, 0x33, 0x32, 0x50
 };
 static const guint8 CORE_GET_CONFIG_RSP_DISCOVERY_INVALID_PARAM[] = {
     0x40, 0x03, 0x06, NCI_STATUS_INVALID_PARAM, 0x02,
     0x32, 0x00, 0x50, 0x00
 };
 static const guint8 CORE_GET_CONFIG_RSP_DISCOVERY_RW[] = {
-    0x40, 0x03, 0x08, 0x00, 0x02,
+    0x40, 0x03, 0x0e, 0x00, 0x03,
+    0x33, 0x04, 0x08, 0x00, 0x00, 0x00, /* LA_NFCID1 (dynamic) */
     0x32, 0x01, 0x00, /* LA_SEL_INFO = 0 */
     0x50, 0x01, 0x00  /* LF_PROTOCOL_TYPE = 0 */
 };
 static const guint8 CORE_GET_CONFIG_RSP_DISCOVERY_PEER[] = {
-    0x40, 0x03, 0x08, 0x00, 0x02,
+    0x40, 0x03, 0x0e, 0x00, 0x03,
+    0x33, 0x04, 0x08, 0x00, 0x00, 0x00, /* LA_NFCID1 (dynamic) */
     0x32, 0x01, 0x40, /* LA_SEL_INFO = 0x40 */
     0x50, 0x01, 0x02  /* LF_PROTOCOL_TYPE = 0x02 */
 };
 static const guint8 CORE_GET_CONFIG_RSP_DISCOVERY_CE_PEER[] = {
-    0x40, 0x03, 0x08, 0x00, 0x02,
+    0x40, 0x03, 0x0e, 0x00, 0x03,
+    0x33, 0x04, 0x08, 0x00, 0x00, 0x00, /* LA_NFCID1 (dynamic) */
     0x32, 0x01, 0x60, /* LA_SEL_INFO = 0x60 */
     0x50, 0x01, 0x02  /* LF_PROTOCOL_TYPE = 0x02 */
 };
 static const guint8 CORE_GET_CONFIG_RSP_DISCOVERY_CE_A[] = {
-    0x40, 0x03, 0x08, 0x00, 0x02,
+    0x40, 0x03, 0x0e, 0x00, 0x03,
+    0x33, 0x04, 0x08, 0x00, 0x00, 0x00, /* LA_NFCID1 (dynamic) */
     0x32, 0x01, 0x60, /* LA_SEL_INFO = 0x60 */
     0x50, 0x01, 0x00  /* LF_PROTOCOL_TYPE = 0x00 */
 };
 static const guint8 CORE_GET_CONFIG_RSP_ERROR[] = {
     0x40, 0x03, 0x02, 0x03, 0x00
+};
+static const guint8 CORE_SET_CONFIG_CMD_DISCOVERY_RW_FULL[] = {
+    0x20, 0x02, 0x0d, 0x03,
+    0x33, 0x04, 0x08, 0x00, 0x00, 0x00, /* LA_NFCID1 (dynamic) */
+    0x32, 0x01, 0x00, /* LA_SEL_INFO = 0 */
+    0x50, 0x01, 0x00  /* LF_PROTOCOL_TYPE = 0 */
 };
 static const guint8 CORE_SET_CONFIG_CMD_DISCOVERY_RW[] = {
     0x20, 0x02, 0x07, 0x02,
@@ -228,9 +240,13 @@ static const guint8 CORE_SET_CONFIG_CMD_DISCOVERY_PEER[] = {
     0x50, 0x01, 0x02  /* LF_PROTOCOL_TYPE = 0x02 */
 };
 static const guint8 CORE_SET_CONFIG_CMD_DISCOVERY_CE[] = {
-    0x20, 0x02, 0x07, 0x02,
-    0x32, 0x01, 0x20, /* LA_SEL_INFO = 0x20 */
-    0x50, 0x01, 0x00  /* LF_PROTOCOL_TYPE = 0x00 */
+    0x20, 0x02, 0x04, 0x01,
+    0x32, 0x01, 0x20  /* LA_SEL_INFO = 0x20 */
+};
+static const guint8 CORE_SET_CONFIG_CMD_LA_NFCID_01020304050607[] = {
+    0x20, 0x02, 0x0d, 0x02,
+    0x33, 0x07, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, /* LA_NFCID */
+    0x32, 0x01, 0x20  /* LA_SEL_INFO = 0x20 */
 };
 static const guint8 RF_SET_LISTEN_MODE_ROUTING_CMD_MIXED_RW_PEER[] = {
     0x21, 0x01, 0x1b, 0x00, 0x05,
@@ -1839,6 +1855,13 @@ static const NciCoreParam TEST_PARAM_INVAL = {
 static const NciCoreParam* const TEST_PARAMS_VERSION_10_WKS_100_INVAL[] = {
     &TEST_PARAM_VERSION_10, &TEST_PARAM_WKS_100, &TEST_PARAM_INVAL, NULL
 };
+static const NciCoreParam TEST_PARAM_LA_NFCID_01020304050607 = {
+    .key = NCI_CORE_PARAM_LA_NFCID1,
+    .value.nfcid1 = { 7, { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 } }
+};
+static const NciCoreParam* const TEST_PARAMS_LA_NFCID_01020304050607[] = {
+    &TEST_PARAM_LA_NFCID_01020304050607, NULL
+};
 
 static const TestSmEntry test_nci_sm_init_params[] = {
     TEST_NCI_SM_SET_PARAMS(TEST_PARAMS_VERSION_10_WKS_100_INVAL, FALSE),
@@ -2071,7 +2094,7 @@ static const TestSmEntry test_nci_sm_discovery_invalid_param[] = {
     TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
     TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
     TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DISCOVERY_INVALID_PARAM),
-    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DISCOVERY_RW),
+    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DISCOVERY_RW_FULL),
     TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),  /* Peer modes off */
 
     TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW),
@@ -2099,7 +2122,7 @@ static const TestSmEntry test_nci_sm_discovery_get_config_error[] = {
     TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
     TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
     TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_ERROR),
-    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DISCOVERY_RW),
+    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DISCOVERY_RW_FULL),
     TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),  /* Peer modes off */
 
     TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW),
@@ -4001,6 +4024,8 @@ static const TestSmEntry test_nci_sm_discovery_rw_ce[] = {
     TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
     TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
     TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DISCOVERY_RW),
+    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DISCOVERY_CE),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
     TEST_NCI_SM_EXPECT_CMD(RF_SET_LISTEN_MODE_ROUTING_CMD_MIXED_F_B_A),
     TEST_NCI_SM_QUEUE_RSP(RF_SET_LISTEN_MODE_ROUTING_RSP),
     TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW_CE),
@@ -4079,6 +4104,8 @@ static const TestSmEntry test_nci_sm_read_ce_ndef_ab[] = {
     TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
     TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
     TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DISCOVERY_RW),
+    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DISCOVERY_CE),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
     TEST_NCI_SM_EXPECT_CMD(RF_SET_LISTEN_MODE_ROUTING_CMD_MIXED_CE_B_A),
     TEST_NCI_SM_QUEUE_RSP(RF_SET_LISTEN_MODE_ROUTING_RSP),
 
@@ -4106,6 +4133,38 @@ static const TestSmEntry test_nci_sm_read_ce_ndef_ab[] = {
     TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_SLEEP_EP_REQUEST),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_LISTEN_SLEEP),
 
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_param_la_nfcid1[] = {
+    TEST_NCI_SM_SET_PARAMS(TEST_PARAMS_LA_NFCID_01020304050607, FALSE),
+    TEST_NCI_SM_SET_OP_MODE(NFC_OP_MODE_CE),
+    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_ASSERT_STATES(NCI_STATE_INIT, NCI_RFST_DISCOVERY),
+
+    TEST_NCI_SM_EXPECT_CMD(CORE_RESET_CMD),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_V2_RSP),
+    TEST_NCI_SM_QUEUE_NTF(CORE_RESET_V2_NTF),
+    TEST_NCI_SM_EXPECT_CMD(CORE_INIT_CMD_V2),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_V2_RSP),
+    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DEFAULT),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
+
+    TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DISCOVERY_RW),
+    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_LA_NFCID_01020304050607),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_EXPECT_CMD(RF_SET_LISTEN_MODE_ROUTING_CMD_MIXED_CE_B_A),
+    TEST_NCI_SM_QUEUE_RSP(RF_SET_LISTEN_MODE_ROUTING_RSP),
+
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_LISTEN_ISODEP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_A_B_LISTEN),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
+
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
     TEST_NCI_SM_END()
 };
 
@@ -4253,6 +4312,37 @@ static const TestSmEntry test_nci_config_f_rw[] = {
     TEST_NCI_SM_END()
 };
 
+static const TestSmEntry test_nci_config_la_nfcid1[] = {
+    TEST_NCI_SM_SET_OP_MODE(NFC_OP_MODE_CE),
+    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_ASSERT_STATES(NCI_STATE_INIT, NCI_RFST_DISCOVERY),
+
+    TEST_NCI_SM_EXPECT_CMD(CORE_RESET_CMD),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_V2_RSP),
+    TEST_NCI_SM_QUEUE_NTF(CORE_RESET_V2_NTF),
+    TEST_NCI_SM_EXPECT_CMD(CORE_INIT_CMD_V2),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_V2_RSP),
+    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DEFAULT),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
+
+    TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DISCOVERY_RW),
+    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_LA_NFCID_01020304050607),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_EXPECT_CMD(RF_SET_LISTEN_MODE_ROUTING_CMD_MIXED_CE_B_A),
+    TEST_NCI_SM_QUEUE_RSP(RF_SET_LISTEN_MODE_ROUTING_RSP),
+
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_LISTEN_ISODEP),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_A_B_LISTEN),
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
+
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
+    TEST_NCI_SM_END()
+};
+
 static const char test_nci_config_ab_data_default[] = CONFIG_SECTION "\n";
 static const char test_nci_config_ab_data_junk[] = "junk";
 static const char test_nci_config_ab_data_empty[] =
@@ -4276,6 +4366,18 @@ static const char test_nci_config_b_data[] =
 static const char test_nci_config_f_data[] =
     CONFIG_SECTION "\n"
     CONFIG_ENTRY_TECHNOLOGIES " = F\n";
+static const char test_nci_config_ab_invalid_la_nfcid1_data1[] =
+    CONFIG_SECTION "\n"
+    CONFIG_ENTRY_TECHNOLOGIES " = A,B\n"
+    CONFIG_ENTRY_LA_NFCID1 " = 010203";
+static const char test_nci_config_ab_invalid_la_nfcid1_data2[] =
+    CONFIG_SECTION "\n"
+    CONFIG_ENTRY_TECHNOLOGIES " = A,B\n"
+    CONFIG_ENTRY_LA_NFCID1 " = Garbage!\n";
+static const char test_nci_config_la_nfcid1_data[] =
+    CONFIG_SECTION "\n"
+    CONFIG_ENTRY_TECHNOLOGIES " = A,B\n"
+    CONFIG_ENTRY_LA_NFCID1 " = 01020304050607\n";
 
 static const TestNciSmData nci_sm_tests[] = {
     { "init-ok", test_nci_sm_init_ok },
@@ -4352,6 +4454,11 @@ static const TestNciSmData nci_sm_tests[] = {
     { "discovery-rw_ce", test_nci_sm_discovery_rw_ce },
     { "set_mode-a", test_nci_sm_set_mode_a },
     { "read-ce-ndef-ab", test_nci_sm_read_ce_ndef_ab, test_nci_config_ab_data },
+    { "read-ce-ndef-ab-invalid_la_nfcid1_config1", test_nci_sm_read_ce_ndef_ab,
+       test_nci_config_ab_invalid_la_nfcid1_data1 },
+    { "read-ce-ndef-ab-invalid_la_nfcid1_config2", test_nci_sm_read_ce_ndef_ab,
+       test_nci_config_ab_invalid_la_nfcid1_data2 },
+    { "param_la_nfcid1", test_nci_param_la_nfcid1, test_nci_config_ab_data },
     { "config_default", test_nci_config_abf, test_nci_config_ab_data_default },
     { "config_empty", test_nci_config_abf, test_nci_config_ab_data_empty },
     { "config_junk", test_nci_config_abf, test_nci_config_ab_data_junk },
@@ -4360,7 +4467,9 @@ static const TestNciSmData nci_sm_tests[] = {
     { "config_ab_x", test_nci_config_ab_ce, test_nci_config_ab_data_x },
     { "config_a_rw", test_nci_config_a_rw, test_nci_config_a_data },
     { "config_b_rw", test_nci_config_b_rw, test_nci_config_b_data },
-    { "config_f_rw", test_nci_config_f_rw, test_nci_config_f_data }
+    { "config_f_rw", test_nci_config_f_rw, test_nci_config_f_data },
+    { "config_la_nfcid1", test_nci_config_la_nfcid1,
+       test_nci_config_la_nfcid1_data }
 };
 
 /*==========================================================================*

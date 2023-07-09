@@ -35,6 +35,7 @@
 #include "nci_param.h"
 #include "nci_state.h"
 #include "nci_transition.h"
+#include "nci_util_p.h"
 #include "nci_log.h"
 
 #include <gutil_macros.h>
@@ -68,6 +69,7 @@ typedef struct nci_sm_object {
     gint entering_state;
     guint pending_switch_id;
     guint32 pending_signals;
+    NciNfcid1 default_la_nfcid1;
 } NciSmObject;
 
 typedef struct nci_sm_switch {
@@ -76,11 +78,10 @@ typedef struct nci_sm_switch {
 } NciSmSwitch;
 
 G_DEFINE_TYPE(NciSmObject, nci_sm_object, G_TYPE_OBJECT)
-#define NCI_TYPE_SM (nci_sm_object_get_type())
-#define NCI_SM(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), \
-        NCI_TYPE_SM, NciSmObject))
-#define NCI_SM_GET_CLASS(obj)  G_TYPE_INSTANCE_GET_CLASS((obj), \
-        NCI_TYPE_SM, NciSmObjectClass)
+
+#define PARENT_CLASS nci_sm_object_parent_class
+#define THIS_TYPE nci_sm_object_get_type()
+#define THIS(obj) G_TYPE_CHECK_INSTANCE_CAST(obj, THIS_TYPE, NciSmObject)
 
 typedef enum nci_sm_signal {
     SIGNAL_NEXT_STATE,
@@ -103,6 +104,7 @@ static guint nci_sm_signals[SIGNAL_COUNT] = { 0 };
 const char* nci_sm_config_file = "/etc/libncicore.conf";
 static const char CONFIG_SECTION[] = "Configuration";
 static const char CONFIG_LIST_SEPARATORS[] = ";,";
+static const char CONFIG_ENTRY_LA_NFCID1[] = "LA_NFCID1";
 static const char CONFIG_ENTRY_TECHNOLOGIES[] = "Technologies";
 static const char CONFIG_TECH_TYPE_A[] = "A";
 static const char CONFIG_TECH_TYPE_B[] = "B";
@@ -123,7 +125,7 @@ typedef struct nci_tech_option {
 } NciTechOption;
 
 static inline NciSmObject* nci_sm_object(NciSm* sm) /* NULL safe */
-    { return G_LIKELY(sm) ? NCI_SM(G_CAST(sm, NciSmObject, sm)) : NULL; }
+    { return G_LIKELY(sm) ? THIS(G_CAST(sm, NciSmObject, sm)) : NULL; }
 
 /*==========================================================================*
  * Implementation
@@ -429,6 +431,7 @@ nci_sm_parse_config(
     NciSm* sm,
     GKeyFile* config)
 {
+    /* Technologies */
     char* sval = g_key_file_get_string(config, CONFIG_SECTION,
         CONFIG_ENTRY_TECHNOLOGIES, NULL);
 
@@ -475,6 +478,33 @@ nci_sm_parse_config(
             sm->techs = NCI_TECH_DEFAULT;
         }
         g_strfreev(techs);
+        g_free(sval);
+    }
+
+    /* LA_NFCID1 */
+    sval = g_key_file_get_string(config, CONFIG_SECTION,
+        CONFIG_ENTRY_LA_NFCID1, NULL);
+    if (sval) {
+        NciNfcid1* nfcid1 = &nci_sm_object(sm)->default_la_nfcid1;
+        const gsize len = strlen(sval = g_strstrip(sval));
+
+        /* NFCID1 can be 4, 7, or 10 bytes long */
+        switch (len) {
+        case 8: case 14: case 20:
+            if (gutil_hex2bin(sval, len, nfcid1->bytes)) {
+                nfcid1->len = len/2;
+                sm->la_nfcid1 = *nfcid1;
+                GDEBUG("  LA_NFCID1 %s", sval);
+                break;
+            } else {
+                /* Undo potential damage */
+                memset(nfcid1, 0, sizeof(*nfcid1));
+            }
+            /* fallthrough */
+        default:
+            GWARN("Invalid LA_NFCID1 '%s' in configuration", sval);
+            break;
+        }
         g_free(sval);
     }
 }
@@ -691,7 +721,7 @@ NciSm*
 nci_sm_new(
     NciSmIo* io)
 {
-    NciSmObject* self = g_object_new(NCI_TYPE_SM, NULL);
+    NciSmObject* self = g_object_new(THIS_TYPE, NULL);
     NciSm* sm = &self->sm;
     NciTransition* deactivate_to_idle;
     NciTransition* deactivate_to_discovery;
@@ -751,11 +781,7 @@ void
 nci_sm_free(
     NciSm* sm)
 {
-    NciSmObject* self = nci_sm_object(sm);
-
-    if (G_LIKELY(self)) {
-        g_object_unref(self);
-    }
+    gutil_object_unref(nci_sm_object(sm));
 }
 
 void
@@ -796,6 +822,53 @@ nci_sm_set_tech(
         return valid_techs;
     }
     return NCI_TECH_NONE;
+}
+
+void
+nci_sm_set_la_nfcid1(
+    NciSm* sm,
+    const NciNfcid1* nfcid1)
+{
+    if (G_LIKELY(sm)) {
+        NciNfcid1* out = &sm->la_nfcid1;
+
+        if (nfcid1) {
+            /*
+             * NFCID1 can be 4, 7, or 10 bytes long, or, as a special case,
+             * empty (interpreted as dynamic)
+             */
+            switch (nfcid1->len) {
+            case 0: case 4: case 7: case 10:
+                if (!nci_nfcid1_equal(nfcid1, out)) {
+                    const gboolean dynamic = nci_nfcid1_dynamic(nfcid1);
+
+#if GUTIL_LOG_DEBUG
+                    if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+                        char* tmp = NULL;
+
+                        GDEBUG("LA_NFCID1 => %s", dynamic ? "Dynamic" :
+                            (tmp = gutil_bin2hex(nfcid1->bytes, nfcid1->len,
+                             FALSE)));
+                        g_free(tmp);
+                    }
+#endif
+                    if (dynamic) {
+                        out->len = 0;
+                    } else {
+                        memcpy(out->bytes, nfcid1->bytes,
+                            out->len = nfcid1->len);
+                    }
+
+                    /* Clear the remaining part */
+                    memset(out->bytes + out->len, 0,
+                        sizeof(out->bytes) - out->len);
+                }
+            }
+        } else {
+            /* Reset to default */
+            *out = nci_sm_object(sm)->default_la_nfcid1;
+        }
+    }
 }
 
 void
@@ -1184,7 +1257,7 @@ void
 nci_sm_object_finalize(
     GObject* object)
 {
-    NciSmObject* self = NCI_SM(object);
+    NciSmObject* self = THIS(object);
     NciSm* sm = &self->sm;
 
     if (self->pending_switch_id) {
@@ -1200,7 +1273,7 @@ nci_sm_object_finalize(
     g_ptr_array_free(self->transitions, TRUE);
     g_ptr_array_free(self->states, TRUE);
     nci_transition_unref(self->reset_transition);
-    G_OBJECT_CLASS(nci_sm_object_parent_class)->finalize(object);
+    G_OBJECT_CLASS(PARENT_CLASS)->finalize(object);
 }
 
 static

@@ -38,6 +38,42 @@
 #include <gutil_misc.h>
 
 gboolean
+nci_nfcid1_dynamic(
+    const NciNfcid1* id)
+{
+    /*
+     * As specified in [DIGITAL], in case of a single size NFCID1 (4 Bytes),
+     * a value of nfcid10 set to 08h indicates that nfcid11 to nfcid13 SHALL
+     * be dynamically generated. In such a situation the NFCC SHALL ignore
+     * the nfcid11 to nfcid13 values and generate them dynamically.
+     */
+    return !id->len || (id->len == 4 && id->bytes[0] == 0x08);
+}
+
+gboolean
+nci_nfcid1_equal(
+    const NciNfcid1* id1,
+    const NciNfcid1* id2)
+{
+    if (id1->len == id2->len) {
+        if (id1->len == 4 && id1->bytes[0] == 0x08) {
+            /* Compare only the first byte */
+            return id1->bytes[0] == id2->bytes[0];
+        } else {
+            /* Compare the whole thing */
+            return !memcmp(id1->bytes, id2->bytes,
+                MIN(id1->len, sizeof(id1->bytes)));
+        }
+    } else if (!id1->len) {
+        return nci_nfcid1_dynamic(id2);
+    } else if (!id2->len) {
+        return nci_nfcid1_dynamic(id1);
+    } else {
+        return FALSE;
+    }
+}
+
+gboolean
 nci_listen_mode(
     NCI_MODE mode)
 {
@@ -117,6 +153,28 @@ nci_parse_config_param_uint(
     } else {
         return 0;
     }
+}
+
+gboolean
+nci_parse_config_param_nfcid1(
+    guint nparams,
+    const GUtilData* params,
+    guint8 id,
+    NciNfcid1* value)
+{
+    GUtilData data;
+
+    if (nci_parse_find_config_param(nparams, params, id, &data)) {
+        switch (data.size) {
+        case 4: case 7: case 10:
+            /* NFCID1 can be 4, 7, or 10 bytes long */
+            value->len = (guint8) data.size;
+            memcpy(value->bytes, data.bytes, value->len);
+            memset(value->bytes + value->len, 0, sizeof(value->bytes) - value->len);
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
 const NciModeParam*
