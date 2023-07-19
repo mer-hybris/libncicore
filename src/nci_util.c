@@ -170,7 +170,8 @@ nci_parse_config_param_nfcid1(
             /* NFCID1 can be 4, 7, or 10 bytes long */
             value->len = (guint8) data.size;
             memcpy(value->bytes, data.bytes, value->len);
-            memset(value->bytes + value->len, 0, sizeof(value->bytes) - value->len);
+            memset(value->bytes + value->len, 0, sizeof(value->bytes) -
+                value->len);
             return TRUE;
         }
     }
@@ -965,8 +966,8 @@ nci_parse_activation_param(
 gboolean
 nci_parse_intf_activated_ntf(
     NciIntfActivationNtf* ntf,
-    NciModeParam* mode_param,
-    NciActivationParam* activation_param,
+    NciModeParam* mp,
+    NciActivationParam* ap,
     const guint8* pkt,
     guint len)
 {
@@ -1001,20 +1002,21 @@ nci_parse_intf_activated_ntf(
         const guint m = (len > (10 + n)) ? pkt[10 + n] : 0;
 
         if (len >= 11 + n + m) {
-            const guint8* act_param_bytes = m ? (pkt + (11 + n)) : NULL;
-            gboolean mode_param_required = FALSE;
-
             ntf->discovery_id = pkt[0];
             ntf->rf_intf = pkt[1];
             ntf->protocol = pkt[2];
             ntf->mode = pkt[3];
             ntf->max_data_packet_size = pkt[4];
             ntf->num_credits = pkt[5];
-            ntf->mode_param_len = n;
-            ntf->mode_param_bytes = n ? (pkt + 7) : NULL;
+            if ((ntf->mode_param_len = n) > 0) {
+                ntf->mode_param_bytes = pkt + 7;
+            }
             ntf->data_exchange_mode = pkt[7 + n];
             ntf->transmit_rate = pkt[8 + n];
             ntf->receive_rate = pkt[9 + n];
+            if ((ntf->activation_param_len = m) > 0) {
+                ntf->activation_param_bytes = pkt + (11 + n);
+            }
 
 #if GUTIL_LOG_DEBUG
             GDEBUG("RF_INTF_ACTIVATED_NTF");
@@ -1031,21 +1033,22 @@ nci_parse_intf_activated_ntf(
                         GString* buf = g_string_new(NULL);
                         guint i;
 
-                        if (n) {
+                        if (ntf->mode_param_len) {
                             const guint8* bytes = ntf->mode_param_bytes;
 
-                            for (i = 0; i < n; i++) {
+                            for (i = 0; i < ntf->mode_param_len; i++) {
                                 g_string_append_printf(buf, " %02x", bytes[i]);
                             }
                             GDEBUG("  RF Tech Parameters =%s", buf->str);
                         }
                         GDEBUG("  Data Exchange RF Tech = 0x%02x",
                             ntf->data_exchange_mode);
-                        if (m) {
+                        if (ntf->activation_param_len) {
+                            const guint8* bytes = ntf->activation_param_bytes;
+
                             g_string_set_size(buf, 0);
-                            for (i = 0; i < m; i++) {
-                                g_string_append_printf(buf, " %02x",
-                                    act_param_bytes[i]);
+                            for (i = 0; i < ntf->activation_param_len; i++) {
+                                g_string_append_printf(buf, " %02x", bytes[i]);
                             }
                             GDEBUG("  Activation Parameters =%s", buf->str);
                         }
@@ -1058,44 +1061,19 @@ nci_parse_intf_activated_ntf(
             }
 #endif /* GUTIL_LOG_DEBUG */
 
-            /* Only require mode parameters defined in NCI 1.0 */
-            switch (ntf->mode) {
-            case NCI_MODE_ACTIVE_POLL_A:
-            case NCI_MODE_PASSIVE_POLL_A:
-            case NCI_MODE_PASSIVE_POLL_B:
-            case NCI_MODE_ACTIVE_POLL_F:
-            case NCI_MODE_PASSIVE_POLL_F:
-            case NCI_MODE_ACTIVE_LISTEN_F:
-            case NCI_MODE_PASSIVE_LISTEN_F:
-                mode_param_required = TRUE;
-                break;
-            case NCI_MODE_PASSIVE_POLL_V:
-            case NCI_MODE_ACTIVE_LISTEN_A:
-            case NCI_MODE_PASSIVE_LISTEN_A:
-            case NCI_MODE_PASSIVE_LISTEN_B:
-            case NCI_MODE_PASSIVE_LISTEN_V:
-                break;
-            }
-
             if (ntf->mode_param_bytes) {
-                memset(mode_param, 0, sizeof(*mode_param));
-                ntf->mode_param = nci_parse_mode_param(mode_param, ntf->mode,
-                    ntf->mode_param_bytes, n);
+                memset(mp, 0, sizeof(*mp));
+                ntf->mode_param = nci_parse_mode_param(mp, ntf->mode,
+                    ntf->mode_param_bytes, ntf->mode_param_len);
             }
 
-            if (ntf->mode_param || !mode_param_required ||
-                (!ntf->mode_param_bytes && !mode_param_required)) {
-                if (act_param_bytes) {
-                    memset(activation_param, 0, sizeof(*activation_param));
-                    ntf->activation_param_len = m;
-                    ntf->activation_param_bytes = act_param_bytes;
-                    ntf->activation_param =
-                        nci_parse_activation_param(activation_param,
-                            ntf->rf_intf, ntf->mode, act_param_bytes, m);
-                }
-                return TRUE;
+            if (ntf->activation_param_bytes) {
+                memset(ap, 0, sizeof(*ap));
+                ntf->activation_param = nci_parse_activation_param(ap,
+                    ntf->rf_intf, ntf->mode, ntf->activation_param_bytes,
+                    ntf->activation_param_len);
             }
-            GDEBUG("Missing RF Tech Parameters");
+            return TRUE;
         }
     }
     GDEBUG("Failed to parse RF_INTF_ACTIVATED_NTF");

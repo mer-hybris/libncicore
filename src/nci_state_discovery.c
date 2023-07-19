@@ -1,6 +1,6 @@
 /*
+ * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2020 Jolla Ltd.
- * Copyright (C) 2019-2020 Slava Monich <slava.monich@jolla.com>
  *
  * You may use this file under the terms of BSD license as follows:
  *
@@ -60,10 +60,18 @@ nci_state_discovery_intf_activated_ntf(
     NciModeParam mode_param;
     NciActivationParam activation_param;
     NciSm* sm = nci_state_sm(self);
+    gboolean ok = nci_parse_intf_activated_ntf(&ntf, &mode_param,
+        &activation_param, payload->bytes, payload->size);
 
     /*
      * 5.2.2 State RFST_DISCOVERY
      *
+     * ...
+     * If discovered by a Remote NFC Endpoint in Listen mode, once the
+     * Remote NFC Endpoint has established any underlying protocol(s)
+     * needed by the configured RF Interface, the NFCC SHALL send
+     * RF_INTF_ACTIVATED_NTF (Listen Mode) to the DH and the state is
+     * changed to RFST_LISTEN_ACTIVE.
      * ...
      * While polling, if the NFCC discovers just one Remote NFC Endpoint
      * that supports just one Protocol, the NFCC SHALL try to automatically
@@ -73,23 +81,18 @@ nci_state_discovery_intf_activated_ntf(
      * and send RF_INTF_ACTIVATED_NTF (Poll Mode) to the DH. At this point,
      * the state is changed to RFST_POLL_ACTIVE.
      */
-    if (nci_parse_intf_activated_ntf(&ntf, &mode_param, &activation_param,
-        payload->bytes, payload->size)) {
+    nci_sm_enter_state(sm, nci_listen_mode(ntf.mode) ?
+        NCI_RFST_LISTEN_ACTIVE : NCI_RFST_POLL_ACTIVE, NULL);
+
+    if (ok) {
         /*
-         * Switch the state first because RF_INTF_ACTIVATED_NTF handler
-         * may want to change the state again (e.g. if configuration is
-         * unsupported).
+         * Note that RF_INTF_ACTIVATED_NTF handler may want to change the
+         * state again (e.g. if configuration is unsupported).
          */
-        if (nci_listen_mode(ntf.mode)) {
-            nci_sm_enter_state(sm, NCI_RFST_LISTEN_ACTIVE, NULL);
-        } else {
-            nci_sm_enter_state(sm, NCI_RFST_POLL_ACTIVE, NULL);
-        }
         nci_sm_intf_activated(sm, &ntf);
     } else {
         /* Deactivate this target */
-        nci_sm_enter_state(sm, NCI_RFST_POLL_ACTIVE, NULL);
-        nci_sm_switch_to(sm, NCI_RFST_DISCOVERY);
+        nci_sm_switch_to(sm, NCI_RFST_IDLE);
     }
 }
 
