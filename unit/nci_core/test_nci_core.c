@@ -522,30 +522,13 @@ static const guint8 RF_INTF_ACTIVATED_NTF_ISODEP[] = {
     0x78, 0x80, 0x81, 0x02, 0x4b, 0x4f, 0x4e, 0x41,
     0x14, 0x11
 };
-static const guint8 RF_INTF_ACTIVATED_NTF_T2_BROKEN1[] = {
+static const guint8 RF_INTF_ACTIVATED_NTF_T2_BROKEN[] = {
     0x61, 0x05, 0x05 /* Too short */, 0x01, 0x01, 0x02, 0x00, 0xff
-};
-static const guint8 RF_INTF_ACTIVATED_NTF_T2_BROKEN2[] = {
-    0x61, 0x05, 0x14 /* Still too short */, 0x01, 0x01, 0x02, 0x00, 0xff,
-    0x01, 0x0c, 0x44, 0x00, 0x07, 0x04, 0x9b, 0xfb,
-    0x4a, 0xeb, 0x2b, 0x80, 0x01, 0x00, 0x00
-};
-static const guint8 RF_INTF_ACTIVATED_NTF_T2_BROKEN3[] = {
-    0x61, 0x05, 0x0b, 0x01, 0x01, 0x02, 0x00, 0xff,
-    0x01, 0x00 /* Missing RF Tech Parameters */, 0x00, 0x00, 0x00, 0x00
 };
 static const guint8 RF_INTF_ACTIVATED_NTF_T4A[] = {
     0x61, 0x05, 0x27, 0x01, 0x02, 0x04, 0x00, 0xff,
     0x01, 0x09, 0x04, 0x00, 0x04, 0x37, 0xf4, 0x95,
     0x95, 0x01, 0x20, 0x00, 0x00, 0x00, 0x13, 0x12,
-    0x78, 0x80, 0x72, 0x02, 0x80, 0x31, 0x80, 0x66,
-    0xb1, 0x84, 0x0c, 0x01, 0x6e, 0x01, 0x83, 0x00,
-    0x90, 0x00
-};
-static const guint8 RF_INTF_ACTIVATED_NTF_T4A_BROKEN1[] = {
-    0x61, 0x05, 0x27, 0x01, 0x02, 0x04, 0x00, 0xff,
-    0x01, 0x09, 0x04, 0x00, 0x04, 0x37, 0xf4, 0x95,
-    0x95, 0x01, 0x20, 0x00, 0x00, 0x00, 0x14 /* One too many */, 0x12,
     0x78, 0x80, 0x72, 0x02, 0x80, 0x31, 0x80, 0x66,
     0xb1, 0x84, 0x0c, 0x01, 0x6e, 0x01, 0x83, 0x00,
     0x90, 0x00
@@ -3248,7 +3231,7 @@ static const TestSmEntry test_nci_sm_dscvr_poll_deact_t4a[] = {
     TEST_NCI_SM_END()
 };
 
-static const TestSmEntry test_nci_sm_dscvr_poll_act_error1[] = {
+static const TestSmEntry test_nci_sm_dscvr_poll_act_error[] = {
     TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
     TEST_NCI_SM_ASSERT_STATES(NCI_STATE_INIT, NCI_RFST_DISCOVERY),
 
@@ -3271,112 +3254,12 @@ static const TestSmEntry test_nci_sm_dscvr_poll_act_error1[] = {
     TEST_NCI_SM_QUEUE_NTF(CORE_CONN_CREDITS_NTF),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
 
-    /* Broken activation switches state machine to DISCOVERY */
-    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_T2_BROKEN1),
-    TEST_NCI_SM_WAIT_STATE(NCI_RFST_POLL_ACTIVE),
-    TEST_NCI_SM_EXPECT_CMD(RF_DEACTIVATE_DISCOVERY_CMD),
+    /* Broken activation switches state machine to IDLE */
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_T2_BROKEN),
+    TEST_NCI_SM_EXPECT_CMD(RF_DEACTIVATE_IDLE_CMD),
     TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
-    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY),
-    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
-    TEST_NCI_SM_END()
-};
-
-static const TestSmEntry test_nci_sm_dscvr_poll_act_error2[] = {
-    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
-    TEST_NCI_SM_ASSERT_STATES(NCI_STATE_INIT, NCI_RFST_DISCOVERY),
-
-    TEST_NCI_SM_EXPECT_CMD(CORE_RESET_CMD),
-    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
-    TEST_NCI_SM_EXPECT_CMD(CORE_INIT_CMD_V1),
-    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP),
-    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DEFAULT),
-    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_IDLE),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
-
-    /* Switch state machine to DISCOVERY state */
-    TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
-    TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
-    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DISCOVERY_RW),
-    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW),
-    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
-    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_RW_A_B_F),
-    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
-    TEST_NCI_SM_QUEUE_NTF(CORE_CONN_CREDITS_NTF),
-    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
-
-    /* Broken activation switches state machine to DISCOVERY */
-    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_T2_BROKEN2),
-    TEST_NCI_SM_WAIT_STATE(NCI_RFST_POLL_ACTIVE),
-    TEST_NCI_SM_EXPECT_CMD(RF_DEACTIVATE_DISCOVERY_CMD),
-    TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
-    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY),
-    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
-    TEST_NCI_SM_END()
-};
-
-static const TestSmEntry test_nci_sm_dscvr_poll_act_error3[] = {
-    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
-    TEST_NCI_SM_ASSERT_STATES(NCI_STATE_INIT, NCI_RFST_DISCOVERY),
-
-    TEST_NCI_SM_EXPECT_CMD(CORE_RESET_CMD),
-    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
-    TEST_NCI_SM_EXPECT_CMD(CORE_INIT_CMD_V1),
-    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP),
-    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DEFAULT),
-    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
-    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
-
-    /* Switch state machine to DISCOVERY state */
-    TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
-    TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
-    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DISCOVERY_RW),
-    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW),
-    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
-    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_RW_A_B_F),
-    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
-    TEST_NCI_SM_QUEUE_NTF(CORE_CONN_CREDITS_NTF),
-    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
-
-    /* Broken activation switches state machine to DISCOVERY */
-    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_T2_BROKEN3),
-    TEST_NCI_SM_WAIT_STATE(NCI_RFST_POLL_ACTIVE),
-    TEST_NCI_SM_EXPECT_CMD(RF_DEACTIVATE_DISCOVERY_CMD),
-    TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
-    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY),
-    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
-    TEST_NCI_SM_END()
-};
-
-static const TestSmEntry test_nci_sm_dscvr_poll_act_error4[] = {
-    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY),
-    TEST_NCI_SM_ASSERT_STATES(NCI_STATE_INIT, NCI_RFST_DISCOVERY),
-
-    TEST_NCI_SM_EXPECT_CMD(CORE_RESET_CMD),
-    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
-    TEST_NCI_SM_EXPECT_CMD(CORE_INIT_CMD_V1),
-    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP),
-    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DEFAULT),
-    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
-    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
-
-    /* Switch state machine to DISCOVERY state */
-    TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY),
-    TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY),
-    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_DISCOVERY_RW),
-    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW),
-    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
-    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_RW_A_B_F),
-    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
-    TEST_NCI_SM_QUEUE_NTF(CORE_CONN_CREDITS_NTF),
-    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
-
-    /* Broken activation switches state machine to DISCOVERY */
-    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_T4A_BROKEN1),
-    TEST_NCI_SM_WAIT_STATE(NCI_RFST_POLL_ACTIVE),
-    TEST_NCI_SM_EXPECT_CMD(RF_DEACTIVATE_DISCOVERY_CMD),
-    TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
-    TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY),
-    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
     TEST_NCI_SM_END()
 };
 
@@ -3593,7 +3476,7 @@ static const TestSmEntry test_nci_sm_discovery_ntf_broken[] = {
     TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_SELECT_RSP),
 
     /* Broken notification switches us back to DISCOVERY */
-    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_T2_BROKEN1),
+    TEST_NCI_SM_QUEUE_NTF(RF_INTF_ACTIVATED_NTF_T2_BROKEN),
     TEST_NCI_SM_EXPECT_CMD(RF_DEACTIVATE_DISCOVERY_CMD),
     TEST_NCI_SM_QUEUE_RSP(RF_DEACTIVATE_RSP),
     TEST_NCI_SM_QUEUE_NTF(RF_DEACTIVATE_NTF_DISCOVERY),
@@ -4430,10 +4313,7 @@ static const TestNciSmData nci_sm_tests[] = {
     { "discovery-poll-discovery-broken", test_nci_sm_dscvr_poll_dscvr_broken },
     { "discovery-poll-read-discovery", test_nci_sm_dscvr_poll_read_dscvr },
     { "discovery-poll-deactivate-t4a", test_nci_sm_dscvr_poll_deact_t4a },
-    { "discovery-poll-activate-error1",  test_nci_sm_dscvr_poll_act_error1 },
-    { "discovery-poll-activate-error2",  test_nci_sm_dscvr_poll_act_error2 },
-    { "discovery-poll-activate-error3",  test_nci_sm_dscvr_poll_act_error3 },
-    { "discovery-poll-activate-error4",  test_nci_sm_dscvr_poll_act_error4 },
+    { "discovery-poll-activate-error",  test_nci_sm_dscvr_poll_act_error },
     { "discovery-poll-activate-t5t",  test_nci_sm_dscvr_poll_act_t5t,
        test_nci_config_abv_data },
     { "discovery-poll-deactivate-t4a-bad-act-param1",
