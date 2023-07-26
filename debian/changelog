@@ -1,3 +1,9 @@
+libncicore (1.1.23) unstable; urgency=low
+
+  * Relax RF_INTF_ACTIVATED_NTF parsing requirements
+
+ -- Slava Monich <slava@monich.com>  Wed, 26 Jul 2023 04:35:30 +0300
+
 libncicore (1.1.22) unstable; urgency=low
 
   * Allow to configure LA_NFCID1 parameter
