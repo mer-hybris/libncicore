@@ -2,32 +2,35 @@
  * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
  *
- * You may use this file under the terms of BSD license as follows:
+ * You may use this file under the terms of the BSD license as follows:
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  *
- *   1. Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *   3. Neither the names of the copyright holders nor the names of its
- *      contributors may be used to endorse or promote products derived
- *      from this software without specific prior written permission.
+ *  1. Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer
+ *     in the documentation and/or other materials provided with the
+ *     distribution.
+ *  3. Neither the names of the copyright holders nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
- * THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) ARISING
+ * IN ANY WAY OUT OF THE USE OR INABILITY TO USE THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * any official policies, either expressed or implied.
  */
 
 #include "nci_transition.h"
@@ -43,9 +46,6 @@
  *
  * +---------------------+
  * | CORE_GET_CONFIG_CMD |
- * | 1. LF_LA_NFCID1     |
- * | 2. LA_SEL_INFO      |
- * | 3. LF_PROTOCOL_TYPE |
  * +---------------------+
  *      |            |
  *    error          ok
@@ -135,9 +135,10 @@ typedef struct nci_tech_mode {
 
 typedef enum core_set_config_flags {
     CORE_SET_CONFIG_FLAGS_NONE = 0,
-    CORE_SET_CONFIG_LA_NFCID1 = 0x01,
-    CORE_SET_CONFIG_LA_SEL_INFO = 0x02,
-    CORE_SET_CONFIG_LF_PROTOCOL_TYPE = 0x04
+    CORE_SET_CONFIG_LA_SENS_RES_1 = 0x01,
+    CORE_SET_CONFIG_LA_NFCID1 = 0x02,
+    CORE_SET_CONFIG_LA_SEL_INFO = 0x04,
+    CORE_SET_CONFIG_LF_PROTOCOL_TYPE = 0x08
 } CORE_SET_CONFIG_FLAGS;
 
 /*==========================================================================*
@@ -916,6 +917,7 @@ void
 nci_transition_idle_to_discovery_set_config(
     NciTransition* self,
     CORE_SET_CONFIG_FLAGS set_config,
+    guint8 la_sens_res_1,
     const NciNfcid1* la_nfcid1,
     guint8 la_sel_info,
     guint8 lf_protocol_type)
@@ -946,30 +948,29 @@ nci_transition_idle_to_discovery_set_config(
     GDEBUG("%c CORE_SET_CONFIG_CMD", DIR_OUT);
     g_byte_array_append(cmd, ARRAY_AND_SIZE(cmd_header));
 
-    if (set_config & CORE_SET_CONFIG_LA_NFCID1) {
-        guint8 entry[6];
+    if (set_config & CORE_SET_CONFIG_LA_SENS_RES_1) {
+        guint8 entry[3];
 
+        GDEBUG("  LA_SENS_RES_1");
+        entry[0] = NCI_CONFIG_LA_SENS_RES_1;
+        entry[1] = 1;
+        entry[2] = la_sens_res_1;
+        g_byte_array_append(cmd, ARRAY_AND_SIZE(entry));
+        cmd->data[0]++;      /* Number of entries */
+    }
+
+    if (set_config & CORE_SET_CONFIG_LA_NFCID1) {
+        guint8 entry[2];     /* Just id and length */
+
+        /*
+         * nci_transition_idle_to_discovery_la_nfcid1_expected() sets
+         * valid non-zero NFCID1 length.
+         */
         GDEBUG("  LA_NFCID1");
         entry[0] = NCI_CONFIG_LA_NFCID1;
-        if (la_nfcid1->len) {
-            entry[1] = la_nfcid1->len;
-            g_byte_array_append(cmd, entry, 2);
-            g_byte_array_append(cmd, la_nfcid1->bytes, la_nfcid1->len);
-        } else {
-            /*
-             * As specified in [DIGITAL], in case of a single size NFCID1
-             * (4 Bytes), a value of nfcid10 set to 08h indicates that
-             * nfcid11 to nfcid13 SHALL be dynamically generated. In
-             * such a situation the NFCC SHALL ignore the nfcid11 to
-             * nfcid13 values and generate them dynamically.
-             */
-            entry[1] = 4;
-            entry[2] = 0x08;
-            entry[3] = 0;
-            entry[4] = 0;
-            entry[5] = 0;
-            g_byte_array_append(cmd, ARRAY_AND_SIZE(entry));
-        }
+        entry[1] = la_nfcid1->len;
+        g_byte_array_append(cmd, ARRAY_AND_SIZE(entry));
+        g_byte_array_append(cmd, la_nfcid1->bytes, la_nfcid1->len);
         cmd->data[0]++;      /* Number of entries */
     }
 
@@ -1026,6 +1027,49 @@ nci_transition_idle_to_discovery_config_byte_ok(
         GDEBUG("  %s not found", name);
     }
     return FALSE;
+}
+
+static
+guint8
+nci_transition_idle_to_discovery_la_sens_res_1_expected(
+    NciSm* sm)
+{
+    /*
+     * [NFCForum-TS-DigitalProtocol-1.0]
+     *
+     * 4.6.3 SENS_RES Response
+     *
+     * Table 7: Byte 1 of SENS_RES
+     *
+     * +===========================================================+
+     * | b8 b7 b6 b5 b4 b3 b2 b1  | Meaning                        |
+     * +===========================================================+
+     * | 0  0                     | NFCID1 size: single (4 bytes)  |
+     * | 0  1                     | NFCID1 size: double (7 bytes)  |
+     * | 1  0                     | NFCID1 size: triple (10 bytes) |
+     * | 1  1                     | RFU                            |
+     * | ...                                                       |
+     * +===========================================================+
+     */
+    switch (sm->la_nfcid1.len) {
+    case 0:  /* fallthrough */
+    case 4:  return NCI_LA_SENS_RES_NFCID1_LEN_4;
+    case 7:  return NCI_LA_SENS_RES_NFCID1_LEN_7;
+    case 10: return NCI_LA_SENS_RES_NFCID1_LEN_10;
+    }
+    return 0;
+}
+
+static
+gboolean
+nci_transition_idle_to_discovery_la_sens_res_1_ok(
+    guint nparams,
+    const GUtilData* params,
+    guint8* expected)
+{
+    return nci_transition_idle_to_discovery_config_byte_ok(nparams, params,
+        NCI_CONFIG_LA_SENS_RES_1, "LA_SENS_RES_1", expected,
+        NCI_LA_SENS_RES_NFCID1_LEN_MASK);
 }
 
 static
@@ -1195,9 +1239,12 @@ nci_transition_idle_to_discovery_get_config_rsp(
         nci_sm_stall(sm, NCI_STALL_ERROR);
     } else if (sm) {
         CORE_SET_CONFIG_FLAGS set_config =
+            CORE_SET_CONFIG_LA_SENS_RES_1 |
             CORE_SET_CONFIG_LA_SEL_INFO |
             CORE_SET_CONFIG_LA_NFCID1 |
             CORE_SET_CONFIG_LF_PROTOCOL_TYPE;
+        guint8 la_sens_res_1 =
+            nci_transition_idle_to_discovery_la_sens_res_1_expected(sm);
         guint8 la_sel_info =
             nci_transition_idle_to_discovery_la_sel_info_expected(sm);
         guint8 lf_protocol_type =
@@ -1231,6 +1278,10 @@ nci_transition_idle_to_discovery_get_config_rsp(
             data.size = payload->size - 2;
             if (cmd_status == NCI_STATUS_OK) {
                 GDEBUG("%c CORE_GET_CONFIG_RSP ok", DIR_IN);
+                if (nci_transition_idle_to_discovery_la_sens_res_1_ok(n,
+                    &data, &la_sens_res_1)) {
+                    set_config &= ~CORE_SET_CONFIG_LA_SENS_RES_1;
+                }
                 if (nci_transition_idle_to_discovery_la_nfcid1_ok(n,
                     &data, &la_nfcid1)) {
                     set_config &= ~CORE_SET_CONFIG_LA_NFCID1;
@@ -1258,7 +1309,7 @@ nci_transition_idle_to_discovery_get_config_rsp(
             GWARN("CORE_GET_CONFIG_CMD unexpected response");
         }
         nci_transition_idle_to_discovery_set_config(self, set_config,
-            &la_nfcid1, la_sel_info, lf_protocol_type);
+            la_sens_res_1, &la_nfcid1, la_sel_info, lf_protocol_type);
     }
 }
 
@@ -1303,14 +1354,14 @@ nci_transition_idle_to_discovery_start(
      * +=========================================================+
      */
     static const guint8 cmd[] = {
-        3,
+        4,
+        NCI_CONFIG_LA_SENS_RES_1,
         NCI_CONFIG_LA_NFCID1,
         NCI_CONFIG_LA_SEL_INFO,
         NCI_CONFIG_LF_PROTOCOL_TYPE
     };
 
-    GDEBUG("%c CORE_GET_CONFIG_CMD (LA_NFCID1,LA_SEL_INFO,LF_PROTOCOL_TYPE)",
-        DIR_OUT);
+    GDEBUG("%c CORE_GET_CONFIG_CMD", DIR_OUT);
     return nci_transition_send_command_static(self,
         NCI_GID_CORE, NCI_OID_CORE_GET_CONFIG, ARRAY_AND_SIZE(cmd),
         nci_transition_idle_to_discovery_get_config_rsp);
