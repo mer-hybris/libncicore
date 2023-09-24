@@ -66,6 +66,14 @@ typedef enum nci_nfcc_power {
     NCI_NFCC_POWER_SWITCH_OFF           = 0x02
 } NCI_NFCC_POWER;
 
+/* LA_SENS_RES_1 (Byte 1 of SENS_RES) coding */
+typedef enum nci_la_sens_res_1 {
+    NCI_LA_SENS_RES_NFCID1_LEN_4        = 0x00,
+    NCI_LA_SENS_RES_NFCID1_LEN_7        = 0x40,
+    NCI_LA_SENS_RES_NFCID1_LEN_10       = 0x80,
+    NCI_LA_SENS_RES_NFCID1_LEN_MASK     = 0xc0
+} NCI_LA_SENS_RES_1;
+
 /* LA_SEL_INFO coding */
 typedef enum nci_la_sel_info {
     NCI_LA_SEL_INFO_ISO_DEP            = 0x20,
