@@ -539,6 +539,16 @@ nci_sm_load_config(
     }
 }
 
+static
+void
+nci_sm_reset(
+    NciSm* sm)
+{
+    if (sm->next_state->state > NCI_RFST_IDLE) {
+        nci_sm_switch_to(sm, NCI_RFST_IDLE);
+    }
+}
+
 /*==========================================================================*
  * Interface
  *==========================================================================*/
@@ -806,7 +816,7 @@ nci_sm_set_op_mode(
          */
         GDEBUG("Mode 0x%02x => 0x%02x", sm->op_mode, op_mode);
         sm->op_mode = op_mode;
-        nci_sm_switch_to(sm, NCI_RFST_IDLE);
+        nci_sm_reset(sm);
     }
 }
 
@@ -826,7 +836,7 @@ nci_sm_set_tech(
          */
         GDEBUG("Tech 0x%04x => 0x%04x", sm->techs, valid_techs);
         sm->techs = valid_techs;
-        nci_sm_switch_to(sm, NCI_RFST_IDLE);
+        nci_sm_reset(sm);
         return valid_techs;
     }
     return NCI_TECH_NONE;
