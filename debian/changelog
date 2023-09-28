@@ -1,3 +1,9 @@
+libncicore (1.1.25) unstable; urgency=low
+
+  * Don't try to unnecessarily switch state machine to IDLE
+
+ -- Slava Monich <slava@monich.com>  Thu, 28 Sep 2023 18:15:27 +0300
+
 libncicore (1.1.24) unstable; urgency=low
 
   * Update byte 1 of SENS_RES based on NFCID1 size
