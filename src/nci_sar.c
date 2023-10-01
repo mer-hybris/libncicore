@@ -1,33 +1,36 @@
 /*
+ * Copyright (C) 2018-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2018-2020 Jolla Ltd.
- * Copyright (C) 2018-2020 Slava Monich <slava.monich@jolla.com>
  *
- * You may use this file under the terms of BSD license as follows:
+ * You may use this file under the terms of the BSD license as follows:
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  *
- *   1. Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *   3. Neither the names of the copyright holders nor the names of its
- *      contributors may be used to endorse or promote products derived
- *      from this software without specific prior written permission.
+ *  1. Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer
+ *     in the documentation and/or other materials provided with the
+ *     distribution.
+ *  3. Neither the names of the copyright holders nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
- * THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) ARISING
+ * IN ANY WAY OUT OF THE USE OR INABILITY TO USE THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * any official policies, either expressed or implied.
  */
 
 #include "nci_sar.h"
@@ -95,7 +98,9 @@ struct nci_sar {
 #define NCI_CONTROL_OID_MASK    (0x3f)  /* Second octet */
 
 /* Data packets */
-#define NCI_DATA_CID_MASK       (0x0f)
+
+#define NCI_DATA_CID_MASK       (0x0f)  /* First octet */
+#define NCI_DATA_CR_MASK        (0x03)  /* Second octet */
 
 static
 void
@@ -173,8 +178,7 @@ nci_sar_write_completed(
 static
 NciSarPacketOutQueue*
 nci_sar_write_queue(
-    NciSar* self,
-    gboolean eat_credit)
+    NciSar* self)
 {
     if (self->cmd.first) {
         return &self->cmd;
@@ -185,7 +189,7 @@ nci_sar_write_queue(
             NciSarLogicalConnection* conn = self->conn + i;
 
             if (conn->out.first && conn->credits) {
-                if (eat_credit && conn->credits != SAR_UNLIMITED_CREDITS) {
+                if (conn->credits != SAR_UNLIMITED_CREDITS) {
                     conn->credits--;
                     GVERBOSE("cid %u: %u credit(s)", i, conn->credits);
                 }
@@ -201,7 +205,22 @@ gboolean
 nci_sar_can_write(
     NciSar* self)
 {
-    return !self->writing && nci_sar_write_queue(self, FALSE);
+    if (!self->writing) {
+        if (self->cmd.first) {
+            return TRUE;
+        } else {
+            guint i;
+
+            for (i = 0; i < self->max_logical_conns; i++) {
+                NciSarLogicalConnection* conn = self->conn + i;
+
+                if (conn->out.first && conn->credits) {
+                    return TRUE;
+                }
+            }
+        }
+    }
+    return FALSE;
 }
 
 static
@@ -227,7 +246,7 @@ nci_sar_attempt_write(
             }
         }
         if (!self->writing) {
-            NciSarPacketOutQueue* queue = nci_sar_write_queue(self, TRUE);
+            NciSarPacketOutQueue* queue = nci_sar_write_queue(self);
 
             if (queue) {
                 self->writing = queue->first;
@@ -384,6 +403,31 @@ nci_sar_send(
 
 static
 void
+nci_sar_take_credits(
+    NciSar* self,
+    guint8 cid,
+    guint8 credits)
+{
+    /* cid is checked by the caller */
+    if (credits) {
+        NciSarLogicalConnection* conn = self->conn + cid;
+
+        if (credits > (0xff - conn->credits)) {
+            GWARN("Credits overflow");
+            conn->credits = SAR_UNLIMITED_CREDITS;
+        } else {
+            conn->credits += credits;
+            GVERBOSE("cid %u: %u credit(s)", cid, conn->credits);
+        }
+
+        if (conn->out.first) {
+            nci_sar_schedule_write(self);
+        }
+    }
+}
+
+static
+void
 nci_sar_hal_handle_control_packet(
     NciSar* self,
     guint8 mt,
@@ -480,6 +524,7 @@ nci_sar_hal_handle_data_segment(
 {
     const guint8 hdr = packet[0];
     const guint8 cid = (hdr & NCI_DATA_CID_MASK);
+    const guint8 cr = (packet[1] & NCI_DATA_CR_MASK);
     const guint8 payload_len = packet[2];
     const guint8* payload = packet + NCI_HDR_SIZE;
     NciSarClient* client = self->client;
@@ -488,6 +533,8 @@ nci_sar_hal_handle_data_segment(
         NciSarLogicalConnection* conn = self->conn + cid;
         GByteArray* in = conn->in;
 
+        /* Take credits from each segment */
+        nci_sar_take_credits(self, cid, cr);
         if (in && in->len > 0) {
             /* Only append the payload */
             g_byte_array_append(in, payload, payload_len);
@@ -845,18 +892,7 @@ nci_sar_add_credits(
     guint8 credits)
 {
     if (G_LIKELY(self) && cid < self->max_logical_conns) {
-        NciSarLogicalConnection* conn = self->conn + cid;
-
-        if (credits > (0xff - conn->credits)) {
-            GWARN("Credits overflow");
-            conn->credits = SAR_UNLIMITED_CREDITS;
-        } else {
-            conn->credits += credits;
-            GVERBOSE("cid %u: %u credit(s)", cid, conn->credits);
-        }
-        if (conn->out.first) {
-            nci_sar_schedule_write(self);
-        }
+        nci_sar_take_credits(self, cid, credits);
     }
 }
 
