@@ -1,3 +1,9 @@
+libncicore (1.1.26) unstable; urgency=low
+
+  * Use CR field of the Data Packet header
+
+ -- Slava Monich <slava@monich.com>  Sun, 01 Oct 2023 17:59:34 +0300
+
 libncicore (1.1.25) unstable; urgency=low
 
   * Don't try to unnecessarily switch state machine to IDLE
