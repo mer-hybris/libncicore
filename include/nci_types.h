@@ -1,33 +1,40 @@
 /*
- * Copyright (C) 2018-2023 Slava Monich <slava@monich.com>
+ * Copyright (C) 2018-2024 Slava Monich <slava@monich.com>
  * Copyright (C) 2018-2020 Jolla Ltd.
  *
- * You may use this file under the terms of BSD license as follows:
+ * You may use this file under the terms of the BSD license as follows:
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  *
- *   1. Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *   3. Neither the names of the copyright holders nor the names of its
- *      contributors may be used to endorse or promote products derived
- *      from this software without specific prior written permission.
+ *  1. Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
- * THE POSSIBILITY OF SUCH DAMAGE.
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer
+ *     in the documentation and/or other materials provided with the
+ *     distribution.
+ *
+ *  3. Neither the names of the copyright holders nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * any official policies, either expressed or implied.
  */
 
 #ifndef NCI_TYPES_H
@@ -58,12 +65,20 @@ typedef enum nci_status {
     NCI_STATUS_SEMANTIC_ERROR = 0x06,
     NCI_STATUS_INVALID_PARAM = 0x09,
     NCI_STATUS_MESSAGE_SIZE_EXCEEDED = 0x0A,
+    NCI_STATUS_STATUS_OK_1_BIT = 0x11, /* Since 1.1.27 */
+    NCI_STATUS_STATUS_OK_2_BIT = 0x12, /* Since 1.1.27 */
+    NCI_STATUS_STATUS_OK_3_BIT = 0x13, /* Since 1.1.27 */
+    NCI_STATUS_STATUS_OK_4_BIT = 0x14, /* Since 1.1.27 */
+    NCI_STATUS_STATUS_OK_5_BIT = 0x15, /* Since 1.1.27 */
+    NCI_STATUS_STATUS_OK_6_BIT = 0x16, /* Since 1.1.27 */
+    NCI_STATUS_STATUS_OK_7_BIT = 0x17, /* Since 1.1.27 */
     NCI_STATUS_DISCOVERY_ALREADY_STARTED = 0xA0,
     NCI_STATUS_DISCOVERY_TARGET_ACTIVATION_FAILED = 0xA1,
     NCI_STATUS_DISCOVERY_TEAR_DOWN = 0xA2,
     NCI_STATUS_RF_TRANSMISSION_ERROR = 0xB0,
     NCI_STATUS_RF_PROTOCOL_ERROR = 0xB1,
     NCI_STATUS_RF_TIMEOUT_ERROR = 0xB2,
+    NCI_STATUS_RF_UNEXPECTED_DATA = 0xB3, /* Since 1.1.27 */
     NCI_STATUS_NFCEE_INTERFACE_ACTIVATION_FAILED = 0xC0,
     NCI_STATUS_NFCEE_TRANSMISSION_ERROR = 0xC1,
     NCI_STATUS_NFCEE_PROTOCOL_ERROR = 0xC2,
