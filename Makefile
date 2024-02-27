@@ -179,7 +179,8 @@ clean:
 	rm -fr $(BUILD_DIR) RPMS installroot
 	rm -fr debian/tmp debian/lib$(NAME) debian/lib$(NAME)-dev
 	rm -f documentation.list debian/files debian/*.substvars
-	rm -f debian/*.debhelper.log debian/*.debhelper debian/*~
+	rm -f debian/*.debhelper.log debian/*.debhelper debian/*~ debian/*.install
+	rm -fr debian/.debhelper
 
 test:
 	make -C unit test
