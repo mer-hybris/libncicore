@@ -1,3 +1,9 @@
+libncicore (1.1.27) unstable; urgency=low
+
+  * Defined status values added in the NCI 2.0 spec
+
+ -- Slava Monich <slava@monich.com>  Tue, 27 Feb 2024 02:27:23 +0200
+
 libncicore (1.1.26) unstable; urgency=low
 
   * Use CR field of the Data Packet header
