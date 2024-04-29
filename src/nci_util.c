@@ -1,34 +1,41 @@
 /*
- * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
+ * Copyright (C) 2019-2024 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
  * Copyright (C) 2020 Open Mobile Platform LLC.
  *
- * You may use this file under the terms of BSD license as follows:
+ * You may use this file under the terms of the BSD license as follows:
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  *
- *   1. Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *   3. Neither the names of the copyright holders nor the names of its
- *      contributors may be used to endorse or promote products derived
- *      from this software without specific prior written permission.
+ *  1. Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
- * THE POSSIBILITY OF SUCH DAMAGE.
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer
+ *     in the documentation and/or other materials provided with the
+ *     distribution.
+ *
+ *  3. Neither the names of the copyright holders nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * any official policies, either expressed or implied.
  */
 
 #include "nci_util_p.h"
@@ -193,7 +200,7 @@ nci_parse_mode_param(
         /* fallthrough */
     case NCI_MODE_PASSIVE_POLL_A:
         /*
-         * NFCForum-TS-NCI-1.0
+         * [NFCForum-TS-NCI-1.0]
          * Table 54: Specific Parameters for NFC-A Poll Mode
          *
          * +=========================================================+
@@ -243,7 +250,7 @@ nci_parse_mode_param(
         return NULL;
     case NCI_MODE_PASSIVE_POLL_B:
         /*
-         * NFCForum-TS-NCI-1.0
+         * [NFCForum-TS-NCI-1.0]
          * Table 56: Specific Parameters for NFC-B Poll Mode
          *
          * +=========================================================+
@@ -253,7 +260,7 @@ nci_parse_mode_param(
          * | 1      | n    | Bytes 2-12 or 13 of SENSB_RES Response  |
          * +=========================================================+
          *
-         * NFCForum-TS-DigitalProtocol-1.0
+         * [NFCForum-TS-DigitalProtocol-1.0]
          * Table 25: SENSB_RES Format
          *
          * +=========================================================+
@@ -328,7 +335,7 @@ nci_parse_mode_param(
     case NCI_MODE_ACTIVE_POLL_F:
     case NCI_MODE_PASSIVE_POLL_F:
         /*
-         * NFCForum-TS-NCI-1.0
+         * [NFCForum-TS-NCI-1.0]
          * Table 58: Specific Parameters for NFC-F Poll Mode
          *
          * +=========================================================+
@@ -359,7 +366,7 @@ nci_parse_mode_param(
     case NCI_MODE_ACTIVE_LISTEN_F:
     case NCI_MODE_PASSIVE_LISTEN_F:
         /*
-         * NFCForum-TS-NCI-1.0
+         * [NFCForum-TS-NCI-1.0]
          * Table 59: Specific Parameters for NFC-F Listen Mode
          *
          * +=========================================================+
@@ -436,7 +443,7 @@ nci_parse_discover_ntf(
     guint len)
 {
     /*
-     * NFCForum-TS-NCI-1.0
+     * [NFCForum-TS-NCI-1.0]
      * Table 52: Control Messages to Start Discovery
      *
      * RF_DISCOVER_NTF
@@ -509,7 +516,7 @@ nci_parse_iso_dep_poll_a_param(
     const guint8 ats_len = bytes[0];
 
     /*
-     * NFCForum-TS-NCI-1.0
+     * [NFCForum-TS-NCI-1.0]
      * Table 76: Activation Parameters for NFC-A/ISO-DEP Poll Mode
      *
      * +=========================================================+
@@ -532,8 +539,10 @@ nci_parse_iso_dep_poll_a_param(
         if (t0 & NFC_T4A_ATS_T0_B) tb = ats_ptr++;
         if (t0 & NFC_T4A_ATS_T0_C) tc = ats_ptr++;
         if (ats_ptr <= ats_end) {
-            /* NFCForum-TS-DigitalProtocol-1.0
-             * Table 66: FSCI to FSC Conversion */
+            /*
+             * [NFCForum-TS-DigitalProtocol-1.0]
+             * Table 66: FSCI to FSC Conversion
+             */
             const guint8 fsci = (t0 & NFC_T4A_ATS_T0_FSCI_MASK);
             static const guint fsc_table[] = {
                 16, 24, 32, 40, 48, 64, 96, 128, 256
@@ -591,7 +600,7 @@ nci_parse_iso_dep_listen_a_param(
     guint len)
 {
     /*
-     * NFCForum-TS-NCI-1.0
+     * [NFCForum-TS-NCI-1.0]
      * Table 78: Activation Parameters for NFC-A/ISO-DEP Listen Mode
      *
      * +=========================================================+
@@ -601,8 +610,10 @@ nci_parse_iso_dep_listen_a_param(
      * +=========================================================+
      */
     if (len > 0) {
-        /* NFCForum-TS-DigitalProtocol-1.0
-         * Table 63: FSDI to FSD Conversion */
+        /*
+         * [NFCForum-TS-DigitalProtocol-1.0]
+         * Table 63: FSDI to FSD Conversion
+         */
         const guint b2 = bytes[0];
         const guint8 fsdi = (b2 >> 4);
         static const guint fsd_table[] = {
@@ -629,7 +640,7 @@ nci_parse_iso_dep_poll_b_param(
     const guint8* bytes,
     guint len)
 {
-    /* NFCForum-TS-NCI-1.0
+    /* [NFCForum-TS-NCI-1.0]
      * Table 75: Activation parameters for NFC-B/ISO-DEP Poll Mode
      *
      * +============================================================+
@@ -644,8 +655,10 @@ nci_parse_iso_dep_poll_b_param(
     const guint attrib_length = bytes[0];
 
     if (attrib_length >= 1) {
-        /* NFCForum-TS-DigitalProtocol-1.0
-         * Table 79: ATTRIB Response Format */
+        /*
+         * [NFCForum-TS-DigitalProtocol-1.0]
+         * Table 79: ATTRIB Response Format
+         */
 
 #define NFC_T4B_MBLI_MASK (0xF0) /* MBLI Mask */
 #define NFC_T4B_DID_MASK  (0x0F) /* DID Mask */
@@ -689,7 +702,7 @@ nci_parse_iso_dep_listen_b_param(
     const guint8* bytes,
     guint len)
 {
-    /* NFCForum-TS-NCI-1.0
+    /* [NFCForum-TS-NCI-1.0]
      * Table 79: Activation parameters for NFC-B/ISO-DEP Listen Mode
      *
      * +============================================================+
@@ -704,8 +717,10 @@ nci_parse_iso_dep_listen_b_param(
     const guint cmdlen = bytes[0];
 
     if (cmdlen >= 8 && len > cmdlen) {
-        /* NFCForum-TS-DigitalProtocol-1.0
-         * Table 71: ATTRIB Command Format */
+        /*
+         * [NFCForum-TS-DigitalProtocol-1.0]
+         * Table 71: ATTRIB Command Format
+         */
         memcpy(param->nfcid0, bytes + 1, sizeof(param->nfcid0));
         memcpy(param->param, bytes + 5, 4);
         if (cmdlen > 8) {
@@ -753,7 +768,7 @@ nci_parse_nfc_dep_poll_param(
     const guint8 atr_res_len = bytes[0];
 
     /*
-     * NFCForum-TS-NCI-1.0
+     * [NFCForum-TS-NCI-1.0]
      * Table 82: Activation Parameters for NFC-DEP Poll Mode
      *
      * +=========================================================+
@@ -767,7 +782,7 @@ nci_parse_nfc_dep_poll_param(
         const guint8* atr_res = bytes + 1;
 
         /*
-         * NFCForum-TS-DigitalProtocol-1.0
+         * [NFCForum-TS-DigitalProtocol-1.0]
          * 14.6.3 ATR_RES Response
          */
         memcpy(param->nfcid3, atr_res, sizeof(param->nfcid3));
@@ -819,7 +834,7 @@ nci_parse_nfc_dep_listen_param(
     const guint8 atr_req_len = bytes[0];
 
     /*
-     * NFCForum-TS-NCI-1.0
+     * [NFCForum-TS-NCI-1.0]
      * Table 83: Activation Parameters for NFC-DEP Listen Mode
      *
      * +=========================================================+
@@ -833,7 +848,7 @@ nci_parse_nfc_dep_listen_param(
         const guint8* atr_req = bytes + 1;
 
         /*
-         * NFCForum-TS-DigitalProtocol-1.0
+         * [NFCForum-TS-DigitalProtocol-1.0]
          * 14.6.2 ATR_REQ Command
          */
         memcpy(param->nfcid3, atr_req, sizeof(param->nfcid3));
@@ -972,7 +987,7 @@ nci_parse_intf_activated_ntf(
     guint len)
 {
     /*
-     * NFCForum-TS-NCI-1.0
+     * [NFCForum-TS-NCI-1.0]
      * Table 61: Notification for RF Interface activation
      *
      * RF_INTF_ACTIVATED_NTF
@@ -1136,6 +1151,54 @@ nci_mode_param_copy_impl(
         GDEBUG("Unhandled activation mode 0x%02x", mode);
     }
     return 0;
+}
+
+gboolean
+nci_parse_rf_deactivate_ntf(
+    NciRfDeactivateNtf* ntf,
+    const GUtilData* pkt)
+{
+    /*
+     * [NFCForum-TS-NCI-1.0]
+     * Table 62: Control Messages for RF Interface Deactivation
+     *
+     * RF_DEACTIVATE_NTF
+     *
+     * +=========================================================+
+     * | Offset | Size | Description                             |
+     * +=========================================================+
+     * | 0      | 1    | Deactivation Type                       |
+     * | 1      | 1    | Deactivation Reason                     |
+     * +=========================================================+
+     */
+    if (pkt->size >= 2) {
+        const guint8 type = pkt->bytes[0];
+        const guint8 reason = pkt->bytes[1];
+
+        switch (type) {
+        case NCI_DEACTIVATE_TYPE_IDLE:
+            GDEBUG("RF_DEACTIVATE_NTF Idle (%u)", reason);
+            break;
+        case NCI_DEACTIVATE_TYPE_DISCOVERY:
+            GDEBUG("RF_DEACTIVATE_NTF Discovery (%u)", reason);
+            break;
+        case NCI_DEACTIVATE_TYPE_SLEEP:
+            GDEBUG("RF_DEACTIVATE_NTF Sleep (%u)", reason);
+            break;
+        case NCI_DEACTIVATE_TYPE_SLEEP_AF:
+            GDEBUG("RF_DEACTIVATE_NTF Sleep_AF (%u)", reason);
+            break;
+        default:
+            GDEBUG("RF_DEACTIVATE_NTF %u (%u)", type, reason);
+            return FALSE;
+        }
+
+        ntf->type = type;
+        ntf->reason = reason;
+        return TRUE;
+    }
+    GWARN("Failed to parse RF_DEACTIVATE_NTF");
+    return FALSE;
 }
 
 static

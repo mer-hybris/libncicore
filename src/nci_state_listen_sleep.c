@@ -1,33 +1,40 @@
 /*
+ * Copyright (C) 2020-2024 Slava Monich <slava@monich.com>
  * Copyright (C) 2020 Jolla Ltd.
- * Copyright (C) 2020 Slava Monich <slava.monich@jolla.com>
  *
- * You may use this file under the terms of BSD license as follows:
+ * You may use this file under the terms of the BSD license as follows:
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  *
- *   1. Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *   3. Neither the names of the copyright holders nor the names of its
- *      contributors may be used to endorse or promote products derived
- *      from this software without specific prior written permission.
+ *  1. Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
- * THE POSSIBILITY OF SUCH DAMAGE.
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer
+ *     in the documentation and/or other materials provided with the
+ *     distribution.
+ *
+ *  3. Neither the names of the copyright holders nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * any official policies, either expressed or implied.
  */
 
 #include "nci_sm.h"
@@ -60,6 +67,7 @@ nci_state_listen_sleep_intf_activated_ntf(
     NciSm* sm = nci_state_sm(self);
 
     /*
+     * [NFCForum-TS-NCI-1.0]
      * 5.2.7 State RFST_LISTEN_SLEEP
      *
      * ...
@@ -94,43 +102,36 @@ nci_state_listen_sleep_rf_deactivate_ntf(
     const GUtilData* payload)
 {
     NciSm* sm = nci_state_sm(self);
+    NciRfDeactivateNtf ntf;
 
-    /*
-     * Table 62: Control Messages for RF Interface Deactivation
-     *
-     * RF_DEACTIVATE_NTF
-     *
-     * +=========================================================+
-     * | Offset | Size | Description                             |
-     * +=========================================================+
-     * | 0      | 1    | Deactivation Type                       |
-     * | 1      | 1    | Deactivation Reason                     |
-     * +=========================================================+
-     */
-    if (payload->size >= 2) {
-        const NCI_DEACTIVATION_TYPE type = payload->bytes[0];
-
-        switch (type) {
+    if (nci_parse_rf_deactivate_ntf(&ntf, payload)) {
+        switch (ntf.type) {
         case NCI_DEACTIVATE_TYPE_DISCOVERY:
             /*
+             * [NFCForum-TS-NCI-1.0]
              * 5.2.7 State RFST_LISTEN_SLEEP
              *
              * ...
              * On detection of remote RF field off, the NFCC SHALL send
              * RF_DEACTIVATE_NTF (Discovery, RF Link Loss) to the DH. The
              * RF Communication state will then change to RFST_DISCOVERY.
+             *
+             * For NFC-B Technology, when the NFCC detects a command during
+             * the RF communication, which forces returning to the IDLE state,
+             * as defined in the [ACTIVITY] Listen Mode state machine, the
+             * NFCC SHALL send an RF_DEACTIVATE_NTF (Discovery, NFC-B_Bad_AFI)
+             * to the DH. The state will then change to RFST_DISCOVERY.
              */
-            GDEBUG("RF_DEACTIVATE_NTF Discovery (%d)", payload->bytes[1]);
             nci_sm_enter_state(sm, NCI_RFST_DISCOVERY, NULL);
             return;
         case NCI_DEACTIVATE_TYPE_SLEEP_AF:
         case NCI_DEACTIVATE_TYPE_SLEEP:
+            /* We are already there */
         case NCI_DEACTIVATE_TYPE_IDLE:
+            /* This one is not supposed to happen spontaneously */
             break;
         }
-        GDEBUG("Unexpected RF_DEACTIVATE_NTF %d (%u)", type, payload->bytes[1]);
-    } else {
-        GWARN("Failed to parse RF_DEACTIVATE_NTF");
+        GDEBUG("Unexpected RF_DEACTIVATE_NTF");
     }
     /* Oops */
     nci_sm_stall(sm, NCI_STALL_ERROR);
