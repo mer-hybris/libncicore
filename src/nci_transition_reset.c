@@ -1,33 +1,40 @@
 /*
- * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
+ * Copyright (C) 2019-2024 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
  *
- * You may use this file under the terms of BSD license as follows:
+ * You may use this file under the terms of the BSD license as follows:
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  *
- *   1. Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *   3. Neither the names of the copyright holders nor the names of its
- *      contributors may be used to endorse or promote products derived
- *      from this software without specific prior written permission.
+ *  1. Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
- * THE POSSIBILITY OF SUCH DAMAGE.
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer
+ *     in the documentation and/or other materials provided with the
+ *     distribution.
+ *
+ *  3. Neither the names of the copyright holders nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * any official policies, either expressed or implied.
  */
 
 #include "nci_transition.h"
@@ -135,6 +142,7 @@ nci_transition_reset_set_config_rsp(
         GDEBUG("CORE_SET_CONFIG timed out");
     } else if (sm) {
         /*
+         * [NFCForum-TS-NCI-1.0]
          * Table 10: Control Messages for Setting Configuration Parameters
          *
          * CORE_SET_CONFIG_RSP
@@ -157,7 +165,7 @@ nci_transition_reset_set_config_rsp(
         nci_transition_finish(self, NULL);
         return;
     }
-    nci_sm_stall(sm, NCI_STALL_ERROR);
+    nci_sm_error(sm);
 }
 
 static
@@ -166,6 +174,7 @@ nci_transition_reset_set_config(
     NciTransition* self)
 {
     /*
+     * [NFCForum-TS-NCI-1.0]
      * Table 10: Control Messages for Setting Configuration Parameters
      *
      * CORE_SET_CONFIG_CMD
@@ -246,14 +255,15 @@ nci_transition_reset_init_v1_rsp(
         GDEBUG("%c CORE_INIT (v1) cancelled", DIR_IN);
     } else if (status == NCI_REQUEST_TIMEOUT) {
         GDEBUG("%c CORE_INIT (v1) timed out", DIR_IN);
-        nci_sm_stall(sm, NCI_STALL_ERROR);
+        nci_sm_error(sm);
     } else if (sar && status == NCI_REQUEST_SUCCESS) {
         const guint8* pkt = payload->bytes;
         const guint len = payload->size;
         guint n; /* Number of Supported RF Interfaces */
 
         /*
-         * NFC Controller Interface (NCI), Version 1.1, Section 4.2
+         * [NFCForum-TS-NCI-1.0]
+         * Table 8: Control Messages to Initialize the NFCC
          *
          * CORE_INIT_RSP
          *
@@ -320,7 +330,7 @@ nci_transition_reset_init_v1_rsp(
             return;
         }
         GWARN("CORE_INIT (v1) failed (or is incomprehensible)");
-        nci_sm_stall(sm, NCI_STALL_ERROR);
+        nci_sm_error(sm);
     }
 }
 
@@ -429,7 +439,7 @@ nci_transition_reset_init_v2_rsp(
         }
         GWARN("CORE_INIT (v1) failed (or is incomprehensible)");
     }
-    nci_sm_stall(sm, NCI_STALL_ERROR);
+    nci_sm_error(sm);
 }
 
 static
@@ -488,14 +498,14 @@ nci_transition_reset_rsp(
             GWARN("Unexpected CORE_RESET_RSP length %u byte(s)", len);
         }
     }
-    nci_sm_stall(sm, NCI_STALL_ERROR);
+    nci_sm_error(sm);
 }
 
 /*==========================================================================*
  * Interface
  *==========================================================================*/
 
-NciTransition* 
+NciTransition*
 nci_transition_reset_new(
     NciSm* sm)
 {
@@ -593,6 +603,7 @@ nci_transition_reset_start(
 
     if (sm) {
         /*
+         * [NFCForum-TS-NCI-1.0]
          * Table 5: Control Messages to Reset the NFCC
          *
          * CORE_RESET_CMD

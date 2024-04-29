@@ -86,6 +86,9 @@ nci_transition_stall(
     NCI_STALL stall)
     NCI_INTERNAL;
 
+#define nci_transition_error(transition) \
+    nci_transition_stall(transition, NCI_STALL_ERROR)
+
 gboolean
 nci_transition_active(
     NciTransition* transition)

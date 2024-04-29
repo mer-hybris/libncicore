@@ -1,33 +1,40 @@
 /*
- * Copyright (C) 2018-2023 Slava Monich <slava@monich.com>
+ * Copyright (C) 2018-2024 Slava Monich <slava@monich.com>
  * Copyright (C) 2018-2021 Jolla Ltd.
  *
- * You may use this file under the terms of BSD license as follows:
+ * You may use this file under the terms of the BSD license as follows:
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  *
- *   1. Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *   3. Neither the names of the copyright holders nor the names of its
- *      contributors may be used to endorse or promote products derived
- *      from this software without specific prior written permission.
+ *  1. Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
- * THE POSSIBILITY OF SUCH DAMAGE.
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer
+ *     in the documentation and/or other materials provided with the
+ *     distribution.
+ *
+ *  3. Neither the names of the copyright holders nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * any official policies, either expressed or implied.
  */
 
 #include "nci_core.h"
@@ -89,11 +96,12 @@ typedef struct nci_core_object {
 } NciCoreObject;
 
 typedef GObjectClass NciCoreObjectClass;
-GType nci_core_object_get_type() NCI_INTERNAL;
+
+#define THIS_TYPE nci_core_object_get_type()
+#define THIS(obj) G_TYPE_CHECK_INSTANCE_CAST((obj), THIS_TYPE, NciCoreObject)
+
+GType THIS_TYPE NCI_INTERNAL;
 G_DEFINE_TYPE(NciCoreObject, nci_core_object, G_TYPE_OBJECT)
-#define NCI_TYPE_CORE (nci_core_object_get_type())
-#define NCI_CORE(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), \
-        NCI_TYPE_CORE, NciCoreObject))
 
 typedef enum nci_core_signal {
     SIGNAL_CURRENT_STATE,
@@ -122,15 +130,15 @@ typedef struct nci_core_param_desc {
     gboolean (*equal)(const NciCoreParamValue*, const NciCoreParamValue*);
 } NciCoreParamDesc;
 
-static inline NciCoreObject* nci_core_object(NciCore* ptr)
-{ return G_LIKELY(ptr) ? /* This one should be NULL safe */
-             NCI_CORE(G_CAST(ptr, NciCoreObject, core)) : NULL; }
+static inline NciCoreObject* nci_core_object_cast(NciCore* ptr)
+    { return G_LIKELY(ptr) ? /* This one should be NULL safe */
+             THIS(G_CAST(ptr, NciCoreObject, core)) : NULL; }
 
-static inline NciCoreObject* nci_core_object_from_sar_client(NciSarClient* ptr)
-    { return NCI_CORE(G_CAST(ptr, NciCoreObject, sar_client)); }
+static inline NciCoreObject* nci_core_object_cast_sar_client(NciSarClient* ptr)
+    { return THIS(G_CAST(ptr, NciCoreObject, sar_client)); }
 
-static inline NciCoreObject* nci_core_object_from_sm_io(NciSmIo* ptr)
-    { return NCI_CORE(G_CAST(ptr, NciCoreObject, io)); }
+static inline NciCoreObject* nci_core_object_cast_sm_io(NciSmIo* ptr)
+    { return THIS(G_CAST(ptr, NciCoreObject, io)); }
 
 /*==========================================================================*
  * Implementation
@@ -169,12 +177,12 @@ nci_core_command_completion(
     gboolean success,
     gpointer user_data)
 {
-    NciCoreObject* self = NCI_CORE(user_data);
+    NciCoreObject* self = THIS(user_data);
 
     self->cmd_id = 0;
     if (!success) {
         GWARN("Failed to send command %02x/%02x", self->rsp_gid, self->rsp_oid);
-        nci_sm_stall(self->sm, NCI_STALL_ERROR);
+        nci_sm_error(self->sm);
     }
 }
 
@@ -186,8 +194,8 @@ nci_core_io_dummy_resp(
     gpointer user_data)
 {
     if (status != NCI_REQUEST_SUCCESS) {
-        GWARN("Command %02x/%02x failed", NCI_CORE(user_data)->rsp_gid,
-            NCI_CORE(user_data)->rsp_oid);
+        GWARN("Command %02x/%02x failed", THIS(user_data)->rsp_gid,
+            THIS(user_data)->rsp_oid);
     }
 }
 
@@ -196,7 +204,7 @@ gboolean
 nci_core_command_timeout(
     gpointer user_data)
 {
-    NciCoreObject* self = NCI_CORE(user_data);
+    NciCoreObject* self = THIS(user_data);
     gpointer rsp_data = self->rsp_data;
 
     GWARN("Command %02x/%02x timed out", self->rsp_gid, self->rsp_oid);
@@ -212,7 +220,7 @@ nci_core_command_timeout(
         memset(&payload, 0, sizeof(payload));
         handler(NCI_REQUEST_TIMEOUT, &payload, rsp_data);
     }
-    nci_sm_stall(self->sm, NCI_STALL_ERROR);
+    nci_sm_error(self->sm);
     return G_SOURCE_REMOVE;
 }
 
@@ -224,7 +232,7 @@ nci_core_send_data_msg_complete(
     gpointer user_data)
 {
     NciCoreSendData* send = user_data;
-    NciCoreObject* self = nci_core_object_from_sar_client(client);
+    NciCoreObject* self = nci_core_object_cast_sar_client(client);
 
     if (send->complete) {
         send->complete(&self->core, ok, send->user_data);
@@ -250,7 +258,7 @@ nci_core_last_state_changed(
     NciSm* sm,
     void* user_data)
 {
-    NciCoreObject* self = NCI_CORE(user_data);
+    NciCoreObject* self = THIS(user_data);
 
     self->core.current_state = sm->last_state->state;
     g_signal_emit(self, nci_core_signals[SIGNAL_CURRENT_STATE], 0);
@@ -262,7 +270,7 @@ nci_core_next_state_changed(
     NciSm* sm,
     void* user_data)
 {
-    NciCoreObject* self = NCI_CORE(user_data);
+    NciCoreObject* self = THIS(user_data);
 
     self->core.next_state = sm->next_state->state;
     g_signal_emit(self, nci_core_signals[SIGNAL_NEXT_STATE], 0);
@@ -275,7 +283,7 @@ nci_core_intf_activated(
     const NciIntfActivationNtf* ntf,
     void* user_data)
 {
-    g_signal_emit(NCI_CORE(user_data), nci_core_signals
+    g_signal_emit(THIS(user_data), nci_core_signals
         [SIGNAL_INTF_ACTIVATED], 0, ntf);
 }
 
@@ -326,7 +334,7 @@ nci_core_add_signal_handler(
     NciCoreFunc func,
     void* user_data)
 {
-    NciCoreObject* self = nci_core_object(core);
+    NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self) && G_LIKELY(func)) {
         NciCoreClosure* closure = (NciCoreClosure*)
@@ -550,7 +558,7 @@ void
 nci_core_io_cancel(
     NciSmIo* io)
 {
-    NciCoreObject* self = nci_core_object_from_sm_io(io);
+    NciCoreObject* self = nci_core_object_cast_sm_io(io);
 
     self->rsp_handler = NULL;
     self->rsp_data = NULL;
@@ -567,7 +575,7 @@ nci_core_io_send(
     NciSmResponseFunc resp,
     gpointer user_data)
 {
-    NciCoreObject* self = nci_core_object_from_sm_io(io);
+    NciCoreObject* self = nci_core_object_cast_sm_io(io);
     NciCore* core = &self->core;
 
     /* Cancel the previous one, if any */
@@ -607,7 +615,7 @@ nci_core_sar_error(
     NciSarClient* client)
 {
     GWARN("State machine broke");
-    nci_sm_stall(nci_core_object_from_sar_client(client)->sm, NCI_STALL_ERROR);
+    nci_sm_error(nci_core_object_cast_sar_client(client)->sm);
 }
 
 static
@@ -619,7 +627,7 @@ nci_core_sar_handle_response(
     const void* data,
     guint len)
 {
-    NciCoreObject* self = nci_core_object_from_sar_client(client);
+    NciCoreObject* self = nci_core_object_cast_sar_client(client);
 
     if (self->rsp_handler) {
         if (self->rsp_gid == gid && self->rsp_oid == oid) {
@@ -656,7 +664,7 @@ nci_core_sar_handle_notification(
     const void* payload_bytes,
     guint payload_len)
 {
-    NciCoreObject* self = nci_core_object_from_sar_client(client);
+    NciCoreObject* self = nci_core_object_cast_sar_client(client);
     GUtilData payload;
 
     payload.bytes = payload_bytes;
@@ -672,7 +680,7 @@ nci_core_sar_handle_data_packet(
     const void* payload,
     guint len)
 {
-    g_signal_emit(nci_core_object_from_sar_client(client), nci_core_signals
+    g_signal_emit(nci_core_object_cast_sar_client(client), nci_core_signals
         [SIGNAL_DATA_PACKET], 0, cid, payload, len);
 }
 
@@ -685,7 +693,7 @@ nci_core_new(
     NciHalIo* hal)
 {
     if (G_LIKELY(hal)) {
-        NciCoreObject* self = g_object_new(NCI_TYPE_CORE, NULL);
+        NciCoreObject* self = g_object_new(THIS_TYPE, NULL);
         NciCore* core = &self->core;
         NciSm* sm;
         guint i;
@@ -716,7 +724,7 @@ void
 nci_core_free(
     NciCore* core)
 {
-    NciCoreObject* self = nci_core_object(core);
+    NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self)) {
         NciSm* sm = self->sm;
@@ -732,7 +740,7 @@ void
 nci_core_restart(
     NciCore* core)
 {
-    NciCoreObject* self = nci_core_object(core);
+    NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self)) {
         nci_core_restart_internal(self);
@@ -744,7 +752,7 @@ nci_core_set_state(
     NciCore* core,
     NCI_STATE state)
 {
-    NciCoreObject* self = nci_core_object(core);
+    NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self)) {
         nci_sm_switch_to(self->sm, state);
@@ -756,7 +764,7 @@ nci_core_set_op_mode(
     NciCore* core,
     NCI_OP_MODE op_mode) /* Since 1.1.0 */
 {
-    NciCoreObject* self = nci_core_object(core);
+    NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self)) {
         nci_sm_set_op_mode(self->sm, op_mode);
@@ -769,7 +777,7 @@ nci_core_set_params(
     const NciCoreParam* const* params, /* NULL terminated list */
     gboolean reset) /* Since 1.1.18 */
 {
-    NciCoreObject* self = nci_core_object(core);
+    NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self) && G_LIKELY(params || reset)) {
         NciCoreParamValue* old[G_N_ELEMENTS(nci_core_params)];
@@ -822,7 +830,7 @@ NCI_TECH
 nci_core_get_tech(
     NciCore* core)  /* Since 1.1.21 */
 {
-    NciCoreObject* self = nci_core_object(core);
+    NciCoreObject* self = nci_core_object_cast(core);
 
     return G_LIKELY(self) ? self->sm->techs : NCI_TECH_NONE;
 }
@@ -832,7 +840,7 @@ nci_core_set_tech(
     NciCore* core,
     NCI_TECH tech)  /* Since 1.1.21 */
 {
-    NciCoreObject* self = nci_core_object(core);
+    NciCoreObject* self = nci_core_object_cast(core);
 
     return G_LIKELY(self) ? nci_sm_set_tech(self->sm, tech) : NCI_TECH_NONE;
 }
@@ -846,7 +854,7 @@ nci_core_send_data_msg(
     GDestroyNotify destroy,
     void* user_data)
 {
-    NciCoreObject* self = nci_core_object(core);
+    NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self)) {
         if (complete || destroy) {
@@ -871,7 +879,7 @@ nci_core_cancel(
     NciCore* core,
     guint id)
 {
-    NciCoreObject* self = nci_core_object(core);
+    NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self)) {
         nci_sar_cancel(self->io.sar, id);
@@ -902,7 +910,7 @@ nci_core_add_intf_activated_handler(
     NciCoreIntfActivationFunc func,
     void* user_data)
 {
-    NciCoreObject* self = nci_core_object(core);
+    NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self) && G_LIKELY(func)) {
         NciCoreIntfActivationClosure* closure = (NciCoreIntfActivationClosure*)
@@ -926,7 +934,7 @@ nci_core_add_data_packet_handler(
     NciCoreDataPacketFunc func,
     void* user_data)
 {
-    NciCoreObject* self = nci_core_object(core);
+    NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self) && G_LIKELY(func)) {
         NciCoreDataPacketClosure* closure = (NciCoreDataPacketClosure*)
@@ -949,7 +957,7 @@ nci_core_remove_handler(
     NciCore* core,
     gulong id)
 {
-    NciCoreObject* self = nci_core_object(core);
+    NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self) && G_LIKELY(id)) {
         g_signal_handler_disconnect(self, id);
@@ -962,7 +970,7 @@ nci_core_remove_handlers(
     gulong* ids,
     guint count)
 {
-    gutil_disconnect_handlers(nci_core_object(core), ids, count);
+    gutil_disconnect_handlers(nci_core_object_cast(core), ids, count);
 }
 
 /*==========================================================================*
@@ -994,7 +1002,7 @@ void
 nci_core_object_finalize(
     GObject* object)
 {
-    NciCoreObject* self = NCI_CORE(object);
+    NciCoreObject* self = THIS(object);
 
     if (self->cmd_timeout_id) {
         g_source_remove(self->cmd_timeout_id);

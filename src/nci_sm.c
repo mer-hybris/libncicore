@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
+ * Copyright (C) 2019-2024 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
  *
  * You may use this file under the terms of the BSD license as follows:
@@ -10,23 +10,27 @@
  *
  *  1. Redistributions of source code must retain the above copyright
  *     notice, this list of conditions and the following disclaimer.
+ *
  *  2. Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer
  *     in the documentation and/or other materials provided with the
  *     distribution.
+ *
  *  3. Neither the names of the copyright holders nor the names of its
  *     contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) ARISING
- * IN ANY WAY OUT OF THE USE OR INABILITY TO USE THIS SOFTWARE, EVEN
- * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * The views and conclusions contained in the software and documentation
  * are those of the authors and should not be interpreted as representing
@@ -127,7 +131,7 @@ typedef struct nci_tech_option {
     NCI_TECH tech;
 } NciTechOption;
 
-static inline NciSmObject* nci_sm_object(NciSm* sm) /* NULL safe */
+static inline NciSmObject* nci_sm_object_cast(NciSm* sm) /* NULL safe */
     { return G_LIKELY(sm) ? THIS(G_CAST(sm, NciSmObject, sm)) : NULL; }
 
 /*==========================================================================*
@@ -242,7 +246,7 @@ nci_sm_start_transition(
         }
         return TRUE;
     } else if (self->active_transition == transition) {
-        /* Ne need to finish it because it hasn't beenstarted */
+        /* Ne need to finish it because it hasn't been started */
         nci_transition_unref(self->active_transition);
         self->active_transition = NULL;
     }
@@ -322,7 +326,6 @@ nci_sm_stall_internal(
         self->active_state = state;
         nci_state_enter(state, NULL);
     }
-    nci_sm_emit_pending_signals(self);
 }
 
 static
@@ -371,7 +374,6 @@ nci_sm_enter_state_internal(
     if (!self->active_transition) {
         nci_sm_set_next_state(self, state);
     }
-    nci_sm_emit_pending_signals(self);
 
     /* Allow direct nci_sm_switch_to() calls */
     self->entering_state--;
@@ -411,7 +413,7 @@ nci_sm_add_signal_handler(
     NciSmFunc func,
     void* user_data)
 {
-    NciSmObject* self = nci_sm_object(sm);
+    NciSmObject* self = nci_sm_object_cast(sm);
 
     if (G_LIKELY(self) && G_LIKELY(func)) {
         NciSmClosure* closure = (NciSmClosure*)
@@ -488,7 +490,7 @@ nci_sm_parse_config(
     sval = g_key_file_get_string(config, CONFIG_SECTION,
         CONFIG_ENTRY_LA_NFCID1, NULL);
     if (sval) {
-        NciNfcid1* nfcid1 = &nci_sm_object(sm)->default_la_nfcid1;
+        NciNfcid1* nfcid1 = &nci_sm_object_cast(sm)->default_la_nfcid1;
         const gsize len = strlen(sval = g_strstrip(sval));
 
         /* NFCID1 can be 4, 7, or 10 bytes long */
@@ -559,25 +561,18 @@ nci_sm_enter_state(
     NCI_STATE id,
     NciParam* param)
 {
-    NciSmObject* self = nci_sm_object(sm);
+    NciSmObject* self = nci_sm_object_cast(sm);
 
     if (G_LIKELY(self)) {
-        const GPtrArray* states = self->states;
-        const guint index = (guint)id;
+        NciState* state = nci_sm_state_by_id(self, id);
 
-        if (index < states->len) {
-            gpointer state_ptr = states->pdata[index];
-
-            if (state_ptr) {
-                NciState* state = NCI_STATE(state_ptr);
-
-                nci_param_ref(param);
-                nci_sm_enter_state_internal(self, state, param);
-                nci_param_unref(param);
-                return state;
-            }
+        if (state) {
+            nci_param_ref(param);
+            nci_sm_enter_state_internal(self, state, param);
+            nci_param_unref(param);
+            nci_sm_emit_pending_signals(self);
+            return state;
         }
-        GERR("Unknown state %d", id);
     }
     return NULL;
 }
@@ -692,7 +687,7 @@ nci_sm_switch_to(
     NciSm* sm,
     NCI_STATE id)
 {
-    NciSmObject* self = nci_sm_object(sm);
+    NciSmObject* self = nci_sm_object_cast(sm);
 
     if (G_LIKELY(self)) {
         NciState* state = nci_sm_state_by_id(self, id);
@@ -724,10 +719,11 @@ nci_sm_stall(
     NciSm* sm,
     NCI_STALL type)
 {
-    NciSmObject* self = nci_sm_object(sm);
+    NciSmObject* self = nci_sm_object_cast(sm);
 
     if (G_LIKELY(self)) {
         nci_sm_stall_internal(self, type);
+        nci_sm_emit_pending_signals(self);
     }
 }
 
@@ -799,7 +795,7 @@ void
 nci_sm_free(
     NciSm* sm)
 {
-    gutil_object_unref(nci_sm_object(sm));
+    gutil_object_unref(nci_sm_object_cast(sm));
 }
 
 void
@@ -889,7 +885,7 @@ nci_sm_set_la_nfcid1(
             }
         } else {
             /* Reset to default */
-            *out = nci_sm_object(sm)->default_la_nfcid1;
+            *out = nci_sm_object_cast(sm)->default_la_nfcid1;
         }
     }
 }
@@ -901,7 +897,7 @@ nci_sm_handle_ntf(
     guint8 oid,
     const GUtilData* data)
 {
-    NciSmObject* self = nci_sm_object(sm);
+    NciSmObject* self = nci_sm_object_cast(sm);
 
     if (self) {
         if (self->active_transition) {
@@ -918,7 +914,7 @@ nci_sm_add_state(
     NciSm* sm,
     NciState* state)
 {
-    NciSmObject* self = nci_sm_object(sm);
+    NciSmObject* self = nci_sm_object_cast(sm);
 
     if (G_LIKELY(self) && G_LIKELY(state)) {
         GPtrArray* states = self->states;
@@ -939,7 +935,7 @@ nci_sm_add_transition(
     NCI_STATE state,
     NciTransition* transition)
 {
-    NciSmObject* self = nci_sm_object(sm);
+    NciSmObject* self = nci_sm_object_cast(sm);
 
     if (G_LIKELY(self) && G_LIKELY(transition)) {
         NciState* src = nci_sm_state_by_id(self, state);
@@ -975,7 +971,7 @@ nci_sm_add_intf_activated_handler(
     NciSmIntfActivationFunc func,
     void* user_data)
 {
-    NciSmObject* self = nci_sm_object(sm);
+    NciSmObject* self = nci_sm_object_cast(sm);
 
     if (G_LIKELY(self) && G_LIKELY(func)) {
         NciSmIntfActivationClosure* closure = (NciSmIntfActivationClosure*)
@@ -999,7 +995,7 @@ nci_sm_remove_handler(
     gulong id)
 {
     if (G_LIKELY(id)) {
-        NciSmObject* self = nci_sm_object(sm);
+        NciSmObject* self = nci_sm_object_cast(sm);
 
         if (G_LIKELY(self)) {
             g_signal_handler_disconnect(self, id);
@@ -1013,7 +1009,7 @@ nci_sm_remove_handlers(
     gulong* ids,
     guint count)
 {
-    NciSmObject* self = nci_sm_object(sm);
+    NciSmObject* self = nci_sm_object_cast(sm);
 
     if (G_LIKELY(self)) {
         gutil_disconnect_handlers(self, ids, count);
@@ -1036,7 +1032,7 @@ nci_sm_add_weak_pointer(
     NciSm** ptr)
 {
     if (G_LIKELY(ptr)) {
-        NciSmObject* self = nci_sm_object(*ptr);
+        NciSmObject* self = nci_sm_object_cast(*ptr);
 
         if (self) {
             g_object_weak_ref(&self->object, nci_sm_weak_pointer_notify, ptr);
@@ -1049,7 +1045,7 @@ nci_sm_remove_weak_pointer(
     NciSm** ptr)
 {
     if (G_LIKELY(ptr)) {
-        NciSmObject* self = nci_sm_object(*ptr);
+        NciSmObject* self = nci_sm_object_cast(*ptr);
 
         if (self) {
             g_object_weak_unref(&self->object, nci_sm_weak_pointer_notify, ptr);
@@ -1085,7 +1081,7 @@ nci_sm_active_transition(
     NciSm* sm,
     NciTransition* transition)
 {
-    NciSmObject* self = nci_sm_object(sm);
+    NciSmObject* self = nci_sm_object_cast(sm);
 
     return G_LIKELY(self) && G_LIKELY(transition) &&
         self->active_transition == transition;
@@ -1096,7 +1092,7 @@ nci_sm_get_state(
     NciSm* sm,
     NCI_STATE id)
 {
-    NciSmObject* self = nci_sm_object(sm);
+    NciSmObject* self = nci_sm_object_cast(sm);
 
     return G_LIKELY(self) ? nci_sm_state_by_id(self, id) : NULL;
 }
@@ -1150,7 +1146,7 @@ nci_sm_intf_activated(
     NciSm* sm,
     const NciIntfActivationNtf* ntf)
 {
-    NciSmObject* self = nci_sm_object(sm);
+    NciSmObject* self = nci_sm_object_cast(sm);
 
     if (G_LIKELY(self)) {
         NciSar* sar = nci_sm_sar(sm);
@@ -1175,6 +1171,7 @@ nci_sm_handle_conn_credits_ntf(
 
     if (sar) {
         /*
+         * [NFCForum-TS-NCI-1.0]
          * Table 17: Control Messages for Connection Credit Management
          *
          * +=========================================================+
@@ -1204,7 +1201,7 @@ nci_sm_handle_conn_credits_ntf(
             }
         }
         GWARN("Failed to parse CORE_CONN_CREDITS_NTF");
-        nci_sm_stall(sm, NCI_STALL_ERROR);
+        nci_sm_error(sm);
     }
 }
 
@@ -1214,6 +1211,7 @@ nci_sm_handle_rf_deactivate_ntf(
     const GUtilData* payload)
 {
     /*
+     * [NFCForum-TS-NCI-1.0]
      * Table 62: Control Messages for RF Interface Deactivation
      *
      * RF_DEACTIVATE_NTF
@@ -1243,7 +1241,7 @@ nci_sm_handle_rf_deactivate_ntf(
         }
     }
     GWARN("Failed to parse RF_DEACTIVATE_NTF");
-    nci_sm_stall(sm, NCI_STALL_ERROR);
+    nci_sm_error(sm);
 }
 
 /*==========================================================================*
