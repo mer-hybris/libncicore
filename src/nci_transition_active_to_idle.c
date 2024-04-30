@@ -59,6 +59,7 @@ typedef NciTransitionClass NciTransitionActiveToIdleClass;
 
 #define THIS_TYPE nci_transition_active_to_idle_get_type()
 #define PARENT_CLASS nci_transition_active_to_idle_parent_class
+#define PARENT_CLASS_CALL(method) (NCI_TRANSITION_CLASS(PARENT_CLASS)->method)
 
 GType THIS_TYPE NCI_INTERNAL;
 G_DEFINE_TYPE(NciTransitionActiveToIdle, nci_transition_active_to_idle,
@@ -122,6 +123,16 @@ nci_transition_active_to_idle_new(
  *==========================================================================*/
 
 static
+gboolean
+nci_transition_active_to_idle_start(
+    NciTransition* self)
+{
+    return PARENT_CLASS_CALL(start)(self) &&
+        nci_transition_deactivate_to_idle(self,
+        nci_transition_active_to_idle_rsp);
+}
+
+static
 void
 nci_transition_active_to_idle_handle_ntf(
     NciTransition* self,
@@ -138,16 +149,7 @@ nci_transition_active_to_idle_handle_ntf(
         }
         break;
     }
-    NCI_TRANSITION_CLASS(PARENT_CLASS)->handle_ntf(self, gid, oid, payload);
-}
-
-static
-gboolean
-nci_transition_active_to_idle_start(
-    NciTransition* self)
-{
-    return nci_transition_deactivate_to_idle(self,
-        nci_transition_active_to_idle_rsp);
+    PARENT_CLASS_CALL(handle_ntf)(self, gid, oid, payload);
 }
 
 /*==========================================================================*

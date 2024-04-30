@@ -42,8 +42,11 @@
 #include "nci_sm.h"
 #include "nci_log.h"
 
+#include <gutil_misc.h>
+
 struct nci_transition_priv {
     NciSm* sm; /* Weak reference */
+    guint timeout_id;
 };
 
 #define PARENT_TYPE G_TYPE_OBJECT
@@ -54,6 +57,24 @@ struct nci_transition_priv {
         NciTransitionClass)
 
 G_DEFINE_ABSTRACT_TYPE(NciTransition, nci_transition, G_TYPE_OBJECT)
+
+/*==========================================================================*
+ * Implementation
+ *==========================================================================*/
+
+static
+gboolean
+nci_transition_timeout(
+    gpointer transition)
+{
+    NciTransition* self = THIS(transition);
+    NciTransitionPriv* priv = self->priv;
+
+    priv->timeout_id = 0;
+    GWARN("Transition to %s timed out", self->dest->name);
+    nci_sm_error(priv->sm);
+    return G_SOURCE_REMOVE;
+}
 
 /*==========================================================================*
  * Interface
@@ -119,7 +140,11 @@ nci_transition_finish(
     NciParam* param)
 {
     if (G_LIKELY(self)) {
-        nci_sm_enter_state(self->priv->sm, self->dest->state, param);
+        NciTransitionPriv* priv = self->priv;
+
+        if (nci_sm_active_transition(priv->sm, self)) {
+            nci_sm_enter_state(priv->sm, self->dest->state, param);
+        }
     }
 }
 
@@ -127,12 +152,7 @@ gboolean
 nci_transition_start(
     NciTransition* self)
 {
-    if (G_LIKELY(self)) {
-        if (GET_THIS_CLASS(self)->start(self)) {
-            return TRUE;
-        }
-    }
-    return FALSE;
+    return G_LIKELY(self) && GET_THIS_CLASS(self)->start(self);
 }
 
 void
@@ -182,6 +202,7 @@ nci_transition_send_command_static(
 }
 
 /*
+ * [NFCForum-TS-NCI-1.0]
  * Table 62: Control Messages for RF Interface Deactivation
  *
  * RF_DEACTIVATE_CMD
@@ -225,7 +246,22 @@ gboolean
 nci_transition_default_start(
     NciTransition* self)
 {
-    GERR("Non-startable transition!");
+    NciTransitionPriv* priv = self->priv;
+    NciSm* sm = priv->sm;
+
+    /* Start (or restart) the timeout */
+    gutil_source_clear(&priv->timeout_id);
+    if (sm) {
+        NciSmIo* io = sm->io;
+        const guint timeout = io->timeout(io);
+
+        if (timeout) {
+            /* Give the transition twice as much time */
+            priv->timeout_id = g_timeout_add(2 * timeout,
+                nci_transition_timeout, self);
+        }
+        return TRUE;
+    }
     return FALSE;
 }
 
@@ -234,6 +270,9 @@ void
 nci_transition_default_finished(
     NciTransition* self)
 {
+    NciTransitionPriv* priv = self->priv;
+
+    gutil_source_clear(&priv->timeout_id);
 }
 
 static
@@ -268,6 +307,7 @@ nci_transition_finalize(
     NciTransition* self = THIS(object);
     NciTransitionPriv* priv = self->priv;
 
+    gutil_source_remove(priv->timeout_id);
     nci_state_unref(self->dest);
     nci_sm_remove_weak_pointer(&priv->sm);
     G_OBJECT_CLASS(PARENT_CLASS)->finalize(object);

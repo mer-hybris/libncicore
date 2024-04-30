@@ -47,6 +47,7 @@ typedef struct nci_sm_io NciSmIo;
 
 struct nci_sm_io {
     NciSar* sar;
+    guint (*timeout)(NciSmIo* io); /* milliseconds */
     gboolean (*send)(NciSmIo* io, guint8 gid, guint8 oid,
         GBytes* payload, NciSmResponseFunc resp, gpointer user_data);
     void (*cancel)(NciSmIo* io);

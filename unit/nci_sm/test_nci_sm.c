@@ -1,33 +1,40 @@
 /*
- * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
+ * Copyright (C) 2019-2024 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2020 Jolla Ltd.
  *
- * You may use this file under the terms of BSD license as follows:
+ * You may use this file under the terms of the BSD license as follows:
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  *
- *   1. Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *   3. Neither the names of the copyright holders nor the names of its
- *      contributors may be used to endorse or promote products derived
- *      from this software without specific prior written permission.
+ *  1. Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
- * THE POSSIBILITY OF SUCH DAMAGE.
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer
+ *     in the documentation and/or other materials provided with the
+ *     distribution.
+ *
+ *  3. Neither the names of the copyright holders nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * any official policies, either expressed or implied.
  */
 
 #include "test_common.h"
@@ -58,8 +65,47 @@ test_unreached_cb(
     NciSm* sm,
     void* user_data)
 {
-    g_assert(FALSE);
+    g_assert_not_reached();
 }
+
+/*==========================================================================*
+ * Test I/O
+ *==========================================================================*/
+
+static
+guint
+test_io_timeout(
+    NciSmIo* io)
+{
+    return 0;
+}
+
+static
+gboolean
+test_io_send(
+    NciSmIo* io,
+    guint8 gid,
+    guint8 oid,
+    GBytes* payload,
+    NciSmResponseFunc resp,
+    gpointer user_data)
+{
+    return FALSE;
+}
+
+static
+void
+test_io_cancel(
+    NciSmIo* io)
+{
+}
+
+static NciSmIo test_io = {
+    NULL,
+    test_io_timeout,
+    test_io_send,
+    test_io_cancel
+};
 
 /*==========================================================================*
  * Test state
@@ -164,9 +210,11 @@ test_transition_start(
     TestTransition* self = TEST_TRANSITION(transition);
 
     if (self->fail_start) {
-        return NCI_TRANSITION_CLASS(test_transition_parent_class)->
-            start(transition);
+        return FALSE;
     } else {
+        /* Base implementation doesn't fail */
+        g_assert(NCI_TRANSITION_CLASS(test_transition_parent_class)->
+            start(transition));
         self->started++;
         nci_transition_finish(transition, NULL);
         return TRUE;
@@ -225,7 +273,7 @@ void
 test_null(
     void)
 {
-    NciSm* sm = nci_sm_new(NULL);
+    NciSm* sm = nci_sm_new(&test_io);
     NciSm* null = NULL;
     gulong zero = 0;
 
@@ -280,7 +328,7 @@ void
 test_state(
     void)
 {
-    NciSm* sm = nci_sm_new(NULL);
+    NciSm* sm = nci_sm_new(&test_io);
     NciState* state = NCI_STATE(test_state_new(sm, TEST_STATE, "TEST"));
     NciState* null = NULL;
 
@@ -309,7 +357,7 @@ void
 test_transition(
     void)
 {
-    NciSm* sm = nci_sm_new(NULL);
+    NciSm* sm = nci_sm_new(&test_io);
     NciTransition* null = NULL;
     NciTransition* reset = nci_transition_reset_new(sm);
     NciTransition* idle_to_discovery =
@@ -368,7 +416,7 @@ void
 test_protocol(
     void)
 {
-    NciSm* sm = nci_sm_new(NULL);
+    NciSm* sm = nci_sm_new(&test_io);
     NciSm* null = NULL;
 
     g_assert(!nci_sm_supports_protocol(null, NCI_PROTOCOL_T1T));
@@ -413,7 +461,7 @@ void
 test_weak_ptr(
     void)
 {
-    NciSm* sm = nci_sm_new(NULL);
+    NciSm* sm = nci_sm_new(&test_io);
     NciSm* ptr1 = sm;
     NciSm* ptr2 = sm;
 
@@ -440,7 +488,7 @@ test_add_state_cb(
 {
     int* count = user_data;
 
-    g_assert(sm->last_state->state == TEST_STATE);
+    g_assert_cmpint(sm->last_state->state, == ,TEST_STATE);
     (*count)++;
 }
 
@@ -449,7 +497,7 @@ void
 test_add_state(
     void)
 {
-    NciSm* sm = nci_sm_new(NULL);
+    NciSm* sm = nci_sm_new(&test_io);
     TestState* test = test_state_new(sm, TEST_STATE, "TEST");
     NciState* state = NCI_STATE(test);
     int count = 0;
@@ -461,27 +509,27 @@ test_add_state(
 
     g_assert(nci_sm_get_state(sm, TEST_STATE) == state);
     g_assert(nci_state_sm(state) == sm);
-    g_assert(!count);
+    g_assert_cmpint(count, == ,0);
 
     /* Switch to our test state */
     g_assert(nci_sm_enter_state(sm, TEST_STATE, NULL));
-    g_assert(test->entered == 1);
-    g_assert(!test->reentered);
+    g_assert_cmpint(test->entered, == ,1);
+    g_assert_cmpint(test->reentered, == ,0);
     g_assert(state->active);
-    g_assert(count == 1);
+    g_assert_cmpint(count, == ,1);
 
     g_assert(nci_sm_enter_state(sm, TEST_STATE, NULL));
-    g_assert(test->entered == 1);
-    g_assert(test->reentered == 1);
+    g_assert_cmpint(test->entered, == ,1);
+    g_assert_cmpint(test->reentered, == ,1);
     g_assert(state->active);
-    g_assert(count == 1);
+    g_assert_cmpint(count, == ,1);
 
     nci_sm_remove_handlers(sm, &id, 1);
     g_assert(!id);
 
     nci_sm_free(sm);
     g_assert(!state->active);
-    g_assert(test->left == 1);
+    g_assert_cmpint(test->left, == ,1);
 
     /* State is no longer associated with the state machine */
     g_assert(!nci_state_sm(state));
@@ -499,7 +547,7 @@ test_last_state_cb(
     void* user_data)
 {
     g_assert(sm == user_data);
-    g_assert(sm->last_state->state == NCI_STATE_STOP);
+    g_assert_cmpint(sm->last_state->state, == ,NCI_STATE_STOP);
     nci_sm_free(sm);
 }
 
@@ -508,7 +556,7 @@ void
 test_last_state(
     void)
 {
-    NciSm* sm = nci_sm_new(NULL);
+    NciSm* sm = nci_sm_new(&test_io);
     gulong id = nci_sm_add_last_state_handler(sm, test_unreached_cb, sm);
 
     /* Remove the dummy handler and add the real one */
@@ -518,7 +566,7 @@ test_last_state(
     nci_sm_add_weak_pointer(&sm);
 
     /* Switching to the same state has no effect */
-    g_assert(sm->last_state->state == NCI_STATE_INIT);
+    g_assert_cmpint(sm->last_state->state, == ,NCI_STATE_INIT);
     g_assert(nci_sm_enter_state(sm, NCI_STATE_INIT, NULL));
     g_assert(sm);
 
@@ -539,7 +587,7 @@ test_next_state_cb(
     void* user_data)
 {
     g_assert(sm == user_data);
-    g_assert(sm->next_state->state == NCI_STATE_STOP);
+    g_assert_cmpint(sm->next_state->state, == ,NCI_STATE_STOP);
     nci_sm_free(sm);
 }
 
@@ -548,7 +596,7 @@ void
 test_next_state(
     void)
 {
-    NciSm* sm = nci_sm_new(NULL);
+    NciSm* sm = nci_sm_new(&test_io);
     gulong id = nci_sm_add_next_state_handler(sm, test_unreached_cb, sm);
 
     /* Remove the dummy handler and add the real one */
@@ -558,7 +606,7 @@ test_next_state(
     nci_sm_add_weak_pointer(&sm);
 
     /* Switching to the same state has no effect */
-    g_assert(sm->next_state->state == NCI_STATE_INIT);
+    g_assert_cmpint(sm->next_state->state, == ,NCI_STATE_INIT);
     g_assert(nci_sm_enter_state(sm, NCI_STATE_INIT, NULL));
     g_assert(sm);
 
@@ -577,7 +625,7 @@ void
 test_transitions(
     void)
 {
-    NciSm* sm = nci_sm_new(NULL);
+    NciSm* sm = nci_sm_new(&test_io);
     TestState* test_state = test_state_new(sm, TEST_STATE, "TEST");
     TestTransition* test_transition;
     int count = 0;
@@ -591,36 +639,36 @@ test_transitions(
 
     /* Simulate IDLE -> TEST switch failure */
     test_transition->fail_start = TRUE;
-    g_assert(sm->last_state->state == NCI_STATE_INIT);
+    g_assert_cmpint(sm->last_state->state, == ,NCI_STATE_INIT);
     g_assert(nci_sm_enter_state(sm, NCI_RFST_IDLE, NULL));
-    g_assert(sm->last_state->state == NCI_RFST_IDLE);
-    g_assert(count == 1);
+    g_assert_cmpint(sm->last_state->state, == ,NCI_RFST_IDLE);
+    g_assert_cmpint(count, == ,1);
     count = 0;
 
     nci_sm_switch_to(sm, TEST_STATE);
-    g_assert(sm->last_state->state == NCI_STATE_ERROR);
-    g_assert(count == 1);
+    g_assert_cmpint(sm->last_state->state, == ,NCI_STATE_ERROR);
+    g_assert_cmpint(count, == ,1);
     count = 0;
 
     /* And then a success */
     test_transition->fail_start = FALSE;
     nci_sm_switch_to(sm, NCI_STATE_INIT);
-    g_assert(sm->last_state->state == NCI_STATE_INIT);
-    g_assert(count == 1);
+    g_assert_cmpint(sm->last_state->state, == ,NCI_STATE_INIT);
+    g_assert_cmpint(count, == ,1);
     count = 0;
 
     g_assert(nci_sm_enter_state(sm, NCI_RFST_IDLE, NULL));
-    g_assert(sm->last_state->state == NCI_RFST_IDLE);
-    g_assert(count == 1);
+    g_assert_cmpint(sm->last_state->state, == ,NCI_RFST_IDLE);
+    g_assert_cmpint(count, == ,1);
     count = 0;
 
     g_assert(!test_transition->finished);
     g_assert(!test_transition->started);
     nci_sm_switch_to(sm, TEST_STATE);
-    g_assert(sm->last_state->state == TEST_STATE);
-    g_assert(test_transition->started == 1);
-    g_assert(test_transition->finished == 1);
-    g_assert(count == 1);
+    g_assert_cmpint(sm->last_state->state, == ,TEST_STATE);
+    g_assert_cmpint(test_transition->started, == ,1);
+    g_assert_cmpint(test_transition->finished, == ,1);
+    g_assert_cmpint(count, == ,1);
     count = 0;
 
     nci_sm_remove_handler(sm, id);

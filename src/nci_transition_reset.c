@@ -37,7 +37,6 @@
  * any official policies, either expressed or implied.
  */
 
-#include "nci_transition.h"
 #include "nci_transition_impl.h"
 #include "nci_util_p.h"
 #include "nci_sar.h"
@@ -47,9 +46,12 @@
 typedef NciTransition NciTransitionReset;
 typedef NciTransitionClass NciTransitionResetClass;
 
-G_DEFINE_TYPE(NciTransitionReset, nci_transition_reset, NCI_TYPE_TRANSITION)
-#define THIS_TYPE (nci_transition_reset_get_type())
+#define THIS_TYPE nci_transition_reset_get_type()
 #define PARENT_CLASS (nci_transition_reset_parent_class)
+#define PARENT_CLASS_CALL(method) (NCI_TRANSITION_CLASS(PARENT_CLASS)->method)
+
+GType THIS_TYPE NCI_INTERNAL;
+G_DEFINE_TYPE(NciTransitionReset, nci_transition_reset, NCI_TYPE_TRANSITION)
 
 /*
  * The reset sequence goes like this:
@@ -591,7 +593,7 @@ nci_transition_reset_handle_ntf(
         }
         break;
     }
-    NCI_TRANSITION_CLASS(PARENT_CLASS)->handle_ntf(self, gid, oid, payload);
+    PARENT_CLASS_CALL(handle_ntf)(self, gid, oid, payload);
 }
 
 static
@@ -601,7 +603,7 @@ nci_transition_reset_start(
 {
     NciSm* sm = nci_transition_sm(self);
 
-    if (sm) {
+    if (sm && PARENT_CLASS_CALL(start)(self)) {
         /*
          * [NFCForum-TS-NCI-1.0]
          * Table 5: Control Messages to Reset the NFCC
