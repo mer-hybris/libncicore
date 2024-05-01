@@ -366,7 +366,10 @@ test_transition(
         nci_transition_deactivate_to_discovery_new(sm);
     NciTransition* deactivate_to_idle =
         nci_transition_deactivate_to_idle_new(sm);
-    NciTransition* active_to_idle = nci_transition_active_to_idle_new(sm);
+    NciTransition* listen_active_to_idle =
+        nci_transition_listen_active_to_idle_new(sm);
+    NciTransition* poll_active_to_idle =
+        nci_transition_poll_active_to_idle_new(sm);
 
     g_assert(!nci_param_w4_all_discoveries_new(NULL));
 
@@ -374,7 +377,8 @@ test_transition(
     g_assert(!nci_transition_idle_to_discovery_new(NULL));
     g_assert(!nci_transition_deactivate_to_discovery_new(NULL));
     g_assert(!nci_transition_deactivate_to_idle_new(NULL));
-    g_assert(!nci_transition_active_to_idle_new(NULL));
+    g_assert(!nci_transition_listen_active_to_idle_new(NULL));
+    g_assert(!nci_transition_poll_active_to_idle_new(NULL));
     g_assert(!nci_transition_sm(null));
     g_assert(!nci_transition_ref(null));
     nci_transition_unref(null);
@@ -398,13 +402,15 @@ test_transition(
     g_assert(!nci_transition_start(idle_to_discovery));
     g_assert(!nci_transition_start(deactivate_to_discovery));
     g_assert(!nci_transition_start(deactivate_to_idle));
-    g_assert(!nci_transition_start(active_to_idle));
+    g_assert(!nci_transition_start(listen_active_to_idle));
+    g_assert(!nci_transition_start(poll_active_to_idle));
 
     nci_transition_unref(reset);
     nci_transition_unref(idle_to_discovery);
     nci_transition_unref(deactivate_to_discovery);
     nci_transition_unref(deactivate_to_idle);
-    nci_transition_unref(active_to_idle);
+    nci_transition_unref(listen_active_to_idle);
+    nci_transition_unref(poll_active_to_idle);
 }
 
 /*==========================================================================*
