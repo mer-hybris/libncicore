@@ -7,7 +7,7 @@ License: BSD
 URL: https://github.com/mer-hybris/libncicore
 Source: %{name}-%{version}.tar.bz2
 
-%define libglibutil_version 1.0.71
+%define libglibutil_version 1.0.79
 %define glib_version 2.32
 
 BuildRequires: pkgconfig

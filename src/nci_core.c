@@ -149,16 +149,13 @@ void
 nci_core_cancel_command(
     NciCoreObject* self)
 {
+    gutil_source_clear(&self->cmd_timeout_id);
     if (self->cmd_id) {
         gpointer user_data = self->rsp_data;
 
         nci_sar_cancel(self->io.sar, self->cmd_id);
         self->cmd_id = 0;
         self->rsp_data = NULL;
-        if (self->cmd_timeout_id) {
-            g_source_remove(self->cmd_timeout_id);
-            self->cmd_timeout_id = 0;
-        }
         if (self->rsp_handler) {
             NciSmResponseFunc handler = self->rsp_handler;
             GUtilData payload;
@@ -635,11 +632,7 @@ nci_core_sar_handle_response(
             gpointer handler_data = self->rsp_data;
             GUtilData payload;
 
-            if (self->cmd_timeout_id) {
-                g_source_remove(self->cmd_timeout_id);
-                self->cmd_timeout_id = 0;
-            }
-
+            gutil_source_clear(&self->cmd_timeout_id);
             self->cmd_id = 0;
             self->rsp_handler = NULL;
             self->rsp_data = NULL;
@@ -730,6 +723,7 @@ nci_core_free(
         NciSm* sm = self->sm;
 
         sm->io = NULL;
+        gutil_source_clear(&self->cmd_timeout_id);
         nci_sar_free(self->io.sar);
         self->io.sar = NULL;
         g_object_unref(self);
@@ -1004,9 +998,7 @@ nci_core_object_finalize(
 {
     NciCoreObject* self = THIS(object);
 
-    if (self->cmd_timeout_id) {
-        g_source_remove(self->cmd_timeout_id);
-    }
+    gutil_source_remove(self->cmd_timeout_id);
     nci_sm_remove_all_handlers(self->sm, self->event_ids);
     nci_sm_free(self->sm);
     nci_sar_free(self->io.sar);
