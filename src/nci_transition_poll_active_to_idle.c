@@ -45,7 +45,6 @@
  *
  * [NFCForum-TS-NCI-1.0]
  * 5.2.5 State RFST_POLL_ACTIVE
- * 5.2.6 State RFST_LISTEN_ACTIVE
  *
  * ...
  * If the DH sends RF_DEACTIVATE_CMD (Idle Mode), the NFCC SHALL send
@@ -54,15 +53,16 @@
  *
  *==========================================================================*/
 
-typedef NciTransition NciTransitionActiveToIdle;
-typedef NciTransitionClass NciTransitionActiveToIdleClass;
+typedef NciTransition NciTransitionPollActiveToIdle;
+typedef NciTransitionClass NciTransitionPollActiveToIdleClass;
 
-#define THIS_TYPE nci_transition_active_to_idle_get_type()
-#define PARENT_CLASS nci_transition_active_to_idle_parent_class
+#define THIS_TYPE nci_transition_poll_active_to_idle_get_type()
+#define PARENT_CLASS nci_transition_poll_active_to_idle_parent_class
+#define PARENT_CLASS_CALL(method) (NCI_TRANSITION_CLASS(PARENT_CLASS)->method)
 
 GType THIS_TYPE NCI_INTERNAL;
-G_DEFINE_TYPE(NciTransitionActiveToIdle, nci_transition_active_to_idle,
-    NCI_TYPE_TRANSITION)
+G_DEFINE_TYPE(NciTransitionPollActiveToIdle,
+    nci_transition_poll_active_to_idle, NCI_TYPE_TRANSITION)
 
 /*==========================================================================*
  * Implementation
@@ -70,7 +70,7 @@ G_DEFINE_TYPE(NciTransitionActiveToIdle, nci_transition_active_to_idle,
 
 static
 void
-nci_transition_active_to_idle_rsp(
+nci_transition_poll_active_to_idle_rsp(
     NCI_REQUEST_STATUS status,
     const GUtilData* payload,
     NciTransition* self)
@@ -103,7 +103,7 @@ nci_transition_active_to_idle_rsp(
  *==========================================================================*/
 
 NciTransition*
-nci_transition_active_to_idle_new(
+nci_transition_poll_active_to_idle_new(
     NciSm* sm)
 {
     NciState* dest = nci_sm_get_state(sm, NCI_RFST_IDLE);
@@ -122,8 +122,18 @@ nci_transition_active_to_idle_new(
  *==========================================================================*/
 
 static
+gboolean
+nci_transition_poll_active_to_idle_start(
+    NciTransition* self)
+{
+    return PARENT_CLASS_CALL(start)(self) &&
+        nci_transition_deactivate_to_idle(self,
+        nci_transition_poll_active_to_idle_rsp);
+}
+
+static
 void
-nci_transition_active_to_idle_handle_ntf(
+nci_transition_poll_active_to_idle_handle_ntf(
     NciTransition* self,
     guint8 gid,
     guint8 oid,
@@ -138,16 +148,7 @@ nci_transition_active_to_idle_handle_ntf(
         }
         break;
     }
-    NCI_TRANSITION_CLASS(PARENT_CLASS)->handle_ntf(self, gid, oid, payload);
-}
-
-static
-gboolean
-nci_transition_active_to_idle_start(
-    NciTransition* self)
-{
-    return nci_transition_deactivate_to_idle(self,
-        nci_transition_active_to_idle_rsp);
+    PARENT_CLASS_CALL(handle_ntf)(self, gid, oid, payload);
 }
 
 /*==========================================================================*
@@ -156,18 +157,18 @@ nci_transition_active_to_idle_start(
 
 static
 void
-nci_transition_active_to_idle_init(
-    NciTransitionActiveToIdle* self)
+nci_transition_poll_active_to_idle_init(
+    NciTransitionPollActiveToIdle* self)
 {
 }
 
 static
 void
-nci_transition_active_to_idle_class_init(
-    NciTransitionActiveToIdleClass* klass)
+nci_transition_poll_active_to_idle_class_init(
+    NciTransitionPollActiveToIdleClass* klass)
 {
-    klass->start = nci_transition_active_to_idle_start;
-    klass->handle_ntf = nci_transition_active_to_idle_handle_ntf;
+    klass->start = nci_transition_poll_active_to_idle_start;
+    klass->handle_ntf = nci_transition_poll_active_to_idle_handle_ntf;
 }
 
 /*

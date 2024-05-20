@@ -551,15 +551,11 @@ G_STATIC_ASSERT(NCI_CORE_PARAM_COUNT == G_N_ELEMENTS(nci_core_params));
  *==========================================================================*/
 
 static
-void
-nci_core_io_cancel(
+guint
+nci_core_io_timeout(
     NciSmIo* io)
 {
-    NciCoreObject* self = nci_core_object_cast_sm_io(io);
-
-    self->rsp_handler = NULL;
-    self->rsp_data = NULL;
-    nci_core_cancel_command(self);
+    return nci_core_object_cast_sm_io(io)->core.cmd_timeout;
 }
 
 static
@@ -600,6 +596,18 @@ nci_core_io_send(
         self->rsp_data = NULL;
         return FALSE;
     }
+}
+
+static
+void
+nci_core_io_cancel(
+    NciSmIo* io)
+{
+    NciCoreObject* self = nci_core_object_cast_sm_io(io);
+
+    self->rsp_handler = NULL;
+    self->rsp_data = NULL;
+    nci_core_cancel_command(self);
 }
 
 /*==========================================================================*
@@ -987,6 +995,7 @@ nci_core_object_init(
 
     core->cmd_timeout = DEFAULT_TIMEOUT;
     self->sar_client.fn = &sar_client_functions;
+    self->io.timeout = nci_core_io_timeout;
     self->io.send = nci_core_io_send;
     self->io.cancel = nci_core_io_cancel;
 }

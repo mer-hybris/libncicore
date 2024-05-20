@@ -762,14 +762,7 @@ nci_sm_new(
      */
     self->reset_transition = nci_transition_reset_new(sm);
 
-    /* Set up the transitions */
-
     /* Reusable deactivate_to_idle */
-    deactivate_to_idle = nci_transition_active_to_idle_new(sm);
-    nci_sm_add_transition(sm, NCI_RFST_LISTEN_ACTIVE, deactivate_to_idle);
-    nci_sm_add_transition(sm, NCI_RFST_POLL_ACTIVE, deactivate_to_idle);
-    nci_transition_unref(deactivate_to_idle);
-
     deactivate_to_idle = nci_transition_deactivate_to_idle_new(sm);
     nci_sm_add_transition(sm, NCI_RFST_DISCOVERY, deactivate_to_idle);
     nci_sm_add_transition(sm, NCI_RFST_W4_ALL_DISCOVERIES, deactivate_to_idle);
@@ -786,6 +779,10 @@ nci_sm_new(
     /* And these are not reusable */
     nci_sm_add_new_transition(sm, NCI_RFST_IDLE,
         nci_transition_idle_to_discovery_new);
+    nci_sm_add_new_transition(sm, NCI_RFST_POLL_ACTIVE,
+        nci_transition_poll_active_to_idle_new);
+    nci_sm_add_new_transition(sm, NCI_RFST_LISTEN_ACTIVE,
+        nci_transition_listen_active_to_idle_new);
 
     nci_sm_load_config(sm);
     return sm;
@@ -1210,37 +1207,22 @@ nci_sm_handle_rf_deactivate_ntf(
     NciSm* sm,
     const GUtilData* payload)
 {
-    /*
-     * [NFCForum-TS-NCI-1.0]
-     * Table 62: Control Messages for RF Interface Deactivation
-     *
-     * RF_DEACTIVATE_NTF
-     *
-     * +=========================================================+
-     * | Offset | Size | Description                             |
-     * +=========================================================+
-     * | 0      | 1    | Deactivation Type                       |
-     * | 1      | 1    | Deactivation Reason                     |
-     * +=========================================================+
-     */
-    if (payload->size >= 2) {
-        const guint8 type = payload->bytes[0];
+    NciRfDeactivateNtf ntf;
 
-        switch (type) {
+    if (nci_parse_rf_deactivate_ntf(&ntf, payload)) {
+        switch (ntf.type) {
         case NCI_DEACTIVATE_TYPE_IDLE:
-            GDEBUG("RF_DEACTIVATE_NTF Idle (%u)", payload->bytes[1]);
             nci_sm_enter_state(sm, NCI_RFST_IDLE, NULL);
             return;
         case NCI_DEACTIVATE_TYPE_DISCOVERY:
-            GDEBUG("RF_DEACTIVATE_NTF Discovery (%u)", payload->bytes[1]);
             nci_sm_enter_state(sm, NCI_RFST_DISCOVERY, NULL);
             return;
-        default:
-            GDEBUG("RF_DEACTIVATE_NTF %u (%u)", type, payload->bytes[1]);
+        case NCI_DEACTIVATE_TYPE_SLEEP:
+        case NCI_DEACTIVATE_TYPE_SLEEP_AF:
+            /* These have to be handled by the state or transition */
             break;
         }
     }
-    GWARN("Failed to parse RF_DEACTIVATE_NTF");
     nci_sm_error(sm);
 }
 

@@ -67,6 +67,7 @@ typedef NciTransitionClass NciTransitionDeactivateToDiscoveryClass;
 
 #define THIS_TYPE nci_transition_deactivate_to_discovery_get_type()
 #define PARENT_CLASS nci_transition_deactivate_to_discovery_parent_class
+#define PARENT_CLASS_CALL(method) (NCI_TRANSITION_CLASS(PARENT_CLASS)->method)
 
 GType THIS_TYPE NCI_INTERNAL;
 G_DEFINE_TYPE(NciTransitionDeactivateToDiscovery,
@@ -163,7 +164,8 @@ gboolean
 nci_transition_deactivate_to_discovery_start(
     NciTransition* self)
 {
-    return nci_transition_deactivate_to_discovery(self,
+    return PARENT_CLASS_CALL(start)(self) &&
+        nci_transition_deactivate_to_discovery(self,
         nci_transition_deactivate_to_discovery_rsp);
 }
 
@@ -184,7 +186,7 @@ nci_transition_deactivate_to_discovery_handle_ntf(
         }
         break;
     }
-    NCI_TRANSITION_CLASS(PARENT_CLASS)->handle_ntf(self, gid, oid, payload);
+    PARENT_CLASS_CALL(handle_ntf)(self, gid, oid, payload);
 }
 
 /*==========================================================================*

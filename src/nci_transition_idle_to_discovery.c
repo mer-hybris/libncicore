@@ -123,6 +123,7 @@ typedef NciTransitionClass NciTransitionIdleToDiscoveryClass;
 
 #define THIS_TYPE nci_transition_idle_to_discovery_get_type()
 #define PARENT_CLASS nci_transition_idle_to_discovery_parent_class
+#define PARENT_CLASS_CALL(method) (NCI_TRANSITION_CLASS(PARENT_CLASS)->method)
 
 GType THIS_TYPE NCI_INTERNAL;
 G_DEFINE_TYPE(NciTransitionIdleToDiscovery, nci_transition_idle_to_discovery,
@@ -1374,10 +1375,13 @@ nci_transition_idle_to_discovery_start(
         NCI_CONFIG_LF_PROTOCOL_TYPE
     };
 
-    GDEBUG("%c CORE_GET_CONFIG_CMD", DIR_OUT);
-    return nci_transition_send_command_static(self,
-        NCI_GID_CORE, NCI_OID_CORE_GET_CONFIG, ARRAY_AND_SIZE(cmd),
-        nci_transition_idle_to_discovery_get_config_rsp);
+    if (PARENT_CLASS_CALL(start)(self)) {
+        GDEBUG("%c CORE_GET_CONFIG_CMD", DIR_OUT);
+        return nci_transition_send_command_static(self,
+            NCI_GID_CORE, NCI_OID_CORE_GET_CONFIG, ARRAY_AND_SIZE(cmd),
+            nci_transition_idle_to_discovery_get_config_rsp);
+    }
+    return FALSE;
 }
 
 /*==========================================================================*
