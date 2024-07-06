@@ -2,17 +2,17 @@ Source: libncicore
 Section: libs
 Priority: optional
 Maintainer: Slava Monich <slava@monich.com>
-Build-Depends: debhelper (>= 8.1.3), libglib2.0-dev (>= 2.32), libglibutil-dev (>= 1.0.71)
+Build-Depends: debhelper (>= 8.1.3), libglib2.0-dev (>= 2.32), libglibutil-dev (>= 1.0.79)
 Standards-Version: 3.8.4
 
 Package: libncicore
 Section: libs
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libglibutil (>= 1.0.71)
+Depends: ${shlibs:Depends}, ${misc:Depends}, libglibutil (>= 1.0.79)
 Description: NFC NCI implementation
 
 Package: libncicore-dev
 Section: libdevel
 Architecture: any
-Depends: libncicore (= ${binary:Version}), ${misc:Depends}, libglibutil-dev (>= 1.0.71)
+Depends: libncicore (= ${binary:Version}), ${misc:Depends}, libglibutil-dev (>= 1.0.79)
 Description: Development files for libncicore
