@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018-2024 Slava Monich <slava@monich.com>
+ * Copyright (C) 2018-2025 Slava Monich <slava@monich.com>
  * Copyright (C) 2018-2021 Jolla Ltd.
  *
  * You may use this file under the terms of the BSD license as follows:
@@ -124,7 +124,7 @@ static const NciCoreParamValue NCI_DEFAULT_LLC_VERSION = { .uint8 = 0x11 };
 static const NciCoreParamValue NCI_DEFAULT_LLC_WKS = { .uint16 = 0x0003 };
 
 typedef struct nci_core_param_desc {
-    NciCoreParamValue* (*get)(NciCoreObject*);
+    void (*get)(NciCoreObject*, NciCoreParamValue*);
     void (*set)(NciCoreObject*, const NciCoreParamValue*);
     void (*reset)(NciCoreObject*);
     gboolean (*equal)(const NciCoreParamValue*, const NciCoreParamValue*);
@@ -364,28 +364,6 @@ nci_core_restart_internal(
  *==========================================================================*/
 
 static
-NciCoreParamValue*
-nci_core_param_uint8_new(
-    guint8 value)
-{
-    NciCoreParamValue* v = g_new0(NciCoreParamValue, 1);
-
-    v->uint8 = value;
-    return v;
-}
-
-static
-NciCoreParamValue*
-nci_core_param_uint16_new(
-    guint16 value)
-{
-    NciCoreParamValue* v = g_new0(NciCoreParamValue, 1);
-
-    v->uint16 = value;
-    return v;
-}
-
-static
 gboolean
 nci_core_param_equal_uint8(
     const NciCoreParamValue* v1,
@@ -404,20 +382,6 @@ nci_core_param_equal_uint16(
 }
 
 static
-NciCoreParamValue*
-nci_core_param_nfcid_new(
-    const NciNfcid1* nfcid)
-{
-    NciCoreParamValue* v = g_new0(NciCoreParamValue, 1);
-
-    if (nfcid->len <= sizeof(nfcid->bytes)) {
-        v->nfcid1.len = nfcid->len;
-        memcpy(v->nfcid1.bytes, nfcid->bytes, nfcid->len);
-    }
-    return v;
-}
-
-static
 gboolean
 nci_core_param_equal_nfcid(
     const NciCoreParamValue* v1,
@@ -427,11 +391,12 @@ nci_core_param_equal_nfcid(
 }
 
 static
-NciCoreParamValue*
+void
 nci_core_param_get_llc_version(
-    NciCoreObject* core)
+    NciCoreObject* core,
+    NciCoreParamValue* value)
 {
-    return nci_core_param_uint8_new(core->sm->llc_version);
+    value->uint8 = core->sm->llc_version;
 }
 
 static
@@ -458,11 +423,12 @@ nci_core_param_reset_llc_version(
 }
 
 static
-NciCoreParamValue*
+void
 nci_core_param_get_llc_wks(
-    NciCoreObject* core)
+    NciCoreObject* core,
+    NciCoreParamValue* value)
 {
-    return nci_core_param_uint16_new(core->sm->llc_wks);
+    value->uint16 = core->sm->llc_wks;
 }
 
 static
@@ -498,11 +464,17 @@ nci_core_param_reset_llc_wks(
 }
 
 static
-NciCoreParamValue*
+void
 nci_core_param_get_la_nfcid1(
-    NciCoreObject* core)
+    NciCoreObject* core,
+    NciCoreParamValue* value)
 {
-    return nci_core_param_nfcid_new(&core->sm->la_nfcid1);
+    const NciNfcid1* nfcid = &core->sm->la_nfcid1;
+
+    if (nfcid->len <= sizeof(nfcid->bytes)) {
+        value->nfcid1.len = nfcid->len;
+        memcpy(value->nfcid1.bytes, nfcid->bytes, nfcid->len);
+    }
 }
 
 static
@@ -773,6 +745,23 @@ nci_core_set_op_mode(
     }
 }
 
+gboolean
+nci_core_get_param(
+    NciCore* core,
+    NCI_CORE_PARAM key,
+    NciCoreParamValue* value)  /* Since 1.1.29 */
+{
+    NciCoreObject* self = nci_core_object_cast(core);
+
+    if (G_LIKELY(self) && key >= 0 && key < NCI_CORE_PARAM_COUNT) {
+        if (value) {
+            nci_core_params[key].get(self, value);
+        }
+        return TRUE;
+    }
+    return FALSE;
+}
+
 void
 nci_core_set_params(
     NciCore* core,
@@ -782,13 +771,13 @@ nci_core_set_params(
     NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self) && G_LIKELY(params || reset)) {
-        NciCoreParamValue* old[G_N_ELEMENTS(nci_core_params)];
-        gboolean changed = FALSE;
+        NciCoreParamValue old[G_N_ELEMENTS(nci_core_params)];
         int i;
 
         /* Save current values */
+        memset(old, 0, sizeof(old));
         for (i = 0; i < G_N_ELEMENTS(nci_core_params); i++) {
-            old[i] = nci_core_params[i].get(self);
+            nci_core_params[i].get(self, old + i);
         }
         /* Reset if requested */
         if (reset) {
@@ -802,28 +791,24 @@ nci_core_set_params(
 
             while (*ptr) {
                 const NciCoreParam* p = *ptr++;
-                guint k = p->key;
+                guint key = p->key;
 
-                if (k < G_N_ELEMENTS(nci_core_params)) {
-                    nci_core_params[k].set(self, &p->value);
+                if (key < G_N_ELEMENTS(nci_core_params)) {
+                    nci_core_params[key].set(self, &p->value);
                 }
             }
         }
-        /* Detect changes and at the same time free saved value */
+        /* Detect changes */
         for (i = 0; i < G_N_ELEMENTS(nci_core_params); i++) {
-            if (!changed) {
-                NciCoreParamValue* val = nci_core_params[i].get(self);
+            NciCoreParamValue value;
 
-                if (!nci_core_params[i].equal(val, old[i])) {
-                    changed = TRUE;
-                }
-                g_free(val);
+            memset(&value, 0, sizeof(value));
+            nci_core_params[i].get(self, &value);
+            if (!nci_core_params[i].equal(old + i, &value)) {
+                /* One change is enough for restart */
+                nci_core_restart_internal(self);
+                break;
             }
-            g_free(old[i]);
-        }
-        /* Restart the state machine if changes were detected */
-        if (changed) {
-            nci_core_restart_internal(self);
         }
     }
 }

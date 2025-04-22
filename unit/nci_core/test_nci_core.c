@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018-2024 Slava Monich <slava@monich.com>
+ * Copyright (C) 2018-2025 Slava Monich <slava@monich.com>
  * Copyright (C) 2018-2021 Jolla Ltd.
  *
  * You may use this file under the terms of the BSD license as follows:
@@ -1220,6 +1220,7 @@ test_null(
     g_assert_cmpint(nci_core_get_tech(NULL), == ,NCI_TECH_NONE);
     g_assert_cmpint(nci_core_set_tech(NULL, NCI_TECH_A), == ,NCI_TECH_NONE);
 
+    g_assert(!nci_core_get_param(NULL, 0, NULL));
     nci_core_set_params(NULL, NULL, FALSE);
     nci_core_set_state(NULL, NCI_STATE_INIT);
     nci_core_set_op_mode(NULL, NFC_OP_MODE_NONE);
@@ -1228,6 +1229,30 @@ test_null(
     nci_core_restart(NULL);
     nci_core_free(NULL);
 
+    nci_core_free(nci);
+}
+
+/*==========================================================================*
+ * param
+ *==========================================================================*/
+
+static
+void
+test_param(
+    void)
+{
+    NCI_CORE_PARAM key;
+    NciCore* nci = nci_core_new(&test_dummy_hal_io);
+
+    g_assert(!nci_core_get_param(nci, (NCI_CORE_PARAM)-1, NULL));
+    g_assert(!nci_core_get_param(nci, NCI_CORE_PARAM_COUNT, NULL));
+    for (key = (NCI_CORE_PARAM)0; key < NCI_CORE_PARAM_COUNT; key++) {
+        NciCoreParamValue value;
+
+        memset(&value, 0, sizeof(value));
+        g_assert(nci_core_get_param(nci, key, NULL));
+        g_assert(nci_core_get_param(nci, key, &value));
+    }
     nci_core_free(nci);
 }
 
@@ -4158,6 +4183,7 @@ int main(int argc, char* argv[])
     G_GNUC_END_IGNORE_DEPRECATIONS;
     g_test_init(&argc, &argv, NULL);
     g_test_add_func(TEST_("null"), test_null);
+    g_test_add_func(TEST_("param"), test_param);
     g_test_add_func(TEST_("restart"), test_restart);
     g_test_add_func(TEST_("init_ok"), test_init_ok);
     g_test_add_func(TEST_("init_failed1"), test_init_failed1);
