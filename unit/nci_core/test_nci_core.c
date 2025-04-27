@@ -1221,6 +1221,7 @@ test_null(
     g_assert_cmpint(nci_core_set_tech(NULL, NCI_TECH_A), == ,NCI_TECH_NONE);
 
     g_assert(!nci_core_get_param(NULL, 0, NULL));
+    nci_core_reset_param(NULL, 0);
     nci_core_set_params(NULL, NULL, FALSE);
     nci_core_set_state(NULL, NCI_STATE_INIT);
     nci_core_set_op_mode(NULL, NFC_OP_MODE_NONE);
@@ -1244,12 +1245,14 @@ test_param(
     NCI_CORE_PARAM key;
     NciCore* nci = nci_core_new(&test_dummy_hal_io);
 
+    nci_core_reset_param(nci, NCI_CORE_PARAM_COUNT); /* noop */
     g_assert(!nci_core_get_param(nci, (NCI_CORE_PARAM)-1, NULL));
     g_assert(!nci_core_get_param(nci, NCI_CORE_PARAM_COUNT, NULL));
     for (key = (NCI_CORE_PARAM)0; key < NCI_CORE_PARAM_COUNT; key++) {
         NciCoreParamValue value;
 
         memset(&value, 0, sizeof(value));
+        nci_core_reset_param(nci, key);
         g_assert(nci_core_get_param(nci, key, NULL));
         g_assert(nci_core_get_param(nci, key, &value));
     }

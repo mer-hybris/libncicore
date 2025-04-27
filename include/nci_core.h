@@ -134,6 +134,11 @@ nci_core_get_param(
     NciCoreParamValue* value);  /* Since 1.1.29 */
 
 void
+nci_core_reset_param(
+    NciCore* core,
+    NCI_CORE_PARAM key);  /* Since 1.1.29 */
+
+void
 nci_core_set_params(
     NciCore* nci,
     const NciCoreParam* const* params, /* NULL terminated list */

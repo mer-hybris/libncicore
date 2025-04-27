@@ -763,6 +763,18 @@ nci_core_get_param(
 }
 
 void
+nci_core_reset_param(
+    NciCore* core,
+    NCI_CORE_PARAM key)  /* Since 1.1.29 */
+{
+    NciCoreObject* self = nci_core_object_cast(core);
+
+    if (G_LIKELY(self) && key >= 0 && key < NCI_CORE_PARAM_COUNT) {
+        nci_core_params[key].reset(self);
+    }
+}
+
+void
 nci_core_set_params(
     NciCore* core,
     const NciCoreParam* const* params, /* NULL terminated list */
