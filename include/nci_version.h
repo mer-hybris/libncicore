@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2024 Slava Monich <slava@monich.com>
+ * Copyright (C) 2020-2025 Slava Monich <slava@monich.com>
  * Copyright (C) 2020-2021 Jolla Ltd.
  *
  * You may use this file under the terms of the BSD license as follows:
@@ -45,7 +45,7 @@
 /* libncicore version */
 #define NCI_CORE_VERSION_MAJOR   1
 #define NCI_CORE_VERSION_MINOR   1
-#define NCI_CORE_VERSION_RELEASE 28
+#define NCI_CORE_VERSION_RELEASE 29
 
 #define NCI_CORE_VERSION_WORD(v1,v2,v3) \
     ((((v1) & 0x7f) << 24) | \
@@ -68,6 +68,7 @@
 /* Specific versions */
 #define NCI_CORE_VERSION_1_1_27      NCI_CORE_VERSION_WORD(1,1,27)
 #define NCI_CORE_VERSION_1_1_28      NCI_CORE_VERSION_WORD(1,1,28)
+#define NCI_CORE_VERSION_1_1_29      NCI_CORE_VERSION_WORD(1,1,29)
 
 #endif /* NCI_CORE_VERSION_H */
 

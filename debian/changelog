@@ -1,3 +1,12 @@
+libncicore (1.1.29) unstable; urgency=low
+
+  * Added nci_core_get_param()
+  * Added nci_core_reset_param()
+  * Added nci_core_add_param_change_handler()
+  * Added nci_core_add_params_change_handler()
+
+ -- Slava Monich <slava@monich.com>  Tue, 29 Apr 2025 01:20:35 +0300
+
 libncicore (1.1.28) unstable; urgency=low
 
   * Fixed LISTEN_ACTIVE to IDLE transition logic
