@@ -105,6 +105,13 @@ void
     const NciIntfActivationNtf* ntf,
     void* user_data);
 
+typedef
+void
+(*NciCoreParamChangeFunc)(
+    NciCore* nci,
+    NCI_CORE_PARAM key,
+    void* user_data); /* Since 1.1.29 */
+
 NciCore*
 nci_core_new(
     NciHalIo* io);
@@ -190,6 +197,19 @@ nci_core_add_data_packet_handler(
     NciCore* nci,
     NciCoreDataPacketFunc func,
     void* user_data);
+
+gulong
+nci_core_add_params_change_handler(
+    NciCore* nci,
+    NciCoreParamChangeFunc func,
+    void* user_data); /* Since 1.1.29 */
+
+gulong
+nci_core_add_param_change_handler(
+    NciCore* nci,
+    NCI_CORE_PARAM key,
+    NciCoreParamChangeFunc func,
+    void* user_data); /* Since 1.1.29 */
 
 void
 nci_core_remove_handler(

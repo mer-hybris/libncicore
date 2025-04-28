@@ -51,21 +51,15 @@
 
 typedef struct nci_core_closure {
     GCClosure cclosure;
-    NciCoreFunc func;
     gpointer* user_data;
+    union {
+        GCallback cb;
+        NciCoreFunc core;
+        NciCoreIntfActivationFunc intf_activation;
+        NciCoreDataPacketFunc data_packet;
+        NciCoreParamChangeFunc param_change;
+    } func;
 } NciCoreClosure;
-
-typedef struct nci_core_intf_activated_closure {
-    GCClosure cclosure;
-    NciCoreIntfActivationFunc func;
-    gpointer* user_data;
-} NciCoreIntfActivationClosure;
-
-typedef struct nci_core_data_packet_closure {
-    GCClosure cclosure;
-    NciCoreDataPacketFunc func;
-    gpointer* user_data;
-} NciCoreDataPacketClosure;
 
 typedef struct nci_core_send_data {
     NciCoreSendFunc complete;
@@ -108,6 +102,7 @@ typedef enum nci_core_signal {
     SIGNAL_NEXT_STATE,
     SIGNAL_INTF_ACTIVATED,
     SIGNAL_DATA_PACKET,
+    SIGNAL_PARAM_CHANGED,
     SIGNAL_COUNT
 } NCI_CORE_SIGNAL;
 
@@ -115,6 +110,7 @@ typedef enum nci_core_signal {
 #define SIGNAL_NEXT_STATE_NAME      "nci-core-next-state"
 #define SIGNAL_INTF_ACTIVATED_NAME  "nci-core-intf-activated"
 #define SIGNAL_DATA_PACKET_NAME     "nci-core-data-packet"
+#define SIGNAL_PARAM_CHANGED_NAME   "nci-core-param-changed"
 
 static guint nci_core_signals[SIGNAL_COUNT] = { 0 };
 
@@ -124,6 +120,7 @@ static const NciCoreParamValue NCI_DEFAULT_LLC_VERSION = { .uint8 = 0x11 };
 static const NciCoreParamValue NCI_DEFAULT_LLC_WKS = { .uint16 = 0x0003 };
 
 typedef struct nci_core_param_desc {
+    const char* name;
     void (*get)(NciCoreObject*, NciCoreParamValue*);
     void (*set)(NciCoreObject*, const NciCoreParamValue*);
     void (*reset)(NciCoreObject*);
@@ -297,7 +294,7 @@ nci_core_closure_cb(
     NciCoreObject* self,
     NciCoreClosure* closure)
 {
-    closure->func(&self->core, closure->user_data);
+    closure->func.core(&self->core, closure->user_data);
 }
 
 static
@@ -305,9 +302,9 @@ void
 nci_core_intf_activated_closure_cb(
     NciCoreObject* self,
     const NciIntfActivationNtf* ntf,
-    NciCoreIntfActivationClosure* closure)
+    NciCoreClosure* closure)
 {
-    closure->func(&self->core, ntf, closure->user_data);
+    closure->func.intf_activation(&self->core, ntf, closure->user_data);
 }
 
 static
@@ -315,12 +312,22 @@ void
 nci_core_data_packet_closure_cb(
     NciCoreObject* self,
     guint8 cid,
-    const void* payload,
+    const void* pkt,
     guint len,
-    NciCoreDataPacketClosure* closure)
+    NciCoreClosure* closure)
 {
 #pragma message("Use GUtilData for payload?")
-    closure->func(&self->core, cid, payload, len, closure->user_data);
+    closure->func.data_packet(&self->core, cid, pkt, len, closure->user_data);
+}
+
+static
+void
+nci_core_param_change_closure_cb(
+    NciCoreObject* self,
+    NCI_CORE_PARAM key,
+    NciCoreClosure* closure)
+{
+    closure->func.param_change(&self->core, key, closure->user_data);
 }
 
 static
@@ -328,22 +335,24 @@ gulong
 nci_core_add_signal_handler(
     NciCore* core,
     NCI_CORE_SIGNAL signal,
-    NciCoreFunc func,
+    GQuark quark,
+    GCallback cb,
+    GCallback handler,
     void* user_data)
 {
     NciCoreObject* self = nci_core_object_cast(core);
 
-    if (G_LIKELY(self) && G_LIKELY(func)) {
+    if (G_LIKELY(self) && G_LIKELY(handler)) {
         NciCoreClosure* closure = (NciCoreClosure*)
             g_closure_new_simple(sizeof(NciCoreClosure), NULL);
 
         closure->cclosure.closure.data = closure;
-        closure->cclosure.callback = G_CALLBACK(nci_core_closure_cb);
-        closure->func = func;
+        closure->cclosure.callback = cb;
         closure->user_data = user_data;
+        closure->func.cb = handler;
 
         return g_signal_connect_closure_by_id(self, nci_core_signals[signal],
-            0, &closure->cclosure.closure, FALSE);
+            quark, &closure->cclosure.closure, FALSE);
     }
     return 0;
 }
@@ -471,10 +480,8 @@ nci_core_param_get_la_nfcid1(
 {
     const NciNfcid1* nfcid = &core->sm->la_nfcid1;
 
-    if (nfcid->len <= sizeof(nfcid->bytes)) {
-        value->nfcid1.len = nfcid->len;
-        memcpy(value->nfcid1.bytes, nfcid->bytes, nfcid->len);
-    }
+    value->nfcid1.len = MIN(nfcid->len, sizeof(nfcid->bytes));
+    memcpy(value->nfcid1.bytes, nfcid->bytes, nfcid->len);
 }
 
 static
@@ -496,16 +503,19 @@ nci_core_param_reset_la_nfcid1(
 
 static const NciCoreParamDesc nci_core_params[] = {
     {   /* NCI_PARAM_LLC_VERSION */
+        "LLC_VERSION",
         nci_core_param_get_llc_version,
         nci_core_param_set_llc_version,
         nci_core_param_reset_llc_version,
         nci_core_param_equal_uint8
     },{ /* NCI_PARAM_LLC_WKS */
+        "LLC_WKS",
         nci_core_param_get_llc_wks,
         nci_core_param_set_llc_wks,
         nci_core_param_reset_llc_wks,
         nci_core_param_equal_uint16
     },{ /* NCI_CORE_PARAM_LA_NFCID1 */
+        "LA_NFCID1",
         nci_core_param_get_la_nfcid1,
         nci_core_param_set_la_nfcid1,
         nci_core_param_reset_la_nfcid1,
@@ -674,7 +684,7 @@ nci_core_new(
         self->io.sar = nci_sar_new(hal, &self->sar_client);
         self->sm = sm = nci_sm_new(&self->io);
 
-        for (i = 0; i < G_N_ELEMENTS(nci_core_params); i++) {
+        for (i = 0; i < NCI_CORE_PARAM_COUNT; i++) {
             nci_core_params[i].reset(self);
         }
 
@@ -770,7 +780,23 @@ nci_core_reset_param(
     NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self) && key >= 0 && key < NCI_CORE_PARAM_COUNT) {
-        nci_core_params[key].reset(self);
+        const NciCoreParamDesc* p = nci_core_params + key;
+        NciCoreParamValue v[2];
+
+        memset(v, 0, sizeof(v));
+        p->get(self, v);
+        p->reset(self);
+        p->get(self, v + 1);
+        if (!p->equal(v, v + 1)) {
+            /* Emit the change signal */
+            GDEBUG("%s changed", p->name);
+            g_object_ref(self);
+            g_signal_emit(self, nci_core_signals[SIGNAL_PARAM_CHANGED],
+                g_quark_from_static_string(p->name), key);
+            /* And restart the state machine */
+            nci_core_restart_internal(self);
+            g_object_unref(self);
+        }
     }
 }
 
@@ -783,17 +809,18 @@ nci_core_set_params(
     NciCoreObject* self = nci_core_object_cast(core);
 
     if (G_LIKELY(self) && G_LIKELY(params || reset)) {
-        NciCoreParamValue old[G_N_ELEMENTS(nci_core_params)];
-        int i;
+        NciCoreParamValue old[NCI_CORE_PARAM_COUNT];
+        NCI_CORE_PARAM change[NCI_CORE_PARAM_COUNT];
+        int i, n = 0;
 
         /* Save current values */
         memset(old, 0, sizeof(old));
-        for (i = 0; i < G_N_ELEMENTS(nci_core_params); i++) {
+        for (i = 0; i < NCI_CORE_PARAM_COUNT; i++) {
             nci_core_params[i].get(self, old + i);
         }
         /* Reset if requested */
         if (reset) {
-            for (i = 0; i < G_N_ELEMENTS(nci_core_params); i++) {
+            for (i = 0; i < NCI_CORE_PARAM_COUNT; i++) {
                 nci_core_params[i].reset(self);
             }
         }
@@ -805,22 +832,38 @@ nci_core_set_params(
                 const NciCoreParam* p = *ptr++;
                 guint key = p->key;
 
-                if (key < G_N_ELEMENTS(nci_core_params)) {
+                if (key < NCI_CORE_PARAM_COUNT) {
                     nci_core_params[key].set(self, &p->value);
                 }
             }
         }
         /* Detect changes */
-        for (i = 0; i < G_N_ELEMENTS(nci_core_params); i++) {
+        for (i = 0; i < NCI_CORE_PARAM_COUNT; i++) {
             NciCoreParamValue value;
+            const NciCoreParamDesc* p = nci_core_params + i;
 
             memset(&value, 0, sizeof(value));
-            nci_core_params[i].get(self, &value);
-            if (!nci_core_params[i].equal(old + i, &value)) {
-                /* One change is enough for restart */
-                nci_core_restart_internal(self);
-                break;
+            p->get(self, &value);
+            if (!p->equal(old + i, &value)) {
+                /* A change to be signalled */
+                GDEBUG("%s changed", p->name);
+                change[n++] = i;
             }
+        }
+        /* Emit change signals if necessary */
+        if (n > 0) {
+            /* Temporary ref in case if the handler frees this obj */
+            g_object_ref(self);
+            for (i = 0; i < n; i++) {
+                NCI_CORE_PARAM key = change[i];
+
+                g_signal_emit(self, nci_core_signals[SIGNAL_PARAM_CHANGED],
+                    g_quark_from_static_string(nci_core_params[key].name),
+                    key);
+            }
+            /* And restart the state machine */
+            nci_core_restart_internal(self);
+            g_object_unref(self);
         }
     }
 }
@@ -889,18 +932,22 @@ gulong
 nci_core_add_current_state_changed_handler(
     NciCore* core,
     NciCoreFunc func,
-    void* data)
+    void* user_data)
 {
-    return nci_core_add_signal_handler(core, SIGNAL_CURRENT_STATE, func, data);
+    return nci_core_add_signal_handler(core, SIGNAL_CURRENT_STATE, 0,
+        G_CALLBACK(nci_core_closure_cb),
+        G_CALLBACK(func), user_data);
 }
 
 gulong
 nci_core_add_next_state_changed_handler(
     NciCore* core,
     NciCoreFunc func,
-    void* data)
+    void* user_data)
 {
-    return nci_core_add_signal_handler(core, SIGNAL_NEXT_STATE, func, data);
+    return nci_core_add_signal_handler(core, SIGNAL_NEXT_STATE, 0,
+        G_CALLBACK(nci_core_closure_cb),
+        G_CALLBACK(func), user_data);
 }
 
 gulong
@@ -909,22 +956,9 @@ nci_core_add_intf_activated_handler(
     NciCoreIntfActivationFunc func,
     void* user_data)
 {
-    NciCoreObject* self = nci_core_object_cast(core);
-
-    if (G_LIKELY(self) && G_LIKELY(func)) {
-        NciCoreIntfActivationClosure* closure = (NciCoreIntfActivationClosure*)
-            g_closure_new_simple(sizeof(NciCoreIntfActivationClosure), NULL);
-        GCClosure* cclosure = &closure->cclosure;
-
-        cclosure->closure.data = closure;
-        cclosure->callback = G_CALLBACK(nci_core_intf_activated_closure_cb);
-        closure->func = func;
-        closure->user_data = user_data;
-
-        return g_signal_connect_closure_by_id(self, nci_core_signals
-            [SIGNAL_INTF_ACTIVATED], 0, &cclosure->closure, FALSE);
-    }
-    return 0;
+    return nci_core_add_signal_handler(core, SIGNAL_INTF_ACTIVATED, 0,
+        G_CALLBACK(nci_core_intf_activated_closure_cb),
+        G_CALLBACK(func), user_data);
 }
 
 gulong
@@ -933,22 +967,34 @@ nci_core_add_data_packet_handler(
     NciCoreDataPacketFunc func,
     void* user_data)
 {
-    NciCoreObject* self = nci_core_object_cast(core);
+    return nci_core_add_signal_handler(core, SIGNAL_DATA_PACKET, 0,
+        G_CALLBACK(nci_core_data_packet_closure_cb),
+        G_CALLBACK(func), user_data);
+}
 
-    if (G_LIKELY(self) && G_LIKELY(func)) {
-        NciCoreDataPacketClosure* closure = (NciCoreDataPacketClosure*)
-            g_closure_new_simple(sizeof(NciCoreDataPacketClosure), NULL);
-        GCClosure* cclosure = &closure->cclosure;
+gulong
+nci_core_add_params_change_handler(
+    NciCore* core,
+    NciCoreParamChangeFunc func,
+    void* user_data) /* Since 1.1.29 */
+{
+    return nci_core_add_signal_handler(core, SIGNAL_PARAM_CHANGED, 0,
+        G_CALLBACK(nci_core_param_change_closure_cb),
+        G_CALLBACK(func), user_data);
+}
 
-        cclosure->closure.data = closure;
-        cclosure->callback = G_CALLBACK(nci_core_data_packet_closure_cb);
-        closure->func = func;
-        closure->user_data = user_data;
-
-        return g_signal_connect_closure_by_id(self, nci_core_signals
-            [SIGNAL_DATA_PACKET], 0, &cclosure->closure, FALSE);
-    }
-    return 0;
+gulong
+nci_core_add_param_change_handler(
+    NciCore* core,
+    NCI_CORE_PARAM key,
+    NciCoreParamChangeFunc func,
+    void* user_data) /* Since 1.1.29 */
+{
+    return (key >= 0 && key < NCI_CORE_PARAM_COUNT) ?
+        nci_core_add_signal_handler(core, SIGNAL_PARAM_CHANGED,
+            g_quark_from_static_string(nci_core_params[key].name),
+            G_CALLBACK(nci_core_param_change_closure_cb),
+            G_CALLBACK(func), user_data) : 0;
 }
 
 void
@@ -1016,21 +1062,27 @@ void
 nci_core_object_class_init(
     NciCoreObjectClass* klass)
 {
+    GType type = G_OBJECT_CLASS_TYPE(klass);
+
     G_OBJECT_CLASS(klass)->finalize = nci_core_object_finalize;
     nci_core_signals[SIGNAL_CURRENT_STATE] =
-        g_signal_new(SIGNAL_CURRENT_STATE_NAME, G_OBJECT_CLASS_TYPE(klass),
+        g_signal_new(SIGNAL_CURRENT_STATE_NAME, type,
             G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE, 0);
     nci_core_signals[SIGNAL_NEXT_STATE] =
-        g_signal_new(SIGNAL_NEXT_STATE_NAME, G_OBJECT_CLASS_TYPE(klass),
+        g_signal_new(SIGNAL_NEXT_STATE_NAME, type,
             G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE, 0);
     nci_core_signals[SIGNAL_INTF_ACTIVATED] =
-        g_signal_new(SIGNAL_INTF_ACTIVATED_NAME, G_OBJECT_CLASS_TYPE(klass),
+        g_signal_new(SIGNAL_INTF_ACTIVATED_NAME, type,
             G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE, 1,
             G_TYPE_POINTER);
     nci_core_signals[SIGNAL_DATA_PACKET] =
-        g_signal_new(SIGNAL_DATA_PACKET_NAME, G_OBJECT_CLASS_TYPE(klass),
+        g_signal_new(SIGNAL_DATA_PACKET_NAME, type,
             G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE, 3,
             G_TYPE_UCHAR, G_TYPE_POINTER, G_TYPE_UINT);
+    nci_core_signals[SIGNAL_PARAM_CHANGED] =
+        g_signal_new(SIGNAL_PARAM_CHANGED_NAME, type,
+            G_SIGNAL_RUN_FIRST | G_SIGNAL_DETAILED, 0, NULL, NULL, NULL,
+            G_TYPE_NONE, 1, G_TYPE_INT);
 }
 
 /*

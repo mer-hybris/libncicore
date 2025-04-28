@@ -1209,11 +1209,17 @@ test_null(
     g_assert(!nci_core_add_next_state_changed_handler(NULL, NULL, NULL));
     g_assert(!nci_core_add_intf_activated_handler(NULL, NULL, NULL));
     g_assert(!nci_core_add_data_packet_handler(NULL, NULL, NULL));
+    g_assert(!nci_core_add_params_change_handler(NULL, NULL, NULL));
+    g_assert(!nci_core_add_param_change_handler(NULL, 0, NULL, NULL));
 
     g_assert(!nci_core_add_current_state_changed_handler(nci, NULL, NULL));
     g_assert(!nci_core_add_next_state_changed_handler(nci, NULL, NULL));
     g_assert(!nci_core_add_intf_activated_handler(nci, NULL, NULL));
     g_assert(!nci_core_add_data_packet_handler(nci, NULL, NULL));
+    g_assert(!nci_core_add_params_change_handler(nci, NULL, NULL));
+    g_assert(!nci_core_add_param_change_handler(nci, 0, NULL, NULL));
+    g_assert(!nci_core_add_param_change_handler(nci, NCI_CORE_PARAM_COUNT,
+        NULL, NULL));
     nci_core_remove_handler(nci, 0);
     nci_core_cancel(nci, 0);
 
@@ -1239,13 +1245,47 @@ test_null(
 
 static
 void
+test_param_cb(
+    NciCore* nci,
+    NCI_CORE_PARAM id,
+    void* user_data)
+{
+    int* count = user_data;
+
+    /* Only NCI_CORE_PARAM_LLC_WKS is changed by this test */
+    g_assert_cmpint(id, == ,NCI_CORE_PARAM_LLC_WKS);
+    (*count)++;
+}
+
+static
+void
 test_param(
     void)
 {
     NCI_CORE_PARAM key;
     NciCore* nci = nci_core_new(&test_dummy_hal_io);
+    gulong id[NCI_CORE_PARAM_COUNT + 1];
+    int i, n[2];
+
+    const NciCoreParam llc_wks = {
+        .key = NCI_CORE_PARAM_LLC_WKS,
+        .value.uint16 = 0xff
+    };
+    const NciCoreParam* params[] = { &llc_wks,  NULL };
+
+    /* Register param change listeners */
+    memset(n, 0, sizeof(n));
+    for (i = 0; i < NCI_CORE_PARAM_COUNT; i++) {
+        /* For each param (all incrementing the same counter) */
+        id[i] = nci_core_add_param_change_handler(nci, i, test_param_cb, n + 0);
+    }
+    /* and one for all params (increments the second counter) */
+    id[i] = nci_core_add_params_change_handler(nci, test_param_cb, n + 1);
 
     nci_core_reset_param(nci, NCI_CORE_PARAM_COUNT); /* noop */
+    g_assert_cmpint(n[0], == ,0); /* No signals emitted */
+    g_assert_cmpint(n[1], == ,0);
+
     g_assert(!nci_core_get_param(nci, (NCI_CORE_PARAM)-1, NULL));
     g_assert(!nci_core_get_param(nci, NCI_CORE_PARAM_COUNT, NULL));
     for (key = (NCI_CORE_PARAM)0; key < NCI_CORE_PARAM_COUNT; key++) {
@@ -1256,6 +1296,20 @@ test_param(
         g_assert(nci_core_get_param(nci, key, NULL));
         g_assert(nci_core_get_param(nci, key, &value));
     }
+    g_assert_cmpint(n[0], == ,0); /* Still no signals */
+    g_assert_cmpint(n[1], == ,0);
+
+    /* Now change something */
+    nci_core_set_params(nci, params, FALSE);
+    g_assert_cmpint(n[0], == ,1);
+    g_assert_cmpint(n[1], == ,1);
+
+    /* And then reset it back to default */
+    nci_core_reset_param(nci, llc_wks.key);
+    g_assert_cmpint(n[0], == ,2);
+    g_assert_cmpint(n[1], == ,2);
+
+    nci_core_remove_all_handlers(nci, id);
     nci_core_free(nci);
 }
 
