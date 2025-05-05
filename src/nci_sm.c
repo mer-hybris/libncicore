@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2024 Slava Monich <slava@monich.com>
+ * Copyright (C) 2019-2025 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
  *
  * You may use this file under the terms of the BSD license as follows:
@@ -491,7 +491,7 @@ nci_sm_parse_config(
         CONFIG_ENTRY_LA_NFCID1, NULL);
     if (sval) {
         NciNfcid1* nfcid1 = &nci_sm_object_cast(sm)->default_la_nfcid1;
-        const gsize len = strlen(sval = g_strstrip(sval));
+        const gsize len = strlen(g_strstrip(sval));
 
         /* NFCID1 can be 4, 7, or 10 bytes long */
         switch (len) {
