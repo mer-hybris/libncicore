@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2024 Slava Monich <slava@monich.com>
+ * Copyright (C) 2019-2025 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
  *
  * You may use this file under the terms of the BSD license as follows:
@@ -116,6 +116,11 @@ nci_sm_new(
 
 void
 nci_sm_free(
+    NciSm* sm)
+    NCI_INTERNAL;
+
+void
+nci_sm_reset(
     NciSm* sm)
     NCI_INTERNAL;
 

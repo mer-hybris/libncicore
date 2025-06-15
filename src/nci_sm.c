@@ -543,7 +543,7 @@ nci_sm_load_config(
 
 static
 void
-nci_sm_reset(
+nci_sm_restart(
     NciSm* sm)
 {
     if (sm->next_state->state > NCI_RFST_IDLE) {
@@ -796,6 +796,31 @@ nci_sm_free(
 }
 
 void
+nci_sm_reset(
+    NciSm* sm)
+{
+    NciSmObject* self = nci_sm_object_cast(sm);
+
+    if (G_LIKELY(self)) {
+        NciState* init = nci_sm_state_by_id(self, NCI_STATE_INIT);
+        NciState* idle = nci_sm_state_by_id(self, NCI_RFST_IDLE);
+
+        /* Cancel queued actions */
+        if (self->pending_switch_id) {
+            g_source_remove(self->pending_switch_id);
+            self->pending_switch_id = 0;
+        }
+        if (self->next_transition) {
+            nci_transition_unref(self->next_transition);
+            self->next_transition = NULL;
+        }
+        nci_sm_enter_state_internal(self, init, NULL);
+        nci_sm_switch_internal(self, idle);
+        nci_sm_emit_pending_signals(self);
+    }
+}
+
+void
 nci_sm_set_op_mode(
     NciSm* sm,
     NCI_OP_MODE op_mode)
@@ -809,7 +834,7 @@ nci_sm_set_op_mode(
          */
         GDEBUG("Mode 0x%02x => 0x%02x", sm->op_mode, op_mode);
         sm->op_mode = op_mode;
-        nci_sm_reset(sm);
+        nci_sm_restart(sm);
     }
 }
 
@@ -829,7 +854,7 @@ nci_sm_set_tech(
          */
         GDEBUG("Tech 0x%04x => 0x%04x", sm->techs, valid_techs);
         sm->techs = valid_techs;
-        nci_sm_reset(sm);
+        nci_sm_restart(sm);
         return valid_techs;
     }
     return NCI_TECH_NONE;
