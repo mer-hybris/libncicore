@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018-2024 Slava Monich <slava@monich.com>
+ * Copyright (C) 2018-2025 Slava Monich <slava@monich.com>
  * Copyright (C) 2018-2020 Jolla Ltd.
  *
  * You may use this file under the terms of the BSD license as follows:
@@ -66,7 +66,7 @@ test_client_unexpected_completion(
     gboolean success,
     gpointer user_data)
 {
-    g_assert(FALSE);
+    g_assert_not_reached();
 }
 
 static
@@ -94,7 +94,7 @@ void
 test_sar_client_unexpected(
     NciSarClient* client)
 {
-    g_assert(FALSE);
+    g_assert_not_reached();
 }
 
 static
@@ -106,7 +106,7 @@ test_sar_client_unexpected_resp(
     const void* payload,
     guint payload_len)
 {
-    g_assert(FALSE);
+    g_assert_not_reached();
 }
 
 static
@@ -117,7 +117,7 @@ test_sar_client_unexpected_data_packet(
     const void* payload,
     guint payload_len)
 {
-    g_assert(FALSE);
+    g_assert_not_reached();
 }
 
 /*==========================================================================*
@@ -520,13 +520,172 @@ test_basic(
     /* Signal error */
     g_assert(test_io->sar);
     test_io->sar->fn->error(test_io->sar);
-    g_assert(test.error_count == 1);
+    g_assert_cmpint(test.error_count, == ,1);
     nci_sar_reset(sar);
 
-    g_assert(test_io->written->len == 3);
+    g_assert_cmpuint(test_io->written->len, == ,3);
 
     nci_sar_free(sar);
     test_hal_io_free(test_io);
+    g_main_loop_unref(test.loop);
+}
+
+/*==========================================================================*
+ * cancel
+ *==========================================================================*/
+
+typedef struct test_cancel_data {
+    NciSarClient client;
+    NciHalIo io;
+    NciSar* sar;
+    gboolean io_started;
+    gboolean io_stopped;
+    gboolean write_submitted;
+    gboolean write_cancelled;
+    gboolean completed;
+    GMainLoop* loop;
+} TestCancelData;
+
+static
+gboolean
+test_cancel_cb(
+    gpointer user_data)
+{
+    TestCancelData* test = user_data;
+
+    g_assert(test->sar);
+    GDEBUG("Resetting SAR");
+    nci_sar_reset(test->sar);
+    return G_SOURCE_REMOVE;
+}
+
+static
+gboolean
+test_cancel_hal_io_start(
+    NciHalIo* io,
+    NciHalClient* sar)
+{
+    TestCancelData* test = G_CAST(io, TestCancelData, io);
+
+    g_assert(!test->io_started);
+    g_assert(!test->io_stopped);
+    g_assert(!test->write_submitted);
+    g_assert(!test->write_cancelled);
+    g_assert(!test->completed);
+
+    GDEBUG("I/O started");
+    test->io_started = TRUE;
+    return TRUE;
+}
+
+static
+void
+test_cancel_hal_io_stop(
+    NciHalIo* io)
+{
+    TestCancelData* test = G_CAST(io, TestCancelData, io);
+
+    g_assert(test->io_started);
+    g_assert(!test->io_stopped);
+    g_assert(test->write_submitted);
+    g_assert(test->write_cancelled);
+    g_assert(!test->completed);
+
+    GDEBUG("I/O stopped");
+    test->io_stopped = TRUE;
+}
+
+static
+gboolean
+test_cancel_hal_io_write(
+    NciHalIo* io,
+    const GUtilData* chunks,
+    guint count,
+    NciHalClientFunc complete)
+{
+    TestCancelData* test = G_CAST(io, TestCancelData, io);
+
+    g_assert(test->io_started);
+    g_assert(!test->io_stopped);
+    g_assert(!test->write_submitted);
+    g_assert(!test->write_cancelled);
+    g_assert(!test->completed);
+
+    /* And cancel it on a fresh stack */
+    GDEBUG("Write submitted");
+    test->write_submitted = TRUE;
+    g_idle_add(test_cancel_cb, test);
+    return TRUE;
+}
+
+static
+void
+test_cancel_hal_io_cancel_write(
+    NciHalIo* io)
+{
+    TestCancelData* test = G_CAST(io, TestCancelData, io);
+
+    g_assert(test->io_started);
+    g_assert(!test->io_stopped);
+    g_assert(test->write_submitted);
+    g_assert(!test->write_cancelled);
+    g_assert(!test->completed);
+
+    GDEBUG("Write cancelled");
+    test->write_cancelled = TRUE;
+}
+
+static
+void
+test_cancel_send_complete(
+    NciSarClient* client,
+    gboolean success,
+    gpointer user_data)
+{
+    TestCancelData* test = user_data;
+
+    g_assert(!success);
+    g_assert(test->io_started);
+    g_assert(test->io_stopped);
+    g_assert(test->write_submitted);
+    g_assert(test->write_cancelled);
+    g_assert(!test->completed);
+
+    GDEBUG("Write failed (as expected)");
+    test->completed = TRUE;
+    g_main_loop_quit(test->loop); /* Done with the test */
+}
+
+static
+void
+test_cancel(
+    void)
+{
+    static const NciHalIoFunctions test_cancel_hal_io_fn = {
+        .start = test_cancel_hal_io_start,
+        .stop = test_cancel_hal_io_stop,
+        .write = test_cancel_hal_io_write,
+        .cancel_write = test_cancel_hal_io_cancel_write
+    };
+
+    TestCancelData test;
+
+    memset(&test, 0, sizeof(test));
+    test.client.fn = &test_dummy_sar_client_fn;
+    test.io.fn = &test_cancel_hal_io_fn;
+    test.sar = nci_sar_new(&test.io, &test.client);
+
+    g_assert(nci_sar_send_command(test.sar, TEST_GID, TEST_OID, NULL,
+        test_cancel_send_complete, NULL, &test));
+    test.loop = g_main_loop_new(NULL, TRUE);
+    test_run_loop(&test_opt, test.loop);
+    g_assert(test.io_started);
+    g_assert(test.io_stopped);
+    g_assert(test.write_submitted);
+    g_assert(test.write_cancelled);
+    g_assert(test.completed);
+
+    nci_sar_free(test.sar);
     g_main_loop_unref(test.loop);
 }
 
@@ -1012,9 +1171,9 @@ test_recv_ntf_handle(
 {
     TestRecvNtf* test = G_CAST(client, TestRecvNtf, client);
 
-    g_assert(gid == TEST_GID);
-    g_assert(oid == TEST_OID);
-    g_assert(!payload_len);
+    g_assert_cmpuint(gid, == ,TEST_GID);
+    g_assert_cmpuint(oid, == ,TEST_OID);
+    g_assert_cmpuint(payload_len, == ,0);
     test->ntf_received++;
 }
 
@@ -1024,7 +1183,7 @@ test_recv_ntf(
     void)
 {
     static const NciSarClientFunctions test_recv_ntf_sar_client_fn = {
-        .error = test_dummy_sar_client_error,
+        .error = test_sar_client_unexpected,
         .handle_response = test_dummy_sar_client_handle_response,
         .handle_notification = test_recv_ntf_handle,
         .handle_data_packet = test_dummy_sar_client_handle_data_packet
@@ -1044,7 +1203,7 @@ test_recv_ntf(
 
     /* Test reception of a complete (non-segmented) packet */
     test_io->sar->fn->read(test_io->sar, ntf, sizeof(ntf));
-    g_assert(test.ntf_received == 1);
+    g_assert_cmpint(test.ntf_received, == ,1);
 
     nci_sar_free(sar);
     test_hal_io_free(test_io);
@@ -1072,9 +1231,9 @@ test_recv_ntf_data_handle(
 {
     TestRecvNtfData* test = G_CAST(client, TestRecvNtfData, client);
 
-    g_assert(gid == TEST_GID);
-    g_assert(oid == TEST_OID);
-    g_assert(payload_len == sizeof(test_recv_ntf_data_payload));
+    g_assert_cmpuint(gid, == ,TEST_GID);
+    g_assert_cmpuint(oid, == ,TEST_OID);
+    g_assert_cmpuint(payload_len, == ,sizeof(test_recv_ntf_data_payload));
     g_assert(!memcmp(test_recv_ntf_data_payload, payload, payload_len));
     test->ntf_received++;
 }
@@ -1085,7 +1244,7 @@ test_recv_ntf_data(
     void)
 {
     static const NciSarClientFunctions test_recv_ntf_sar_client_fn = {
-        .error = test_dummy_sar_client_error,
+        .error = test_sar_client_unexpected,
         .handle_response = test_dummy_sar_client_handle_response,
         .handle_notification = test_recv_ntf_data_handle,
         .handle_data_packet = test_dummy_sar_client_handle_data_packet
@@ -1111,7 +1270,7 @@ test_recv_ntf_data(
 
     /* Test reception of a complete (non-segmented) packet */
     test_io->sar->fn->read(test_io->sar, packet->data, packet->len);
-    g_assert(test.ntf_received == 1);
+    g_assert_cmpint(test.ntf_received, == ,1);
 
     nci_sar_free(sar);
     test_hal_io_free(test_io);
@@ -1124,9 +1283,18 @@ test_recv_ntf_data(
 
 typedef struct test_recv_multi {
     NciSarClient client;
+    int error_count;
     int ntf_received;
     int rsp_received;
 } TestRecvMulti;
+
+static
+void
+test_recv_multi_handle_error(
+    NciSarClient* client)
+{
+    G_CAST(client, TestRecvMulti, client)->error_count++;
+}
 
 static
 void
@@ -1139,9 +1307,9 @@ test_recv_multi_handle_resp(
 {
     TestRecvMulti* test = G_CAST(client, TestRecvMulti, client);
 
-    g_assert(gid == TEST_GID);
-    g_assert(oid == TEST_OID);
-    g_assert(!payload_len);
+    g_assert_cmpuint(gid, == ,TEST_GID);
+    g_assert_cmpuint(oid, == ,TEST_OID);
+    g_assert_cmpuint(payload_len, == ,0);
     test->rsp_received++;
 }
 
@@ -1156,9 +1324,9 @@ test_recv_multi_handle_ntf(
 {
     TestRecvMulti* test = G_CAST(client, TestRecvMulti, client);
 
-    g_assert(gid == TEST_GID);
-    g_assert(oid == TEST_OID);
-    g_assert(!payload_len);
+    g_assert_cmpuint(gid, == ,TEST_GID);
+    g_assert_cmpuint(oid, == ,TEST_OID);
+    g_assert_cmpuint(payload_len, == ,0);
     test->ntf_received++;
 }
 
@@ -1168,7 +1336,7 @@ test_recv_multi(
     void)
 {
     static const NciSarClientFunctions test_recv_multi_fn = {
-        .error = test_dummy_sar_client_error,
+        .error = test_recv_multi_handle_error,
         .handle_response = test_recv_multi_handle_resp,
         .handle_notification = test_recv_multi_handle_ntf,
         .handle_data_packet = test_dummy_sar_client_handle_data_packet
@@ -1190,8 +1358,9 @@ test_recv_multi(
     g_assert(test_io->sar);
 
     test_io->sar->fn->read(test_io->sar, packets, sizeof(packets));
-    g_assert(test.ntf_received == 1);
-    g_assert(test.rsp_received == 1);
+    g_assert_cmpint(test.error_count, == ,1);
+    g_assert_cmpint(test.ntf_received, == ,1);
+    g_assert_cmpint(test.rsp_received, == ,1);
 
     nci_sar_free(sar);
     test_hal_io_free(test_io);
@@ -1218,9 +1387,9 @@ test_recv_seg_handle_resp(
 {
     TestRecvSeg* test = G_CAST(client, TestRecvSeg, client);
 
-    g_assert(gid == TEST_GID);
-    g_assert(oid == TEST_OID);
-    g_assert(!payload_len);
+    g_assert_cmpuint(gid, == ,TEST_GID);
+    g_assert_cmpuint(oid, == ,TEST_OID);
+    g_assert_cmpuint(payload_len, == ,0);
     test->rsp_received++;
 }
 
@@ -1236,9 +1405,9 @@ test_recv_seg_handle_ntf(
     TestRecvSeg* test = G_CAST(client, TestRecvSeg, client);
     static const guint8 expected_data[] = { 0x01, 0x02, 0x03 };
 
-    g_assert(gid == TEST_GID);
-    g_assert(oid == TEST_OID);
-    g_assert(payload_len == sizeof(expected_data));
+    g_assert_cmpuint(gid, == ,TEST_GID);
+    g_assert_cmpuint(oid, == ,TEST_OID);
+    g_assert_cmpuint(payload_len, == ,sizeof(expected_data));
     g_assert(!memcmp(expected_data, payload, payload_len));
     test->ntf_received++;
 }
@@ -1282,8 +1451,8 @@ test_recv_seg(
     test_io->sar->fn->read(test_io->sar, buf2, sizeof(buf2));
     test_io->sar->fn->read(test_io->sar, buf3, sizeof(buf3));
     test_io->sar->fn->read(test_io->sar, buf4, sizeof(buf4));
-    g_assert(test.ntf_received == 1);
-    g_assert(test.rsp_received == 1);
+    g_assert_cmpint(test.ntf_received, == ,1);
+    g_assert_cmpint(test.rsp_received, == ,1);
 
     nci_sar_free(sar);
     test_hal_io_free(test_io);
@@ -1410,7 +1579,7 @@ test_bad_cid(
 
     nci_sar_set_max_logical_connections(sar, 1);
     test_io->sar->fn->read(test_io->sar, buf, sizeof(buf));
-    g_assert(test.error_count == 1);
+    g_assert_cmpint(test.error_count, == ,1);
 
     nci_sar_free(sar);
     test_hal_io_free(test_io);
@@ -1440,20 +1609,22 @@ test_recv_data_handle_packet(
     GDEBUG("packet #%d, %u byte(s)", test->packet_count, payload_len);
     switch (test->packet_count) {
     case 0:
-        g_assert(cid == 0);
-        g_assert(payload_len == 0);
+        g_assert_cmpuint(cid, == ,0);
+        g_assert_cmpuint(payload_len, == ,0);
         break;
     case 1:
-        g_assert(cid == 1);
-        g_assert(payload_len == sizeof(payload1));
+        g_assert_cmpuint(cid, == ,1);
+        g_assert_cmpuint(payload_len, == ,sizeof(payload1));
         g_assert(!memcmp(payload, payload1, payload_len));
         break;
     case 2:
-        g_assert(cid == 1);
-        g_assert(payload_len == sizeof(payload2));
+        g_assert_cmpuint(cid, == ,1);
+        g_assert_cmpuint(payload_len, == ,sizeof(payload2));
         g_assert(!memcmp(payload, payload2, payload_len));
         break;
-    default: g_assert(FALSE);
+    default:
+        g_assert_not_reached();
+        break;
     }
     test->packet_count++;
 }
@@ -1464,7 +1635,7 @@ test_recv_data(
     void)
 {
     static const NciSarClientFunctions test_recv_data_fn = {
-        .error = test_dummy_sar_client_error,
+        .error = test_sar_client_unexpected,
         .handle_response = test_sar_client_unexpected_resp,
         .handle_notification = test_sar_client_unexpected_resp,
         .handle_data_packet = test_recv_data_handle_packet
@@ -1498,7 +1669,7 @@ test_recv_data(
     test_io->sar->fn->read(test_io->sar, buf2, sizeof(buf2));
     test_io->sar->fn->read(test_io->sar, buf3, sizeof(buf3));
     test_io->sar->fn->read(test_io->sar, buf4, sizeof(buf4));
-    g_assert(test.packet_count == 3);
+    g_assert_cmpint(test.packet_count, == ,3);
 
     nci_sar_free(sar);
     test_hal_io_free(test_io);
@@ -1524,8 +1695,8 @@ test_recv_data_seg_handle_packet(
     TestRecvDataSeg* test = G_CAST(client, TestRecvDataSeg, client);
     static const guint8 expected_payload[] = { 0x01, 0x02, 0x03 };
 
-    g_assert(cid == 1);
-    g_assert(payload_len == sizeof(expected_payload));
+    g_assert_cmpuint(cid, == ,1);
+    g_assert_cmpuint(payload_len, == ,sizeof(expected_payload));
     g_assert(!memcmp(payload, expected_payload, payload_len));
     g_assert(!test->packet_received);
     test->packet_received = TRUE;
@@ -1537,7 +1708,7 @@ test_recv_data_seg(
     void)
 {
     static const NciSarClientFunctions test_recv_data_seg_fn = {
-        .error = test_dummy_sar_client_error,
+        .error = test_sar_client_unexpected,
         .handle_response = test_sar_client_unexpected_resp,
         .handle_notification = test_sar_client_unexpected_resp,
         .handle_data_packet = test_recv_data_seg_handle_packet
@@ -1681,7 +1852,7 @@ test_recv_cr(
     void)
 {
     static const NciSarClientFunctions test_recv_data_fn = {
-        .error = test_dummy_sar_client_error,
+        .error = test_sar_client_unexpected,
         .handle_response = test_sar_client_unexpected_resp,
         .handle_notification = test_sar_client_unexpected_resp,
         .handle_data_packet = test_recv_cr_handle_packet
@@ -1731,6 +1902,7 @@ int main(int argc, char* argv[])
     g_test_add_func(TEST_("null"), test_null);
     g_test_add_func(TEST_("fail"), test_fail);
     g_test_add_func(TEST_("basic"), test_basic);
+    g_test_add_func(TEST_("cancel"), test_cancel);
     g_test_add_func(TEST_("send_seg"), test_send_seg);
     g_test_add_func(TEST_("send_data_seg"), test_send_data_seg);
     g_test_add_func(TEST_("send_data_seg2"), test_send_data_seg2);
