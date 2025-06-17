@@ -364,8 +364,7 @@ nci_core_restart_internal(
 {
     nci_core_cancel_command(self);
     nci_sar_reset(self->io.sar);
-    nci_sm_enter_state(self->sm, NCI_STATE_INIT, NULL);
-    nci_sm_switch_to(self->sm, NCI_RFST_IDLE);
+    nci_sm_reset(self->sm);
 }
 
 /*==========================================================================*
