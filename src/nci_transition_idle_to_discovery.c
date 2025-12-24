@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2024 Slava Monich <slava@monich.com>
+ * Copyright (C) 2019-2025 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2020 Jolla Ltd.
  *
  * You may use this file under the terms of the BSD license as follows:
@@ -140,9 +140,10 @@ typedef struct nci_tech_mode {
 typedef enum core_set_config_flags {
     CORE_SET_CONFIG_FLAGS_NONE = 0,
     CORE_SET_CONFIG_LA_SENS_RES_1 = 0x01,
-    CORE_SET_CONFIG_LA_NFCID1 = 0x02,
-    CORE_SET_CONFIG_LA_SEL_INFO = 0x04,
-    CORE_SET_CONFIG_LF_PROTOCOL_TYPE = 0x08
+    CORE_SET_CONFIG_LA_SEL_INFO = 0x02,
+    CORE_SET_CONFIG_LA_NFCID1 = 0x04,
+    CORE_SET_CONFIG_LF_PROTOCOL_TYPE = 0x08,
+    CORE_SET_CONFIG_LI_A_HB = 0x10
 } CORE_SET_CONFIG_FLAGS;
 
 /*==========================================================================*
@@ -932,6 +933,7 @@ nci_transition_idle_to_discovery_set_config(
     CORE_SET_CONFIG_FLAGS set_config,
     guint8 la_sens_res_1,
     const NciNfcid1* la_nfcid1,
+    const NciAtsHb* li_a_hb,
     guint8 la_sel_info,
     guint8 lf_protocol_type)
 {
@@ -973,6 +975,17 @@ nci_transition_idle_to_discovery_set_config(
         cmd->data[0]++;      /* Number of entries */
     }
 
+    if (set_config & CORE_SET_CONFIG_LA_SEL_INFO) {
+        guint8 entry[3];
+
+        GDEBUG("  LA_SEL_INFO");
+        entry[0] = NCI_CONFIG_LA_SEL_INFO;
+        entry[1] = 1;
+        entry[2] = la_sel_info;
+        g_byte_array_append(cmd, ARRAY_AND_SIZE(entry));
+        cmd->data[0]++;      /* Number of entries */
+    }
+
     if (set_config & CORE_SET_CONFIG_LA_NFCID1) {
         guint8 entry[2];     /* Just id and length */
 
@@ -988,17 +1001,6 @@ nci_transition_idle_to_discovery_set_config(
         cmd->data[0]++;      /* Number of entries */
     }
 
-    if (set_config & CORE_SET_CONFIG_LA_SEL_INFO) {
-        guint8 entry[3];
-
-        GDEBUG("  LA_SEL_INFO");
-        entry[0] = NCI_CONFIG_LA_SEL_INFO;
-        entry[1] = 1;
-        entry[2] = la_sel_info;
-        g_byte_array_append(cmd, ARRAY_AND_SIZE(entry));
-        cmd->data[0]++;      /* Number of entries */
-    }
-
     if (set_config & CORE_SET_CONFIG_LF_PROTOCOL_TYPE) {
         guint8 entry[3];
 
@@ -1007,6 +1009,17 @@ nci_transition_idle_to_discovery_set_config(
         entry[1] = 1;
         entry[2] = lf_protocol_type;
         g_byte_array_append(cmd, ARRAY_AND_SIZE(entry));
+        cmd->data[0]++;      /* Number of entries */
+    }
+
+    if (set_config & CORE_SET_CONFIG_LI_A_HB) {
+        guint8 entry[2];     /* Just id and length */
+
+        GDEBUG("  LI_A_HIST_BY");
+        entry[0] = NCI_CONFIG_LI_A_HIST_BY;
+        entry[1] = li_a_hb->len;
+        g_byte_array_append(cmd, ARRAY_AND_SIZE(entry));
+        g_byte_array_append(cmd, li_a_hb->bytes, li_a_hb->len);
         cmd->data[0]++;      /* Number of entries */
     }
 
@@ -1235,6 +1248,59 @@ nci_transition_idle_to_discovery_lf_protocol_type_ok(
 }
 
 static
+gboolean
+nci_transition_idle_to_discovery_hb_ok(
+    guint nparams,
+    const GUtilData* params,
+    guint8 id,
+    const char* name,
+    const NciAtsHb* hb)
+{
+    GUtilData data;
+
+    if (nci_parse_find_config_param(nparams, params, id, &data)) {
+        if (data.size == hb->len && (!hb->len ||
+            !memcmp(data.bytes, hb->bytes, hb->len))) {
+#if GUTIL_LOG_DEBUG
+            if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+                if (data.size) {
+                    char* hex = gutil_bin2hex(data.bytes, data.size, FALSE);
+
+                    GDEBUG("  %s %s ok", name, hex);
+                    g_free(hex);
+                } else {
+                    GDEBUG("  %s (empty) ok", name);
+                }
+            }
+#endif
+            return TRUE;
+        } else {
+#if GUTIL_LOG_DEBUG
+            if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+                char* hex1 = gutil_bin2hex(data.bytes, data.size, FALSE);
+
+                if (hb->len) {
+                    char* hex2 = gutil_bin2hex(hb->bytes, hb->len, FALSE);
+
+                    GDEBUG("  %s %s needs to be %s", name,
+                        data.size ? hex1 : "(empty)", hex2);
+                    g_free(hex2);
+                } else {
+                    GDEBUG("  %s %s needs to be reset", name, hex1);
+                }
+                g_free(hex1);
+            }
+#endif
+            return FALSE;
+        }
+    } else {
+        /* If there's no HB to configure, then just leave everything as is */
+        GDEBUG("  %s not found", name);
+        return !hb->len;
+    }
+}
+
+static
 void
 nci_transition_idle_to_discovery_get_config_rsp(
     NCI_REQUEST_STATUS status,
@@ -1254,6 +1320,7 @@ nci_transition_idle_to_discovery_get_config_rsp(
             CORE_SET_CONFIG_LA_SENS_RES_1 |
             CORE_SET_CONFIG_LA_SEL_INFO |
             CORE_SET_CONFIG_LA_NFCID1 |
+            CORE_SET_CONFIG_LI_A_HB |
             CORE_SET_CONFIG_LF_PROTOCOL_TYPE;
         guint8 la_sens_res_1 =
             nci_transition_idle_to_discovery_la_sens_res_1_expected(sm);
@@ -1307,6 +1374,10 @@ nci_transition_idle_to_discovery_get_config_rsp(
                     &data, &lf_protocol_type)) {
                     set_config &= ~CORE_SET_CONFIG_LF_PROTOCOL_TYPE;
                 }
+                if (nci_transition_idle_to_discovery_hb_ok(n, &data,
+                    NCI_CONFIG_LI_A_HIST_BY, "LI_A_HIST_BY", &sm->li_a_hb)) {
+                    set_config &= ~CORE_SET_CONFIG_LI_A_HB;
+                }
                 if (!set_config) {
                     /* No need to set parameters */
                     nci_transition_idle_to_discovery_configure_routing(self);
@@ -1322,7 +1393,8 @@ nci_transition_idle_to_discovery_get_config_rsp(
             GWARN("CORE_GET_CONFIG_CMD unexpected response");
         }
         nci_transition_idle_to_discovery_set_config(self, set_config,
-            la_sens_res_1, &la_nfcid1, la_sel_info, lf_protocol_type);
+            la_sens_res_1, &la_nfcid1, &sm->li_a_hb, la_sel_info,
+            lf_protocol_type);
     }
 }
 
@@ -1368,11 +1440,12 @@ nci_transition_idle_to_discovery_start(
      * +=========================================================+
      */
     static const guint8 cmd[] = {
-        4,
+        5,
         NCI_CONFIG_LA_SENS_RES_1,
-        NCI_CONFIG_LA_NFCID1,
         NCI_CONFIG_LA_SEL_INFO,
-        NCI_CONFIG_LF_PROTOCOL_TYPE
+        NCI_CONFIG_LA_NFCID1,
+        NCI_CONFIG_LF_PROTOCOL_TYPE,
+        NCI_CONFIG_LI_A_HIST_BY
     };
 
     if (PARENT_CLASS_CALL(start)(self)) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2024 Slava Monich <slava@monich.com>
+ * Copyright (C) 2019-2025 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
  * Copyright (C) 2020 Open Mobile Platform LLC.
  *
@@ -63,6 +63,14 @@ nci_nfcid1_equal(
 gboolean
 nci_listen_mode(
     NCI_MODE mode)
+    NCI_INTERNAL;
+
+gboolean
+nci_parse_find_config_param(
+    guint nparams,
+    const GUtilData* params,
+    guint8 id,
+    GUtilData* value)
     NCI_INTERNAL;
 
 guint

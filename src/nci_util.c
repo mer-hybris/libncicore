@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2024 Slava Monich <slava@monich.com>
+ * Copyright (C) 2019-2025 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
  * Copyright (C) 2020 Open Mobile Platform LLC.
  *
@@ -104,7 +104,6 @@ nci_listen_mode(
     return FALSE;
 }
 
-static
 gboolean
 nci_parse_find_config_param(
     guint nparams,

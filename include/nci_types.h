@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018-2024 Slava Monich <slava@monich.com>
+ * Copyright (C) 2018-2025 Slava Monich <slava@monich.com>
  * Copyright (C) 2018-2020 Jolla Ltd.
  *
  * You may use this file under the terms of the BSD license as follows:
@@ -285,6 +285,27 @@ typedef struct nci_nfcid {
     guint8 len;
     guint8 bytes[10];
 } NciNfcid1; /* Since 1.1.22 */
+
+/*
+ * ATS (Answer To Select) HB (Historical Bytes), up to 15 bytes
+ * as suggested by the NFC forum spec:
+ *
+ * [NFCForum-TS-DigitalProtocol-1.0]
+ * Requirements 142: Historical Bytes of the ATS
+ *
+ * +=========================================================================+
+ * | Poll Mode                          | Listen Mode                        |
+ * +=========================================================================+
+ * | 11.6.2.23                          | 11.6.2.24                          |
+ * | The NFC Forum Device MUST be ready | The NFC Forum Device MUST send     |
+ * | to receive an ATS with up to 15    | no more than 15 historical bytes.  |
+ * | historical bytes.                  |                                    |
+ * +=========================================================================+
+ */
+typedef struct nci_ats_hb {
+    guint8 len;
+    guint8 bytes[15];
+} NciAtsHb; /* Since 1.1.31 */
 
 /* This is essentially NCI_MODE as a bitmask */
 
