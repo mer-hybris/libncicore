@@ -267,8 +267,8 @@ typedef enum nci_rf_technology {
 
 /* Listen Mode: ISO-DEP Discovery Parameters */
 #define NCI_CONFIG_LI_FWI                       (0x58)
-#define NCI_CONFIG_LA_HIST_BY                   (0x59)
-#define NCI_CONFIG_LB_H_INFO_RESP               (0x5A)
+#define NCI_CONFIG_LI_A_HIST_BY                 (0x59)
+#define NCI_CONFIG_LI_B_H_INFO_RESP             (0x5A)
 #define NCI_CONFIG_LI_BIT_RATE                  (0x5B)
 #define NCI_CONFIG_LI_A_RATS_TC1                (0x5C) /* NCI 2.0 */
 

@@ -399,6 +399,20 @@ nci_core_param_equal_nfcid(
 }
 
 static
+gboolean
+nci_core_param_equal_hb(
+    const NciCoreParamValue* v1,
+    const NciCoreParamValue* v2)
+{
+    const NciAtsHb* hb1 = &v1->hb;
+    const NciAtsHb* hb2 = &v2->hb;
+
+    /* Compare no more than 15 bytes */
+    return hb1->len == hb2->len && !memcmp(hb1->bytes, hb2->bytes,
+        MIN(hb1->len, sizeof(hb1->bytes)));
+}
+
+static
 void
 nci_core_param_get_llc_version(
     NciCoreObject* core,
@@ -480,7 +494,7 @@ nci_core_param_get_la_nfcid1(
     const NciNfcid1* nfcid = &core->sm->la_nfcid1;
 
     value->nfcid1.len = MIN(nfcid->len, sizeof(nfcid->bytes));
-    memcpy(value->nfcid1.bytes, nfcid->bytes, nfcid->len);
+    memcpy(value->nfcid1.bytes, nfcid->bytes, value->nfcid1.len);
 }
 
 static
@@ -498,6 +512,35 @@ nci_core_param_reset_la_nfcid1(
     NciCoreObject* core)
 {
     nci_sm_set_la_nfcid1(core->sm, NULL);
+}
+
+static
+void
+nci_core_param_get_li_a_hb(
+    NciCoreObject* core,
+    NciCoreParamValue* value)
+{
+    const NciAtsHb* hb = &core->sm->li_a_hb;
+
+    value->hb.len = MIN(hb->len, sizeof(hb->bytes));
+    memcpy(value->hb.bytes, hb->bytes, value->hb.len);
+}
+
+static
+void
+nci_core_param_set_li_a_hb(
+    NciCoreObject* core,
+    const NciCoreParamValue* value)
+{
+    nci_sm_set_li_a_hb(core->sm, &value->hb);
+}
+
+static
+void
+nci_core_param_reset_li_a_hb(
+    NciCoreObject* core)
+{
+    nci_sm_set_li_a_hb(core->sm, NULL);
 }
 
 static const NciCoreParamDesc nci_core_params[] = {
@@ -519,12 +562,19 @@ static const NciCoreParamDesc nci_core_params[] = {
         nci_core_param_set_la_nfcid1,
         nci_core_param_reset_la_nfcid1,
         nci_core_param_equal_nfcid
+    },{ /* NCI_CORE_PARAM_LI_A_HB */
+        "LI_A_HB",
+        nci_core_param_get_li_a_hb,
+        nci_core_param_set_li_a_hb,
+        nci_core_param_reset_li_a_hb,
+        nci_core_param_equal_hb
     }
 };
 
 G_STATIC_ASSERT(NCI_CORE_PARAM_LLC_VERSION == 0);
 G_STATIC_ASSERT(NCI_CORE_PARAM_LLC_WKS == 1);
 G_STATIC_ASSERT(NCI_CORE_PARAM_LA_NFCID1 == 2);
+G_STATIC_ASSERT(NCI_CORE_PARAM_LI_A_HB == 3);
 G_STATIC_ASSERT(NCI_CORE_PARAM_COUNT == G_N_ELEMENTS(nci_core_params));
 
 /*==========================================================================*

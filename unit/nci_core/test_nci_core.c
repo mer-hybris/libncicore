@@ -58,6 +58,7 @@ static TestOpt test_opt;
 #define CONFIG_SECTION "[Configuration]"
 #define CONFIG_ENTRY_TECHNOLOGIES "Technologies"
 #define CONFIG_ENTRY_LA_NFCID1 "LA_NFCID1"
+#define CONFIG_ENTRY_LI_A_HB "LI_A_HB"
 
 static const guint8 CORE_RESET_CMD[] = {
     0x20, 0x00, 0x01, 0x00
@@ -196,18 +197,19 @@ static const guint8 CORE_SET_CONFIG_RSP_ERROR[] = {
     0x40, 0x02, 0x02, NCI_STATUS_REJECTED, 0x00
 };
 static const guint8 CORE_GET_CONFIG_CMD_DISCOVERY[] = {
-    /* LA_SENS_RES_1, LA_NFCID1, LA_SEL_INFO, LF_PROTOCOL_TYPE */
-    0x20, 0x03, 0x05, 0x04, 0x30, 0x33, 0x32, 0x50
+    /* LA_SENS_RES_1, LA_SEL_INFO, LA_NFCID1, LF_PROTOCOL_TYPE, LI_A_HIST_BY */
+    0x20, 0x03, 0x06, 0x05, 0x30, 0x32, 0x33, 0x50, 0x59 
 };
 static const guint8 CORE_GET_CONFIG_RSP_DISCOVERY_INVALID_PARAM[] = {
     0x40, 0x03, 0x06, NCI_STATUS_INVALID_PARAM, 0x02,
     0x32, 0x00, 0x50, 0x00
 };
 static const guint8 CORE_GET_CONFIG_RSP_NO_LA_SENS_RES_1[] = {
-    0x40, 0x03, 0x0e, 0x00, 0x04,
-    0x33, 0x04, 0x08, 0x00, 0x00, 0x00, /* LA_NFCID1 (dynamic) */
+    0x40, 0x03, 0x10, 0x00, 0x04,
     0x32, 0x01, 0x00, /* LA_SEL_INFO = 0 */
-    0x50, 0x01, 0x00  /* LF_PROTOCOL_TYPE = 0 */
+    0x33, 0x04, 0x08, 0x00, 0x00, 0x00, /* LA_NFCID1 (dynamic) */
+    0x50, 0x01, 0x00, /* LF_PROTOCOL_TYPE = 0 */
+    0x59, 0x00        /* LI_A_HIST_BY (none) */
 };
 static const guint8 CORE_GET_CONFIG_RSP_NFCID_01020304050607[] = {
     0x40, 0x03, 0x14, 0x00, 0x04,
@@ -255,11 +257,12 @@ static const guint8 CORE_GET_CONFIG_RSP_ERROR[] = {
     0x40, 0x03, 0x02, 0x03, 0x00
 };
 static const guint8 CORE_SET_CONFIG_CMD_DISCOVERY_RW_FULL[] = {
-    0x20, 0x02, 0x10, 0x04,
+    0x20, 0x02, 0x12, 0x05,
     0x30, 0x01, 0x00, /* LA_SENS_RES_1 (4 bytes NFCID1) */
-    0x33, 0x04, 0x08, 0x00, 0x00, 0x00, /* LA_NFCID1 (dynamic) */
     0x32, 0x01, 0x00, /* LA_SEL_INFO = 0 */
-    0x50, 0x01, 0x00  /* LF_PROTOCOL_TYPE = 0 */
+    0x33, 0x04, 0x08, 0x00, 0x00, 0x00, /* LA_NFCID1 (dynamic) */
+    0x50, 0x01, 0x00, /* LF_PROTOCOL_TYPE = 0 */
+    0x59, 0x00        /* LI_A_HIST_BY (none) */
 };
 static const guint8 CORE_SET_CONFIG_CMD_DISCOVERY_RW[] = {
     0x20, 0x02, 0x07, 0x02,
@@ -278,20 +281,26 @@ static const guint8 CORE_SET_CONFIG_CMD_DISCOVERY_CE[] = {
 static const guint8 CORE_SET_CONFIG_CMD_NFCID_01020304050607_1[] = {
     0x20, 0x02, 0x10, 0x03,
     0x30, 0x01, 0x40, /* Default LA_SENS_RES_1 for 7 bytes NFCID1 */
-    0x33, 0x07, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, /* LA_NFCID1 */
-    0x32, 0x01, 0x20  /* LA_SEL_INFO = 0x20 */
+    0x32, 0x01, 0x20, /* LA_SEL_INFO = 0x20 */
+    0x33, 0x07, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 /* LA_NFCID1 */
 };
 static const guint8 CORE_SET_CONFIG_CMD_NFCID_01020304050607_2[] = {
     0x20, 0x02, 0x10, 0x03,
     0x30, 0x01, 0x44, /* LA_SENS_RES_1 (7 bytes NFCID1) */
-    0x33, 0x07, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, /* LA_NFCID1 */
-    0x32, 0x01, 0x20  /* LA_SEL_INFO = 0x20 */
+    0x32, 0x01, 0x20, /* LA_SEL_INFO = 0x20 */
+    0x33, 0x07, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 /* LA_NFCID1 */
 };
 static const guint8 CORE_SET_CONFIG_CMD_NFCID_DYNAMIC[] = {
     0x20, 0x02, 0x0d, 0x03,
     0x30, 0x01, 0x04, /* LA_SENS_RES_1 for dynamic 4 bytes NFCID1 */
-    0x33, 0x04, 0x08, 0x00, 0x00, 0x00, /* LA_NFCID1 (dynamic) */
-    0x32, 0x01, 0x20  /* LA_SEL_INFO = 0x20 */
+    0x32, 0x01, 0x20, /* LA_SEL_INFO = 0x20 */
+    0x33, 0x04, 0x08, 0x00, 0x00, 0x00 /* LA_NFCID1 (dynamic) */
+};
+static const guint8 CORE_SET_CONFIG_CMD_LI_A_HB_01020304[] = {
+    0x20, 0x02, 0x0d, 0x03,
+    0x30, 0x01, 0x00, /* LA_SENS_RES_1 (4 bytes NFCID1) */
+    0x32, 0x01, 0x20, /* LA_SEL_INFO = 0x20 */
+    0x59, 0x04, 0x01, 0x02, 0x03, 0x04  /* LI_A_HIST_BY (01020304) */
 };
 static const guint8 RF_SET_LISTEN_MODE_ROUTING_CMD_MIXED_RW_PEER[] = {
     0x21, 0x01, 0x1b, 0x00, 0x05,
@@ -1994,6 +2003,13 @@ static const NciCoreParam TEST_PARAM_LA_NFCID_01020304050607 = {
 };
 static const NciCoreParam* const TEST_PARAMS_LA_NFCID_01020304050607[] = {
     &TEST_PARAM_LA_NFCID_01020304050607, NULL
+};
+static const NciCoreParam TEST_PARAM_LI_A_HB_01020304 = {
+    .key = NCI_CORE_PARAM_LI_A_HB,
+    .value.hb = { 4, { 0x01, 0x02, 0x03, 0x04 } }
+};
+static const NciCoreParam* const TEST_PARAMS_LI_A_HB_01020304[] = {
+    &TEST_PARAM_LI_A_HB_01020304, NULL
 };
 
 static const TestSmEntry test_nci_sm_init_params[] = {
@@ -3936,6 +3952,39 @@ static const TestSmEntry test_nci_param_la_nfcid1[] = {
     TEST_NCI_SM_END()
 };
 
+/* Common part of LI_A_HB tests */
+#define TEST_NCI_PARAM_LI_A() \
+    TEST_NCI_SM_SET_OP_MODE(NFC_OP_MODE_CE), \
+    TEST_NCI_SM_SET_STATE(NCI_RFST_DISCOVERY), \
+    TEST_NCI_SM_ASSERT_STATES(NCI_STATE_INIT, NCI_RFST_DISCOVERY), \
+    TEST_NCI_DEFAULT_RESET_V2(), \
+    \
+    TEST_NCI_SM_ASSERT_STATES(NCI_RFST_IDLE, NCI_RFST_DISCOVERY), \
+    TEST_NCI_SM_EXPECT_CMD(CORE_GET_CONFIG_CMD_DISCOVERY), \
+    TEST_NCI_SM_QUEUE_RSP(CORE_GET_CONFIG_RSP_NO_LA_SENS_RES_1), \
+    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_LI_A_HB_01020304), \
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP), \
+    TEST_NCI_SM_EXPECT_CMD(RF_SET_LISTEN_MODE_ROUTING_CMD_MIXED_CE_B_A), \
+    TEST_NCI_SM_QUEUE_RSP(RF_SET_LISTEN_MODE_ROUTING_RSP), \
+    \
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_LISTEN_ISODEP), \
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP), \
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_A_B_LISTEN), \
+    TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP), \
+    \
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY)
+
+static const TestSmEntry test_nci_param_li_a_hb[] = {
+    TEST_NCI_SM_SET_PARAMS(TEST_PARAMS_LI_A_HB_01020304, FALSE),
+    TEST_NCI_PARAM_LI_A(),
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_param_li_a_hb_conf[] = {
+    TEST_NCI_PARAM_LI_A(),
+    TEST_NCI_SM_END()
+};
+
 static const TestSmEntry test_nci_config_abf[] = {
     TEST_NCI_SM_SET_OP_MODE(NFC_OP_MODE_RW|NFC_OP_MODE_PEER|NFC_OP_MODE_CE|
                             NFC_OP_MODE_POLL|NFC_OP_MODE_LISTEN),
@@ -4114,7 +4163,8 @@ static const char test_nci_config_ab_invalid_la_nfcid1_data1[] =
 static const char test_nci_config_ab_invalid_la_nfcid1_data2[] =
     CONFIG_SECTION "\n"
     CONFIG_ENTRY_TECHNOLOGIES " = A,B\n"
-    CONFIG_ENTRY_LA_NFCID1 " = Garbage!\n";
+    CONFIG_ENTRY_LA_NFCID1 " = Garbage!\n"
+    CONFIG_ENTRY_LI_A_HB " = Junk!\n";
 static const char test_nci_config_la_nfcid1_data[] =
     CONFIG_SECTION "\n"
     CONFIG_ENTRY_TECHNOLOGIES " = A,B\n"
@@ -4123,6 +4173,10 @@ static const char test_nci_config_la_nfcid1_dynamic_data[] =
     CONFIG_SECTION "\n"
     CONFIG_ENTRY_TECHNOLOGIES " = A,B\n"
     CONFIG_ENTRY_LA_NFCID1 " = \n";
+static const char test_nci_config_li_a_hb_data[] =
+    CONFIG_SECTION "\n"
+    CONFIG_ENTRY_TECHNOLOGIES " = A,B\n"
+    CONFIG_ENTRY_LI_A_HB " = 01020304\n";
 
 static const TestNciSmData nci_sm_tests[] = {
     { "init-ok", test_nci_sm_init_ok },
@@ -4209,6 +4263,9 @@ static const TestNciSmData nci_sm_tests[] = {
     { "read-ce-ndef-ab-invalid_la_nfcid1_config2", test_nci_sm_read_ce_ndef_ab,
        test_nci_config_ab_invalid_la_nfcid1_data2 },
     { "param_la_nfcid1", test_nci_param_la_nfcid1, test_nci_config_ab_data },
+    { "param_li_a_hb", test_nci_param_li_a_hb },
+    { "param_li_a_hb_conf", test_nci_param_li_a_hb_conf,
+       test_nci_config_li_a_hb_data },
     { "config_default", test_nci_config_abf, test_nci_config_ab_data_default },
     { "config_empty", test_nci_config_abf, test_nci_config_ab_data_empty },
     { "config_junk", test_nci_config_abf, test_nci_config_ab_data_junk },

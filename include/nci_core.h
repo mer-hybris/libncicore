@@ -61,6 +61,7 @@ typedef enum nci_core_param_key {
     NCI_CORE_PARAM_LLC_VERSION, /* uint8, default is 0x11 (v1.1) */
     NCI_CORE_PARAM_LLC_WKS,     /* uint16, default is 0x0003 (SDP-only) */
     NCI_CORE_PARAM_LA_NFCID1,   /* nfcid1, default is dynamic (Since 1.1.22) */
+    NCI_CORE_PARAM_LI_A_HB,     /* hb, default is empty (Since 1.1.31) */
     NCI_CORE_PARAM_COUNT
 } NCI_CORE_PARAM; /* Since 1.1.18 */
 
@@ -69,7 +70,8 @@ typedef union nci_core_param_value {
     guint16 uint16;
     guint32 uint32;
     NciNfcid1 nfcid1; /* Since 1.1.22 */
-} NciCoreParamValue; /* Since 1.1.18 */
+    NciAtsHb hb;      /* Since 1.1.31 */
+} NciCoreParamValue;  /* Since 1.1.18 */
 
 typedef struct nci_core_param {
     NCI_CORE_PARAM key;

@@ -68,6 +68,7 @@ struct nci_sm {
     guint8 llc_version;
     guint16 llc_wks;
     NciNfcid1 la_nfcid1; /* NFCID1 in Listen A mode */
+    NciAtsHb li_a_hb; /* ATS Historical Bytes in Listen A mode */
 };
 
 typedef
@@ -140,6 +141,12 @@ void
 nci_sm_set_la_nfcid1(
     NciSm* sm,
     const NciNfcid1* nfcid1)
+    NCI_INTERNAL;
+
+void
+nci_sm_set_li_a_hb(
+    NciSm* sm,
+    const NciAtsHb* hb)
     NCI_INTERNAL;
 
 void
