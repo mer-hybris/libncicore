@@ -1,3 +1,9 @@
+libncicore (1.1.31) unstable; urgency=low
+
+  * Added LI_A_HB parameter (ATS Historical Bytes in Listen A mode)
+
+ -- Slava Monich <slava@monich.com>  Mon, 29 Dec 2025 19:22:58 +0200
+
 libncicore (1.1.30) unstable; urgency=low
 
   * Made state machine reset more reliable
