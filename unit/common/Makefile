@@ -1,6 +1,7 @@
 # -*- Mode: makefile-gmake -*-
 
 .PHONY: clean all debug release coverage debug_lib release_lib coverage_lib
+.PHONY: valgrind test test-banner test-debug test-release
 
 #
 # Real test makefile defines EXE (and possibly SRC) and includes this one.
@@ -45,7 +46,7 @@ CC = $(CROSS_COMPILE)gcc
 LD = $(CC)
 WARNINGS += -Wall
 INCLUDES += -I$(COMMON_DIR) -I$(LIB_DIR)/src -I$(LIB_DIR)/include
-BASE_FLAGS = -fPIC
+BASE_FLAGS = -fPIC -g
 BASE_LDFLAGS = $(BASE_FLAGS) $(LDFLAGS)
 BASE_CFLAGS = $(BASE_FLAGS) $(CFLAGS)
 FULL_CFLAGS = $(BASE_CFLAGS) $(DEFINES) $(WARNINGS) $(INCLUDES) -MMD -MP \
@@ -53,17 +54,14 @@ FULL_CFLAGS = $(BASE_CFLAGS) $(DEFINES) $(WARNINGS) $(INCLUDES) -MMD -MP \
 FULL_LDFLAGS = $(BASE_LDFLAGS)
 LIBS = $(shell pkg-config --libs $(PKGS)) -ldl
 QUIET_MAKE = make --no-print-directory
-DEBUG_FLAGS = -g
-RELEASE_FLAGS =
-COVERAGE_FLAGS = -g
 
-DEBUG_LDFLAGS = $(FULL_LDFLAGS) $(DEBUG_FLAGS)
-RELEASE_LDFLAGS = $(FULL_LDFLAGS) $(RELEASE_FLAGS)
-COVERAGE_LDFLAGS = $(FULL_LDFLAGS) $(COVERAGE_FLAGS) --coverage
+DEBUG_LDFLAGS = $(FULL_LDFLAGS)
+RELEASE_LDFLAGS = $(FULL_LDFLAGS)
+COVERAGE_LDFLAGS = $(FULL_LDFLAGS) --coverage
 
-DEBUG_CFLAGS = $(FULL_CFLAGS) $(DEBUG_FLAGS) -DDEBUG
-RELEASE_CFLAGS = $(FULL_CFLAGS) $(RELEASE_FLAGS) -O2
-COVERAGE_CFLAGS = $(FULL_CFLAGS) $(COVERAGE_FLAGS) --coverage
+DEBUG_CFLAGS = $(FULL_CFLAGS) -DDEBUG
+RELEASE_CFLAGS = $(FULL_CFLAGS) -O2
+COVERAGE_CFLAGS = $(FULL_CFLAGS) --coverage
 
 #
 # Files
@@ -132,11 +130,16 @@ cleaner: unitclean
 test_banner:
 	@echo "===========" $(EXE) "=========== "
 
-test: test_banner debug 
+test-debug: test_banner debug
 	@LD_LIBRARY_PATH="$(LIB_DIR)/$(DEBUG_LIB_PATH)" $(DEBUG_EXE)
 
-valgrind: test_banner debug
-	@LD_LIBRARY_PATH="$(LIB_DIR)/$(DEBUG_LIB_PATH)" G_DEBUG=gc-friendly G_SLICE=always-malloc valgrind --tool=memcheck --leak-check=full --show-possibly-lost=no $(DEBUG_EXE)
+test-release: test_banner release
+	@LD_LIBRARY_PATH="$(LIB_DIR)/$(RELEASE_LIB_PATH)" $(RELEASE_EXE)
+
+test: test-release
+
+valgrind: test_banner release
+	@LD_LIBRARY_PATH="$(LIB_DIR)/$(RELEASE_LIB_PATH)" G_DEBUG=gc-friendly G_SLICE=always-malloc valgrind --tool=memcheck --leak-check=full --show-possibly-lost=no $(RELEASE_EXE)
 
 $(DEBUG_BUILD_DIR):
 	mkdir -p $@
