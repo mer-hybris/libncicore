@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018-2025 Slava Monich <slava@monich.com>
+ * Copyright (C) 2018-2026 Slava Monich <slava@monich.com>
  * Copyright (C) 2018-2021 Jolla Ltd.
  *
  * You may use this file under the terms of the BSD license as follows:
@@ -525,16 +525,29 @@ static const guint8 RF_DISCOVER_CMD_RW_CE_PEER_A_B_F[] = {
     0x85, 0x01, /* ActiveListenF */
     0x82, 0x01  /* PassiveListenF */
 };
+static const guint8 RF_DISCOVER_CMD_RW_CE_A_B[] = {
+    0x21, 0x03, 0x0b, 0x05,
+    0x03, 0x01, /* ActivePollA */
+    0x00, 0x01, /* PassivePollA */
+    0x01, 0x01, /* PassivePollB */
+    0x80, 0x01, /* PassiveListenA */
+    0x81, 0x01  /* PassiveListenB */
+};
 static const guint8 RF_DISCOVER_CMD_RW_CE_A_B_F[] = {
-    0x21, 0x03, 0x11, 0x08,
+    0x21, 0x03, 0x0f, 0x07,
     0x03, 0x01, /* ActivePollA */
     0x00, 0x01, /* PassivePollA */
     0x01, 0x01, /* PassivePollB */
     0x05, 0x01, /* ActivePollF */
     0x02, 0x01, /* PassivePollF */
-    0x83, 0x01, /* ActiveListenA */
     0x80, 0x01, /* PassiveListenA */
     0x81, 0x01  /* PassiveListenB */
+};
+static const guint8 RF_DISCOVER_CMD_RW_CE_A[] = {
+    0x21, 0x03, 0x07, 0x03,
+    0x03, 0x01, /* ActivePollA */
+    0x00, 0x01, /* PassivePollA */
+    0x80, 0x01  /* PassiveListenA */
 };
 static const guint8 RF_DISCOVER_CMD_ALL_A_B[] = {
     0x21, 0x03, 0x0d, 0x06,
@@ -545,13 +558,6 @@ static const guint8 RF_DISCOVER_CMD_ALL_A_B[] = {
     0x80, 0x01, /* PassiveListenA */
     0x81, 0x01  /* PassiveListenB */
 };
-static const guint8 RF_DISCOVER_CMD_ALL_A[] = {
-    0x21, 0x03, 0x09, 0x04,
-    0x03, 0x01, /* ActivePollA */
-    0x00, 0x01, /* PassivePollA */
-    0x83, 0x01, /* ActiveListenA */
-    0x80, 0x01  /* PassiveListenA */
-};
 static const guint8 RF_DISCOVER_CMD_NFCDEP_LISTEN[] = {
     0x21, 0x03, 0x09, 0x04,
     0x83, 0x01, /* ActiveListenA */
@@ -560,13 +566,11 @@ static const guint8 RF_DISCOVER_CMD_NFCDEP_LISTEN[] = {
     0x82, 0x01  /* PassiveListenF */
 };
 static const guint8 RF_DISCOVER_CMD_A_LISTEN[] = {
-    0x21, 0x03, 0x05, 0x02,
-    0x83, 0x01, /* ActiveListenA */
+    0x21, 0x03, 0x03, 0x01,
     0x80, 0x01  /* PassiveListenA */
 };
 static const guint8 RF_DISCOVER_CMD_A_B_LISTEN[] = {
-    0x21, 0x03, 0x07, 0x03,
-    0x83, 0x01, /* ActiveListenA */
+    0x21, 0x03, 0x05, 0x02,
     0x80, 0x01, /* PassiveListenA */
     0x81, 0x01  /* PassiveListenB */
 };
@@ -1419,9 +1423,6 @@ test_init_ok(
     /* Responses */
     test_hal_io_queue_rsp(hal, CORE_RESET_RSP);
     test_hal_io_queue_ntf(hal, CORE_IGNORED_NTF);
-    /* Couple more broken notifications */
-    test_hal_io_queue_ntf(hal, CORE_CONN_CREDITS_BROKEN1_NTF);
-    test_hal_io_queue_ntf(hal, CORE_CONN_CREDITS_BROKEN2_NTF);
     /* Final response */
     test_hal_io_queue_rsp(hal, CORE_INIT_RSP);
     test_hal_io_queue_rsp(hal, CORE_SET_CONFIG_RSP);
@@ -1527,6 +1528,75 @@ test_init_failed2(
     nci_core_free(nci);
     test_hal_io_free(hal);
     g_main_loop_unref(loop);
+}
+
+/*==========================================================================*
+ * init_failed3
+ * init_failed4
+ *==========================================================================*/
+
+static
+void
+test_init_broken_conn_credits_done(
+    NciCore* nci,
+    void* user_data)
+{
+    if (nci->current_state == NCI_STATE_ERROR) {
+        test_quit_later((GMainLoop*)user_data);
+    }
+}
+
+static
+void
+test_init_broken_conn_credits(
+    const guint8* broken_ntf,
+    guint broken_ntf_len)
+{
+    TestHalIo* hal = test_hal_io_new();
+    NciCore* nci = nci_core_new(&hal->io);
+    GMainLoop* loop = g_main_loop_new(NULL, TRUE);
+    gulong id[2];
+
+    nci_core_set_state(nci, NCI_RFST_IDLE);
+    test_hal_io_queue_rsp(hal, CORE_RESET_RSP);
+    test_hal_io_queue_rsp(hal, CORE_INIT_RSP);
+    test_hal_io_queue_rsp(hal, CORE_SET_CONFIG_RSP);
+    test_hal_io_queue_read(hal, broken_ntf, broken_ntf_len, TRUE);
+
+    id[0] = nci_core_add_current_state_changed_handler(nci,
+        test_init_broken_conn_credits_done, loop);
+    id[1] = nci_core_add_data_packet_handler(nci,
+        test_data_packet_handler_not_reached, NULL);
+
+    g_assert(id[0]);
+    g_assert(id[1]);
+
+    test_run_loop(&test_opt, loop);
+
+    g_assert(nci->current_state == NCI_STATE_ERROR);
+    g_assert(nci->next_state == NCI_STATE_ERROR);
+    nci_core_remove_all_handlers(nci, id);
+    nci_core_free(nci);
+    test_hal_io_free(hal);
+    g_main_loop_unref(loop);
+}
+
+static
+void
+test_init_failed3(
+    void)
+{
+    test_init_broken_conn_credits(TEST_ARRAY_AND_SIZE
+        (CORE_CONN_CREDITS_BROKEN1_NTF));
+}
+
+static
+void
+test_init_failed4(
+    void)
+{
+    test_init_broken_conn_credits(TEST_ARRAY_AND_SIZE
+        (CORE_CONN_CREDITS_BROKEN2_NTF));
 }
 
 /*==========================================================================*
@@ -3469,7 +3539,7 @@ static const TestSmEntry test_nci_sm_nfc_dep_listen_disappear[] = {
     TEST_NCI_SM_QUEUE_RSP(RF_SET_LISTEN_MODE_ROUTING_RSP),\
     TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW_CE_A_B),\
     TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),\
-    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_ALL_A),\
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_RW_CE_A),\
     TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),\
     TEST_NCI_SM_QUEUE_NTF(CORE_CONN_CREDITS_NTF),\
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY)
@@ -3896,7 +3966,7 @@ static const TestSmEntry test_nci_sm_read_ce_ndef_ab[] = {
 
     TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_MAP_CMD_RW_CE_A_B),
     TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_MAP_RSP),
-    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_ALL_A_B),
+    TEST_NCI_SM_EXPECT_CMD(RF_DISCOVER_CMD_RW_CE_A_B),
     TEST_NCI_SM_QUEUE_RSP(RF_DISCOVER_RSP),
     TEST_NCI_SM_QUEUE_NTF(CORE_CONN_CREDITS_NTF),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_DISCOVERY),
@@ -4300,8 +4370,10 @@ int main(int argc, char* argv[])
     g_test_add_func(TEST_("param"), test_param);
     g_test_add_func(TEST_("restart"), test_restart);
     g_test_add_func(TEST_("init_ok"), test_init_ok);
-    g_test_add_func(TEST_("init_failed1"), test_init_failed1);
-    g_test_add_func(TEST_("init_failed2"), test_init_failed2);
+    g_test_add_func(TEST_("init_failed/1"), test_init_failed1);
+    g_test_add_func(TEST_("init_failed/2"), test_init_failed2);
+    g_test_add_func(TEST_("init_failed/3"), test_init_failed3);
+    g_test_add_func(TEST_("init_failed/4"), test_init_failed4);
     for (i = 0; i < G_N_ELEMENTS(nci_sm_tests); i++) {
         const TestNciSmData* test = nci_sm_tests + i;
         char* path = g_strconcat(TEST_PREFIX "sm/", test->name, NULL);
