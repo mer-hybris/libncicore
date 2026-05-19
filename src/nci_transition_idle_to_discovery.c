@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2025 Slava Monich <slava@monich.com>
+ * Copyright (C) 2019-2026 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2020 Jolla Ltd.
  *
  * You may use this file under the terms of the BSD license as follows:
@@ -314,7 +314,7 @@ nci_transition_idle_to_discovery_discover(
     }
 
     if (sm->op_mode & NFC_OP_MODE_CE) {
-        techs |= NCI_TECH_A_LISTEN | NCI_TECH_B_LISTEN;
+        techs |= NCI_TECH_A_LISTEN_PASSIVE | NCI_TECH_B_LISTEN;
     }
 
     /* Mask off the disabled techs */
