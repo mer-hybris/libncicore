@@ -1,3 +1,11 @@
+libncicore (1.1.32) unstable; urgency=low
+
+  * Require only passive modes for card emulation
+  * Handle CORE_CONN_CREDITS during transition
+  * Use release build for unit testing
+
+ -- Slava Monich <slava@monich.com>  Tue, 19 May 2026 19:34:45 +0300
+
 libncicore (1.1.31) unstable; urgency=low
 
   * Added LI_A_HB parameter (ATS Historical Bytes in Listen A mode)
