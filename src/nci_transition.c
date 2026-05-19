@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2024 Slava Monich <slava@monich.com>
+ * Copyright (C) 2019-2026 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2020 Jolla Ltd.
  *
  * You may use this file under the terms of the BSD license as follows:
@@ -283,6 +283,15 @@ nci_transition_default_handle_ntf(
     guint8 oid,
     const GUtilData* payload)
 {
+    switch (gid) {
+    case NCI_GID_CORE:
+        switch (oid) {
+        case NCI_OID_CORE_CONN_CREDITS:
+            nci_sm_handle_conn_credits_ntf(self->priv->sm, payload);
+            return;
+        }
+        break;
+    }
     GDEBUG("Notification 0x%02x/0x%02x is ignored in transition", gid, oid);
 }
 
