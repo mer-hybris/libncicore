@@ -109,6 +109,12 @@ static const guint8 CORE_INIT_V2_RSP[] = {
     0x05, 0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x00,
     0x00, 0x90, 0x00
 };
+static const guint8 CORE_INIT_V2_RSP_EXT[] = {
+    0x40, 0x01, 0x1a, 0x00, 0x1a, 0x7e, 0x06, 0x00,
+    0x02, 0x00, 0x02, 0xff, 0xff, 0x00, 0x0c, 0x01,
+    0x05, 0x01, 0x01, 0x02, 0x02, 0x01, 0x02, 0x03,
+    0x00, 0x00, 0x00, 0x90, 0x00
+};
 static const guint8 CORE_INIT_V2_RSP_NO_PROTOCOL_ROUTING[] = {
     0x40, 0x01, 0x18, 0x00, 0x1a, 0x7a, 0x06, 0x00,
     0x02, 0x00, 0x02, 0xff, 0xff, 0x00, 0x0c, 0x01,
@@ -2171,6 +2177,19 @@ static const TestSmEntry test_nci_sm_init_v2[] = {
     TEST_NCI_SM_QUEUE_NTF(CORE_RESET_V2_NTF),
     TEST_NCI_SM_EXPECT_CMD(CORE_INIT_CMD_V2),
     TEST_NCI_SM_QUEUE_RSP(CORE_INIT_V2_RSP),
+    TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DEFAULT),
+    TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
+    TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_END()
+};
+
+static const TestSmEntry test_nci_sm_init_v2_ext[] = {
+    TEST_NCI_SM_EXPECT_CMD(CORE_RESET_CMD),
+    TEST_NCI_SM_SET_STATE(NCI_RFST_IDLE),
+    TEST_NCI_SM_QUEUE_RSP(CORE_RESET_V2_RSP),
+    TEST_NCI_SM_QUEUE_NTF(CORE_RESET_V2_NTF),
+    TEST_NCI_SM_EXPECT_CMD(CORE_INIT_CMD_V2),
+    TEST_NCI_SM_QUEUE_RSP(CORE_INIT_V2_RSP_EXT),
     TEST_NCI_SM_EXPECT_CMD(CORE_SET_CONFIG_CMD_DEFAULT),
     TEST_NCI_SM_QUEUE_RSP(CORE_SET_CONFIG_RSP),
     TEST_NCI_SM_WAIT_STATE(NCI_RFST_IDLE),
@@ -4257,6 +4276,7 @@ static const TestNciSmData nci_sm_tests[] = {
     { "reset-timeout", test_nci_sm_reset_timeout },
     { "inir-set-config-timeout", test_nci_sm_init_set_config_timeout },
     { "init-v2", test_nci_sm_init_v2 },
+    { "init-v2-ext", test_nci_sm_init_v2_ext },
     { "init-v2-error", test_nci_sm_init_v2_error },
     { "init-v2-broken1", test_nci_sm_init_v2_broken1 },
     { "init-v2-broken2", test_nci_sm_init_v2_broken2 },
