@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2026 Jolla Mobile Ltd
  * Copyright (C) 2020-2025 Slava Monich <slava@monich.com>
  * Copyright (C) 2020-2021 Jolla Ltd.
  *
@@ -45,7 +46,7 @@
 /* libncicore version */
 #define NCI_CORE_VERSION_MAJOR   1
 #define NCI_CORE_VERSION_MINOR   1
-#define NCI_CORE_VERSION_RELEASE 32
+#define NCI_CORE_VERSION_RELEASE 33
 
 #define NCI_CORE_VERSION_WORD(v1,v2,v3) \
     ((((v1) & 0x7f) << 24) | \
@@ -72,6 +73,7 @@
 #define NCI_CORE_VERSION_1_1_30      NCI_CORE_VERSION_WORD(1,1,30)
 #define NCI_CORE_VERSION_1_1_31      NCI_CORE_VERSION_WORD(1,1,31)
 #define NCI_CORE_VERSION_1_1_32      NCI_CORE_VERSION_WORD(1,1,32)
+#define NCI_CORE_VERSION_1_1_33      NCI_CORE_VERSION_WORD(1,1,33)
 
 #endif /* NCI_CORE_VERSION_H */
 

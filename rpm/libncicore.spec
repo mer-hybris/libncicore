@@ -1,6 +1,6 @@
 Name: libncicore
 
-Version: 1.1.32
+Version: 1.1.33
 Release: 0
 Summary: NCI state machine
 License: BSD
