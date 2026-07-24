@@ -381,7 +381,7 @@ nci_transition_reset_init_v2_rsp(
          * +=========================================================+
          */
         if (len >= 14 && pkt[0] == NCI_STATUS_OK &&
-            len == (2 * (n = pkt[13]) + 14)) {
+            len >= (2 * (n = pkt[13]) + 14)) {
             guint8 max_logical_conns = pkt[5];
             guint8 max_control_payload = pkt[8];
             guint i;
@@ -439,7 +439,7 @@ nci_transition_reset_init_v2_rsp(
             nci_transition_reset_set_config(self);
             return;
         }
-        GWARN("CORE_INIT (v1) failed (or is incomprehensible)");
+        GWARN("CORE_INIT (v2) failed (or is incomprehensible)");
     }
     nci_sm_error(sm);
 }
