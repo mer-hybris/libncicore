@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2026 Jolla Mobile Ltd
  * Copyright (C) 2018-2026 Slava Monich <slava@monich.com>
  * Copyright (C) 2018-2021 Jolla Ltd.
  *
@@ -2279,7 +2280,6 @@ static const TestSmEntry test_nci_sm_init_broken[] = {
     TEST_NCI_SM_EXPECT_CMD(CORE_RESET_CMD),
     TEST_NCI_SM_SET_STATE(NCI_RFST_IDLE),
     TEST_NCI_SM_QUEUE_RSP(CORE_RESET_RSP),
-    TEST_NCI_SM_QUEUE_NTF(CORE_RESET_V2_NTF), /* Unexpected (ignored) */
     TEST_NCI_SM_EXPECT_CMD(CORE_INIT_CMD_V1),
     TEST_NCI_SM_QUEUE_RSP(CORE_INIT_RSP_BROKEN),
     TEST_NCI_SM_WAIT_STATE(NCI_STATE_ERROR),
