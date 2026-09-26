@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2026 Jolla Mobile Ltd
  * Copyright (C) 2019-2023 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
  * Copyright (C) 2020 Open Mobile Platform LLC.
@@ -169,7 +170,7 @@ test_mode_param_success(
     NciModeParam param;
 
     memset(&param, 0, sizeof(param));
-    g_assert(nci_parse_mode_param(&param, test->mode,
+    g_assert_true(nci_parse_mode_param(&param, test->mode,
         test->data.bytes, test->data.size));
     g_assert(!memcmp(&param, &test->expected, sizeof(param)));
 }
@@ -184,17 +185,20 @@ static const guint8 mode_param_success_data_poll_b[] =
     { 0x0b, 0x65, 0xe6, 0x70, 0x15, 0xe1, 0xf3, 0x5e, 0x11, 0x77, 0x87, 0x95 };
 static const guint8 mode_param_success_data_poll_b_rfu[] =
     { 0x0b, 0x65, 0xe6, 0x70, 0x15, 0xe1, 0xf3, 0x5e, 0x11, 0x77, 0x97, 0x95 };
-static const guint8 mode_param_success_data_poll_f_1[] =
-    { 0x01, 0x12, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0xc0, 0xc1,
-      0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f, 0xab };
+static const guint8 mode_param_success_data_active_poll_a[] =
+    { 0x23, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x0a, 0x32, 0x46, 0x66, 0x6d, 0x01, 0x01, 0x11, 0x02, 0x02,
+      0x07, 0xff, 0x03, 0x02, 0x00, 0x03, 0x04, 0x01, 0x64, 0x07, 0x01, 0x03 };
 static const guint8 mode_param_success_data_poll_f_2[] =
     { 0x02, 0x12, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0xc0, 0xc1,
       0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f, 0xab };
 static const guint8 mode_param_success_data_poll_f_3[] =
     { 0x03, 0x12, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0xc0, 0xc1,
       0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f, 0xab };
-static const guint8 mode_param_success_data_listen_f_0[] =
-    { 0x00 };
+static const guint8 mode_param_success_data_active_listen_a[] =
+    { 0x22, 0xd9, 0x17, 0xa2, 0x8f, 0x1c, 0x41, 0xc1, 0x66, 0x9c, 0x8e, 0x00,
+      0x00, 0x00, 0x32, 0x46, 0x66, 0x6d, 0x01, 0x01, 0x11, 0x02, 0x02, 0x07,
+      0xff, 0x03, 0x02, 0x00, 0x03, 0x04, 0x01, 0x64, 0x07, 0x01, 0x03 };
 static const guint8 mode_param_success_data_listen_f_1[] =
     { 0x08, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21 };
 static const guint8 mode_param_success_data_listen_f_2[] =
@@ -202,12 +206,12 @@ static const guint8 mode_param_success_data_listen_f_2[] =
 static const TestModeParamSuccessData mode_param_success_tests[] = {
     {
         .name = "minimal",
-        .mode = NCI_MODE_ACTIVE_POLL_A,
+        .mode = NCI_MODE_PASSIVE_POLL_A,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_minimal) },
         .expected = { .poll_a = { { 0x04, 0x00 } } }
     },{
         .name = "no_nfcid1",
-        .mode = NCI_MODE_ACTIVE_POLL_A,
+        .mode = NCI_MODE_PASSIVE_POLL_A,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_no_nfcid1) },
         .expected = { .poll_a = { { 0x04, 0x00 }, 0, { 0 }, 1, 0x20 } }
     },{
@@ -232,11 +236,11 @@ static const TestModeParamSuccessData mode_param_success_tests[] = {
                                   {0xe1, 0xf3, 0x5e, 0x11},
                                   {mode_param_success_data_poll_b_rfu + 9, 3}}}
     },{
-        .name = "active_poll_f",
-        .mode = NCI_MODE_ACTIVE_POLL_F,
-        .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_poll_f_1) },
-        .expected = { .poll_f = { 1, {0x01, 0xfe, 0xc0, 0xf1,
-                                      0xc4, 0x41, 0x38, 0x21} } }
+        .name = "active_poll_a",
+        .mode = NCI_MODE_ACTIVE_POLL_A,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_active_poll_a) },
+        .expected = { .poll_active = { {}, 0x00, 0x00, 0x00, 0x0a, 0x32,
+                    { mode_param_success_data_active_poll_a + 16,  20 } }}
     },{
         .name = "passive_poll_f",
         .mode = NCI_MODE_PASSIVE_POLL_F,
@@ -250,9 +254,13 @@ static const TestModeParamSuccessData mode_param_success_tests[] = {
         .expected = { .poll_f = { 3, {0x01, 0xfe, 0xc0, 0xf1,
                                       0xc4, 0x41, 0x38, 0x21} } }
     },{
-        .name = "active_listen_f",
-        .mode = NCI_MODE_ACTIVE_LISTEN_F,
-        .data = { TEST_ARRAY_AND_SIZE(mode_param_success_data_listen_f_0) },
+        .name = "active_listen_a",
+        .mode = NCI_MODE_ACTIVE_LISTEN_A,
+        .data = {TEST_ARRAY_AND_SIZE(mode_param_success_data_active_listen_a)},
+        .expected = { .listen_active = { {0xd9, 0x17, 0xa2, 0x8f, 0x1c,
+                                          0x41, 0xc1, 0x66, 0x9c, 0x8e},
+                                          0x00, 0x00, 0x00, 0x32,
+                    { mode_param_success_data_active_listen_a + 15,  20 } }}
     },{
         .name = "passive_listen_f",
         .mode = NCI_MODE_PASSIVE_LISTEN_F,
@@ -303,9 +311,9 @@ static const guint8 mode_param_fail_pollf_data_too_short_1[] =
       0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0x0f };
 static const guint8 mode_param_fail_pollf_data_too_short_2[] =
     { 0x01, 0x07, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38 };
-static const guint8 mode_param_fail_listenf_data_too_short[] =
+static const guint8 mode_param_fail_listen_data_too_short[] =
     { 0x08, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38 };
-static const guint8 mode_param_fail_listenf_data_bad_len[] =
+static const guint8 mode_param_fail_listen_data_bad_len[] =
     { 0x09, 0x01, 0xfe, 0xc0, 0xf1, 0xc4, 0x41, 0x38, 0x21, 0x00 };
 static const TestModeParamFailData mode_param_fail_tests[] = {
     {
@@ -319,35 +327,30 @@ static const TestModeParamFailData mode_param_fail_tests[] = {
         .mode = NCI_MODE_PASSIVE_LISTEN_A
     },{
         .name = "passive_poll_a_empty",
-        .mode = NCI_MODE_PASSIVE_POLL_A,
-        .data = { NULL, 0 }
-    },{
-        .name = "active_poll_a_empty",
-        .mode = NCI_MODE_ACTIVE_POLL_A,
-        .data = { NULL, 0 }
+        .mode = NCI_MODE_PASSIVE_POLL_A
     },{
         .name = "too_short/poll_a",
-        .mode = NCI_MODE_ACTIVE_POLL_A,
+        .mode = NCI_MODE_PASSIVE_POLL_A,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_data_too_short_1) }
     },{
         .name = "too_short/poll_b",
-        .mode = NCI_MODE_ACTIVE_POLL_A,
+        .mode = NCI_MODE_PASSIVE_POLL_B,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_data_too_short_1) }
     },{
         .name = "too_short/poll_f",
-        .mode = NCI_MODE_ACTIVE_POLL_F,
+        .mode = NCI_MODE_PASSIVE_POLL_F,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_data_too_short_1) }
     },{
         .name = "too_short/2",
-        .mode = NCI_MODE_ACTIVE_POLL_A,
+        .mode = NCI_MODE_PASSIVE_POLL_A,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_data_too_short_2) }
     },{
         .name = "too_short/3",
-        .mode = NCI_MODE_ACTIVE_POLL_A,
+        .mode = NCI_MODE_PASSIVE_POLL_A,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_data_too_short_3) }
     },{
         .name = "too_long",
-        .mode = NCI_MODE_ACTIVE_POLL_A,
+        .mode = NCI_MODE_PASSIVE_POLL_A,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_data_too_long) }
     },{
         .name = "poll_b_empty",
@@ -366,16 +369,41 @@ static const TestModeParamFailData mode_param_fail_tests[] = {
         .mode = NCI_MODE_PASSIVE_POLL_F,
         .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_pollf_data_too_short_2) }
     },{
-        .name = "listen_f_empty",
-        .mode = NCI_MODE_ACTIVE_LISTEN_F,
+        .name = "active_poll_a_empty",
+        .mode = NCI_MODE_ACTIVE_POLL_A
     },{
-        .name = "listen_f_too_short",
-        .mode = NCI_MODE_ACTIVE_LISTEN_F,
-        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_listenf_data_too_short) }
+        .name = "active_poll_f_empty",
+        .mode = NCI_MODE_ACTIVE_POLL_F
     },{
-        .name = "listen_f_bad_len",
+        .name = "active_poll_a_too_short",
+        .mode = NCI_MODE_ACTIVE_POLL_A,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_listen_data_too_short) }
+    },{
+        .name = "active_poll_f_too_short",
+        .mode = NCI_MODE_ACTIVE_POLL_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_listen_data_too_short) }
+    },{
+        .name = "active_listen_a_empty",
+        .mode = NCI_MODE_ACTIVE_LISTEN_A
+    },{
+        .name = "active_listen_f_empty",
+        .mode = NCI_MODE_ACTIVE_LISTEN_F
+    },{
+        .name = "active_listen_a_too_short",
+        .mode = NCI_MODE_ACTIVE_LISTEN_A,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_listen_data_too_short) }
+    },{
+        .name = "active_listen_f_too_short",
+        .mode = NCI_MODE_ACTIVE_LISTEN_F,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_listen_data_too_short) }
+    },{
+        .name = "active_listen_a_bad_len",
+        .mode = NCI_MODE_PASSIVE_LISTEN_A,
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_listen_data_bad_len) }
+    },{
+        .name = "active_listen_f_bad_len",
         .mode = NCI_MODE_PASSIVE_LISTEN_F,
-        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_listenf_data_bad_len) }
+        .data = { TEST_ARRAY_AND_SIZE(mode_param_fail_listen_data_bad_len) }
     }
 };
 
@@ -460,6 +488,10 @@ static const guint8 test_intf_activated_ntf_iso_dep_listen_2[] = {
     0x01, 0x02, 0x04, 0x81, 0xff, 0x01, 0x01, 0x00,
     0x81, 0x00, 0x00, 0x0c, 0x0b, 0x64, 0x84, 0x7c,
     0x9c, 0x00, 0x05, 0x01, 0x00, 0x01, 0x02, 0x03
+};
+static const guint8 test_intf_activated_ntf_iso_dep_listen_3[] = {
+    0x01, 0x02, 0x04, 0x80, 0xff, 0x01, 0x00, 0x80,
+    0x00, 0x00, 0x01, 0x80
 };
 static const guint8 test_intf_activated_ntf_isodep_poll_1[] = {
     0x01, 0x02, 0x04, 0x01, 0xff, 0x01, 0x0c, 0x0b,
@@ -603,6 +635,9 @@ static const NciActivationParam test_intf_activated_ntf_iso_dep_listen_ap_2 = {
         .hlc = { test_intf_activated_ntf_iso_dep_listen_2 + 0x15, 3 }
     }
 };
+static const NciActivationParam test_intf_activated_ntf_iso_dep_listen_ap_3 = {
+    .iso_dep_listen_a = { 256, 0x00 }
+};
 static const NciActivationParam test_intf_activated_ntf_isodep_poll_ap_1 = {
     .iso_dep_poll_b = {
         .mbli = 0x00,
@@ -690,6 +725,10 @@ static const TestIntfActivatedSuccessData intf_activated_success_tests[] = {
         .name = "isodep/listen/ok/2",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_iso_dep_listen_2)},
         .activation_param = &test_intf_activated_ntf_iso_dep_listen_ap_2
+    },{
+        .name = "isodep/listen/ok/3",
+        .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_iso_dep_listen_3)},
+        .activation_param = &test_intf_activated_ntf_iso_dep_listen_ap_3
     },{
         .name = "isodep/poll/ok/1",
         .data = {TEST_ARRAY_AND_SIZE(test_intf_activated_ntf_isodep_poll_1)},
@@ -965,7 +1004,6 @@ test_discover_copy_check(
         g_assert(n1->param);
         g_assert(!memcmp(n1->param_bytes, n2->param_bytes, n2->param_len));
         switch (n2->mode) {
-        case NCI_MODE_ACTIVE_POLL_A:
         case NCI_MODE_PASSIVE_POLL_A:
             {
                 const NciModeParamPollA* p1 = &n1->param->poll_a;
@@ -1170,27 +1208,33 @@ test_mode_param_copy_check(
         g_assert(copy);
         g_assert(orig != copy);
         switch (mode) {
-        case NCI_MODE_ACTIVE_POLL_A:        /* fallthrough */
         case NCI_MODE_PASSIVE_POLL_A:
             test_poll_a_copy_check(&orig->poll_a, &copy->poll_a);
             break;
-        case NCI_MODE_ACTIVE_POLL_F:        /* fallthrough */
         case NCI_MODE_PASSIVE_POLL_F:
             test_poll_f_copy_check(&orig->poll_f, &copy->poll_f);
             break;
         case NCI_MODE_PASSIVE_POLL_B:
             test_poll_b_copy_check(&orig->poll_b, &copy->poll_b);
             break;
-        case NCI_MODE_ACTIVE_LISTEN_F:
         case NCI_MODE_PASSIVE_LISTEN_F:
             test_listen_f_copy_check(&orig->listen_f, &copy->listen_f);
             break;
         case NCI_MODE_PASSIVE_POLL_V:
         case NCI_MODE_PASSIVE_LISTEN_V:
             break;
-        case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
-        case NCI_MODE_PASSIVE_LISTEN_B:     /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_A:
+        case NCI_MODE_PASSIVE_LISTEN_B:
+            break;
+        case NCI_MODE_ACTIVE_POLL_A:
+        case NCI_MODE_ACTIVE_POLL_F:
+            g_assert_cmpmem(&orig->poll_active, sizeof(orig->poll_active),
+                &copy->poll_active, sizeof(copy->poll_active));
+            break;
         case NCI_MODE_ACTIVE_LISTEN_A:
+        case NCI_MODE_ACTIVE_LISTEN_F:
+            g_assert_cmpmem(&orig->listen_active, sizeof(orig->listen_active),
+                &copy->listen_active, sizeof(copy->listen_active));
             break;
         }
     } else {
@@ -1507,7 +1551,7 @@ typedef struct test_parse_config_param_uint_data {
 
 static
 void
-test_parse_config_param(
+test_parse_config_param_uint(
     gconstpointer test_data)
 {
     const TestParseConfigParamUintData* test = test_data;
@@ -1551,6 +1595,62 @@ static const TestParseConfigParamUintData parse_config_param_uint_tests[] = {
     {1, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_short_2)}, 1, 1, 1},
     {2, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_small_1)}, 2, 0, 0},
     {1, {TEST_ARRAY_AND_SIZE(parse_config_param_uint_data_long)}, 1, 0, 0}
+};
+
+/*==========================================================================*
+ * parse_config_param_nfcid1
+ *==========================================================================*/
+
+typedef struct test_parse_config_param_nfcid1_data {
+    guint nparams;
+    GUtilData params;
+    guint id;
+    gboolean ok;
+    NciNfcid1 result;
+} TestParseConfigParamNfcid1Data;
+
+static
+void
+test_parse_config_param_nfcid1(
+    gconstpointer test_data)
+{
+    const TestParseConfigParamNfcid1Data* test = test_data;
+    NciNfcid1 nfcid1;
+    gboolean ok;
+
+    memset(&nfcid1, 0, sizeof(nfcid1));
+    ok = nci_parse_config_param_nfcid1(test->nparams,
+        &test->params, test->id, &nfcid1);
+
+    g_assert_cmpuint(ok, == ,test->ok);
+    g_assert(!memcmp(&nfcid1, &test->result, sizeof(nfcid1)));
+}
+
+static const guint8 parse_config_param_nfcid1_data_1[] = {
+    0x01, 0x01, 0x01,
+    0x02, 0x04, 0x01, 0x02, 0x03, 0x04
+};
+static const guint8 parse_config_param_nfcid1_data_2[] = {
+    0x01, 0x07, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07
+};
+static const guint8 parse_config_param_nfcid1_data_3[] = {
+    0x01, 0x0a, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0a
+};
+
+static const TestParseConfigParamNfcid1Data parse_config_param_nfcid1_tests[] =
+{
+    /* Invalid id */
+    { 2, { TEST_ARRAY_AND_SIZE(parse_config_param_nfcid1_data_1)}, 3 },
+    /* Invalid NFCID1 length */
+    { 2, { TEST_ARRAY_AND_SIZE(parse_config_param_nfcid1_data_1)}, 1 },
+    /* Valid cases 4, 7, and 10 bytes long */
+    { 2, { TEST_ARRAY_AND_SIZE(parse_config_param_nfcid1_data_1)}, 2, TRUE,
+         { 4, {0x01, 0x02, 0x03, 0x04} } },
+    { 1, { TEST_ARRAY_AND_SIZE(parse_config_param_nfcid1_data_2)}, 1, TRUE,
+         { 7, {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07} } },
+    { 1, { TEST_ARRAY_AND_SIZE(parse_config_param_nfcid1_data_3)}, 1, TRUE,
+         { 10, {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a} } },
 };
 
 /*==========================================================================*
@@ -1634,7 +1734,15 @@ int main(int argc, char* argv[])
             parse_config_param_uint_tests + i;
         char* path = g_strdup_printf(TEST_("config_param_uint/%u"), i + 1);
 
-        g_test_add_data_func(path, test, test_parse_config_param);
+        g_test_add_data_func(path, test, test_parse_config_param_uint);
+        g_free(path);
+    }
+    for (i = 0; i < G_N_ELEMENTS(parse_config_param_nfcid1_tests); i++) {
+        const TestParseConfigParamNfcid1Data* test =
+            parse_config_param_nfcid1_tests + i;
+        char* path = g_strdup_printf(TEST_("config_param_nfcid1/%u"), i + 1);
+
+        g_test_add_data_func(path, test, test_parse_config_param_nfcid1);
         g_free(path);
     }
     return g_test_run();
