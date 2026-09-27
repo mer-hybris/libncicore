@@ -1,6 +1,6 @@
 Name: libncicore
 
-Version: 1.1.33
+Version: 1.2.0
 Release: 0
 Summary: NCI state machine
 License: BSD
@@ -53,14 +53,12 @@ make test
 %postun -p /sbin/ldconfig
 
 %files
-%defattr(-,root,root,-)
 %{_libdir}/%{name}.so.*
 %if %{license_support} == 0
 %license LICENSE
 %endif
 
 %files devel
-%defattr(-,root,root,-)
 %dir %{_includedir}/ncicore
 %{_libdir}/pkgconfig/*.pc
 %{_libdir}/%{name}.so
