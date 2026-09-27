@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2026 Jolla Mobile Ltd
  * Copyright (C) 2019-2025 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
  * Copyright (C) 2020 Open Mobile Platform LLC.
@@ -184,6 +185,125 @@ nci_parse_config_param_nfcid1(
     return FALSE;
 }
 
+static
+gboolean
+nci_parse_atr_req(
+    NciAtrReq* out,
+    const guint8* atr_req, /* ATR_REQ bytes from and including Byte 3 */
+    guint len)
+{
+    const guint fixed_part = 14;
+
+    /*
+     * [NFCForum-TS-DigitalProtocol-1.0]
+     * 14.6.2 ATR_REQ Command
+     *
+     * Table 87: ATR_REQ Format
+     *
+     * Byte 3..12        NFCID3
+     * Byte 13           DID
+     * Byte 14           BS
+     * Byte 15           BR
+     * Byte 16           PP
+     * Byte 17..17+n     G[0]..G[n]
+     */
+    if (len >= fixed_part) {
+        memcpy(out->nfcid3, atr_req, sizeof(out->nfcid3));
+        out->did = atr_req[10];
+        out->bs = atr_req[11];
+        out->br = atr_req[12];
+        out->pp = atr_req[13];
+        if (len > fixed_part) {
+            out->g.bytes = atr_req + fixed_part;
+            out->g.size = len - fixed_part;
+        }
+
+#if GUTIL_LOG_DEBUG
+        if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+            GString* buf = g_string_new(NULL);
+            guint i;
+
+            for (i = 0; i < sizeof(out->nfcid3); i++) {
+                g_string_append_printf(buf, " %02x", out->nfcid3[i]);
+            }
+            GDEBUG("  AtrReq.nfcid3 =%s", buf->str);
+            GDEBUG("  AtrReq.did = 0x%02x", out->did);
+            GDEBUG("  AtrReq.bs = 0x%02x", out->bs);
+            GDEBUG("  AtrReq.br = 0x%02x", out->br);
+            GDEBUG("  AtrReq.pp = 0x%02x", out->pp);
+            g_string_set_size(buf, 0);
+            for (i = 0; i < out->g.size; i++) {
+                g_string_append_printf(buf, " %02x", out->g.bytes[i]);
+            }
+            GDEBUG("  AtrReq.g =%s", buf->str);
+            g_string_free(buf, TRUE);
+        }
+#endif
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static
+gboolean
+nci_parse_atr_res(
+    NciAtrRes* out,
+    const guint8* atr_res,
+    guint len)
+{
+    const guint fixed_part = 15;
+    /*
+     * [NFCForum-TS-DigitalProtocol-1.0]
+     * 14.6.3 ATR_RES Response
+     *
+     * Table 92: ATR_RES Format
+     *
+     * Byte 3..12        NFCID3
+     * Byte 13           DID
+     * Byte 14           BS
+     * Byte 15           BR
+     * Byte 16           TO
+     * Byte 17           PP
+     * Byte 18..18+n     G[0]..G[n]
+     */
+    if (len >= fixed_part) {
+        memcpy(out->nfcid3, atr_res, sizeof(out->nfcid3));
+        out->did = atr_res[10];
+        out->bs = atr_res[11];
+        out->br = atr_res[12];
+        out->to = atr_res[13];
+        out->pp = atr_res[14];
+        if (len > fixed_part) {
+            out->g.bytes = atr_res + fixed_part;
+            out->g.size = len - fixed_part;
+        }
+#if GUTIL_LOG_DEBUG
+        if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
+            GString* buf = g_string_new(NULL);
+            guint i;
+
+            for (i = 0; i < sizeof(out->nfcid3); i++) {
+                g_string_append_printf(buf, " %02x", out->nfcid3[i]);
+            }
+            GDEBUG("  AtrRes.nfcid3 =%s", buf->str);
+            GDEBUG("  AtrRes.did = 0x%02x", out->did);
+            GDEBUG("  AtrRes.bs = 0x%02x", out->bs);
+            GDEBUG("  AtrRes.br = 0x%02x", out->br);
+            GDEBUG("  AtrRes.to = 0x%02x", out->to);
+            GDEBUG("  AtrRes.pp = 0x%02x", out->pp);
+            g_string_set_size(buf, 0);
+            for (i = 0; i < out->g.size; i++) {
+                g_string_append_printf(buf, " %02x", out->g.bytes[i]);
+            }
+            GDEBUG("  AtrRes.g =%s", buf->str);
+            g_string_free(buf, TRUE);
+        }
+#endif
+        return TRUE;
+    }
+    return FALSE;
+}
+
 const NciModeParam*
 nci_parse_mode_param(
     NciModeParam* param,
@@ -192,11 +312,6 @@ nci_parse_mode_param(
     guint len)
 {
     switch (mode) {
-    case NCI_MODE_ACTIVE_POLL_A:
-        if (!len) {
-            return NULL;
-        }
-        /* fallthrough */
     case NCI_MODE_PASSIVE_POLL_A:
         /*
          * [NFCForum-TS-NCI-1.0]
@@ -291,7 +406,7 @@ nci_parse_mode_param(
          * | FSC (bytes) | 16  24  32  40  48  64  96  128 256 RFU   |
          * +=========================================================+
          */
-        if (len >= 1 && bytes[0] >= 11) {
+        if (len > 0 && bytes[0] >= 11) {
             NciModeParamPollB* ppb = &param->poll_b;
             const guint fsci = (bytes[10] >> 4);
             static const guint fsc_table[] = {
@@ -331,7 +446,6 @@ nci_parse_mode_param(
         }
         GDEBUG("Failed to parse parameters for NFC-B poll mode");
         return NULL;
-    case NCI_MODE_ACTIVE_POLL_F:
     case NCI_MODE_PASSIVE_POLL_F:
         /*
          * [NFCForum-TS-NCI-1.0]
@@ -359,10 +473,8 @@ nci_parse_mode_param(
                 pf->nfcid2[4], pf->nfcid2[5], pf->nfcid2[6], pf->nfcid2[7]);
             return param;
         }
-        /* This does happen */
-        GDEBUG("No parameters for NFC-F poll mode");
+        GDEBUG("Failed to parse parameters for NFC-F poll mode");
         return NULL;
-    case NCI_MODE_ACTIVE_LISTEN_F:
     case NCI_MODE_PASSIVE_LISTEN_F:
         /*
          * [NFCForum-TS-NCI-1.0]
@@ -375,7 +487,7 @@ nci_parse_mode_param(
          * | 1      | n    | NFCID2 generated by the Local NFCC      |
          * +=========================================================+
          */
-        if (len > 0 && (bytes[0] + 1) <= len) {
+        if (len > 0 && len > bytes[0]) {
             NciModeParamListenF* lf =  &param->listen_f;
 
             if (bytes[0] == 0) {
@@ -387,8 +499,7 @@ nci_parse_mode_param(
                 return param;
             }
         }
-        /* This does happen */
-        GDEBUG("No parameters for NFC-F listen mode");
+        GDEBUG("Failed to parse parameters for NFC-F listen mode");
         return NULL;
     case NCI_MODE_PASSIVE_POLL_V:
         /*
@@ -422,11 +533,59 @@ nci_parse_mode_param(
         }
         GDEBUG("Failed to parse parameters for NFC-V poll mode");
         return NULL;
+    case NCI_MODE_ACTIVE_POLL_A:
+    case NCI_MODE_ACTIVE_POLL_F:
+        /*
+         * NFC Controller Interface (NCI)
+         * Technical Specification
+         * Version 2.0
+         *
+         * Table 75: Specific Parameters for NFC-ACM Poll Mode
+         *
+         * +=========================================================+
+         * | Offset | Size | Description                             |
+         * +=========================================================+
+         * | 0      | 1    | Length of ATR_RES Command Parameter (n) |
+         * | 1      | n    | ATR_RES bytes from and including Byte 3 |
+         * +=========================================================+
+         */
+        if (len > 0 && len > bytes[0]) {
+            GDEBUG("NFC-ACM (poll)");
+            if (nci_parse_atr_res(&param->poll_active, bytes + 1, bytes[0])) {
+                return param;
+            }
+        }
+        GDEBUG("Failed to parse parameters for NFC-ACM poll mode");
+        return NULL;
+    case NCI_MODE_ACTIVE_LISTEN_A:
+    case NCI_MODE_ACTIVE_LISTEN_F:
+        /*
+         * NFC Controller Interface (NCI)
+         * Technical Specification
+         * Version 2.0
+         *
+         * Table 76: Specific Parameters for NFC-ACM Listen Mode
+         *
+         * +=========================================================+
+         * | Offset | Size | Description                             |
+         * +=========================================================+
+         * | 0      | 1    | Length of ATR_REQ Command Parameter (n) |
+         * | 1      | n    | ATR_REQ bytes from and including Byte 3 |
+         * +=========================================================+
+         */
+        if (len > 0 && len > bytes[0]) {
+            GDEBUG("NFC-ACM (listen)");
+            if (nci_parse_atr_req(&param->listen_active, bytes + 1, bytes[0])) {
+                return param;
+            }
+        }
+        GDEBUG("Failed to parse parameters for NFC-ACM listen mode");
+        return NULL;
     case NCI_MODE_PASSIVE_LISTEN_V:
+        /* Not implemented */
         break;
     case NCI_MODE_PASSIVE_LISTEN_A:
     case NCI_MODE_PASSIVE_LISTEN_B:
-    case NCI_MODE_ACTIVE_LISTEN_A:
         /* NCI 1.0 defines no parameters for A/B Listen modes */
         return NULL;
     }
@@ -763,9 +922,6 @@ nci_parse_nfc_dep_poll_param(
     const guint8* bytes,
     guint len)
 {
-    /* ATR_RES Length */
-    const guint8 atr_res_len = bytes[0];
-
     /*
      * [NFCForum-TS-NCI-1.0]
      * Table 82: Activation Parameters for NFC-DEP Poll Mode
@@ -777,49 +933,8 @@ nci_parse_nfc_dep_poll_param(
      * | 1      | n    | ATR_RES bytes from and including Byte 3 |
      * +=========================================================+
      */
-    if (atr_res_len >= 15 && len >= atr_res_len + 1) {
-        const guint8* atr_res = bytes + 1;
-
-        /*
-         * [NFCForum-TS-DigitalProtocol-1.0]
-         * 14.6.3 ATR_RES Response
-         */
-        memcpy(param->nfcid3, atr_res, sizeof(param->nfcid3));
-        param->did = atr_res[10];
-        param->bs = atr_res[11];
-        param->br = atr_res[12];
-        param->to = atr_res[13];
-        param->pp = atr_res[14];
-        if (atr_res_len > 15) {
-            param->g.bytes = atr_res + 15;
-            param->g.size = atr_res_len - 15;
-        }
-#if GUTIL_LOG_DEBUG
-        if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
-            GString* buf = g_string_new(NULL);
-            guint i;
-
-            GDEBUG("NFC-DEP");
-            for (i = 0; i < sizeof(param->nfcid3); i++) {
-                g_string_append_printf(buf, " %02x", param->nfcid3[i]);
-            }
-            GDEBUG("  AtrRes.nfcid3 =%s", buf->str);
-            GDEBUG("  AtrRes.did = 0x%02x", param->did);
-            GDEBUG("  AtrRes.bs = 0x%02x", param->bs);
-            GDEBUG("  AtrRes.br = 0x%02x", param->br);
-            GDEBUG("  AtrRes.to = 0x%02x", param->to);
-            GDEBUG("  AtrRes.pp = 0x%02x", param->pp);
-            g_string_set_size(buf, 0);
-            for (i = 0; i < param->g.size; i++) {
-                g_string_append_printf(buf, " %02x", param->g.bytes[i]);
-            }
-            GDEBUG("  AtrRes.g =%s", buf->str);
-            g_string_free(buf, TRUE);
-        }
-#endif
-        return TRUE;
-    }
-    return FALSE;
+    return len > 0 && len > bytes[0] &&
+        nci_parse_atr_res(param, bytes + 1, bytes[0]);
 }
 
 static
@@ -829,9 +944,6 @@ nci_parse_nfc_dep_listen_param(
     const guint8* bytes,
     guint len)
 {
-    /* ATR_REQ Length */
-    const guint8 atr_req_len = bytes[0];
-
     /*
      * [NFCForum-TS-NCI-1.0]
      * Table 83: Activation Parameters for NFC-DEP Listen Mode
@@ -843,47 +955,8 @@ nci_parse_nfc_dep_listen_param(
      * | 1      | n    | ATR_REQ bytes from and including Byte 3 |
      * +=========================================================+
      */
-    if (atr_req_len >= 14 && len >= atr_req_len + 1) {
-        const guint8* atr_req = bytes + 1;
-
-        /*
-         * [NFCForum-TS-DigitalProtocol-1.0]
-         * 14.6.2 ATR_REQ Command
-         */
-        memcpy(param->nfcid3, atr_req, sizeof(param->nfcid3));
-        param->did = atr_req[10];
-        param->bs = atr_req[11];
-        param->br = atr_req[12];
-        param->pp = atr_req[13];
-        if (atr_req_len > 14) {
-            param->g.bytes = atr_req + 14;
-            param->g.size = atr_req_len - 14;
-        }
-#if GUTIL_LOG_DEBUG
-        if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
-            GString* buf = g_string_new(NULL);
-            guint i;
-
-            GDEBUG("NFC-DEP");
-            for (i = 0; i < sizeof(param->nfcid3); i++) {
-                g_string_append_printf(buf, " %02x", param->nfcid3[i]);
-            }
-            GDEBUG("  AtrReq.nfcid3 =%s", buf->str);
-            GDEBUG("  AtrReq.did = 0x%02x", param->did);
-            GDEBUG("  AtrReq.bs = 0x%02x", param->bs);
-            GDEBUG("  AtrReq.br = 0x%02x", param->br);
-            GDEBUG("  AtrReq.pp = 0x%02x", param->pp);
-            g_string_set_size(buf, 0);
-            for (i = 0; i < param->g.size; i++) {
-                g_string_append_printf(buf, " %02x", param->g.bytes[i]);
-            }
-            GDEBUG("  AtrReq.g =%s", buf->str);
-            g_string_free(buf, TRUE);
-        }
-#endif
-        return TRUE;
-    }
-    return FALSE;
+    return len > 0 && len > bytes[0] &&
+        nci_parse_atr_req(param, bytes + 1, bytes[0]);
 }
 
 static
@@ -941,6 +1014,7 @@ nci_parse_activation_param(
         /* There are no Activation Parameters for Frame RF interface */
         break;
     case NCI_RF_INTERFACE_NFC_DEP:
+        GDEBUG("NFC-DEP");
         switch (mode) {
         case NCI_MODE_ACTIVE_POLL_A:
         case NCI_MODE_ACTIVE_POLL_F:
@@ -1107,11 +1181,13 @@ nci_mode_param_copy_impl(
         const NciModeParamListenF* listen_f = NULL;
 
         switch (mode) {
-        case NCI_MODE_ACTIVE_POLL_A:        /* fallthrough */
         case NCI_MODE_PASSIVE_POLL_A:
-        case NCI_MODE_ACTIVE_POLL_F:
         case NCI_MODE_PASSIVE_POLL_F:
         case NCI_MODE_PASSIVE_POLL_V:
+        case NCI_MODE_ACTIVE_POLL_A:
+        case NCI_MODE_ACTIVE_POLL_F:
+        case NCI_MODE_ACTIVE_LISTEN_F:
+        case NCI_MODE_ACTIVE_LISTEN_A:
             memcpy(dest, src, size);
             return size;
         case NCI_MODE_PASSIVE_POLL_B:
@@ -1126,7 +1202,6 @@ nci_mode_param_copy_impl(
                 size += G_ALIGN8(poll_b->prot_info.size);
             }
             return size;
-        case NCI_MODE_ACTIVE_LISTEN_F:
         case NCI_MODE_PASSIVE_LISTEN_F:
             listen_f = &src->listen_f;
             memcpy(dest, src, size);
@@ -1141,9 +1216,8 @@ nci_mode_param_copy_impl(
             return size;
         case NCI_MODE_PASSIVE_LISTEN_V:
             break;
-        case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_A:
         case NCI_MODE_PASSIVE_LISTEN_B:
-        case NCI_MODE_ACTIVE_LISTEN_A:
             /* NCI 1.0 defines no parameters for A/B Listen modes */
             return 0;
         }
@@ -1213,10 +1287,12 @@ nci_mode_param_size(
         const NciModeParamListenF* listen_f = NULL;
 
         switch (mode) {
-        case NCI_MODE_ACTIVE_POLL_A:        /* fallthrough */
+        case NCI_MODE_ACTIVE_POLL_A:
         case NCI_MODE_PASSIVE_POLL_A:
+        case NCI_MODE_ACTIVE_LISTEN_A:
         case NCI_MODE_ACTIVE_POLL_F:
         case NCI_MODE_PASSIVE_POLL_F:
+        case NCI_MODE_ACTIVE_LISTEN_F:
         case NCI_MODE_PASSIVE_POLL_V:
             size = sizeof(NciModeParam);
             break;
@@ -1228,7 +1304,6 @@ nci_mode_param_size(
                 size += G_ALIGN8(poll_b->prot_info.size);
             }
             break;
-        case NCI_MODE_ACTIVE_LISTEN_F:      /* fallthrough */
         case NCI_MODE_PASSIVE_LISTEN_F:
             size = sizeof(NciModeParam);
             listen_f = &param->listen_f;
@@ -1240,8 +1315,7 @@ nci_mode_param_size(
         case NCI_MODE_PASSIVE_LISTEN_V:
         case NCI_MODE_PASSIVE_LISTEN_A:
         case NCI_MODE_PASSIVE_LISTEN_B:
-        case NCI_MODE_ACTIVE_LISTEN_A:
-            /* NCI 1.0 defines no parameters for A/B Listen modes */
+            /* No parameters for NFC-A Listen modes */
             break;
         }
     }
@@ -1329,8 +1403,9 @@ nci_util_copy_mode_param(
         gsize size = nci_mode_param_size(param, mode);
 
         switch (mode) {
-        case NCI_MODE_ACTIVE_POLL_A:        /* fallthrough */
+        case NCI_MODE_ACTIVE_POLL_A:
         case NCI_MODE_PASSIVE_POLL_A:
+        case NCI_MODE_ACTIVE_LISTEN_A:
         case NCI_MODE_ACTIVE_POLL_F:
         case NCI_MODE_PASSIVE_POLL_F:
         case NCI_MODE_PASSIVE_POLL_B:
@@ -1344,10 +1419,9 @@ nci_util_copy_mode_param(
             return copy;
         case NCI_MODE_PASSIVE_LISTEN_V:
             break;
-        case NCI_MODE_PASSIVE_LISTEN_A:     /* fallthrough */
+        case NCI_MODE_PASSIVE_LISTEN_A:
         case NCI_MODE_PASSIVE_LISTEN_B:
-        case NCI_MODE_ACTIVE_LISTEN_A:
-            /* NCI 1.0 defines no parameters for A/B Listen modes */
+            /* No parameters for A/B Listen modes */
             return NULL;
         }
         GDEBUG("Unhandled activation mode 0x%02x", mode);

@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2026 Jolla Mobile Ltd
  * Copyright (C) 2019-2025 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
  *
@@ -60,7 +61,7 @@ struct nci_sm {
     GBytes* rf_interfaces;
     guint max_routing_table_size;
     NCI_TECH techs;
-    NCI_INTERFACE_VERSION version;
+    NCI_VERSION version;
     NCI_NFCC_DISCOVERY nfcc_discovery;
     NCI_NFCC_ROUTING nfcc_routing;
     NCI_NFCC_POWER nfcc_power;

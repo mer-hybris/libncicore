@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2026 Jolla Mobile Ltd
  * Copyright (C) 2018-2024 Slava Monich <slava@monich.com>
  * Copyright (C) 2018-2020 Jolla Ltd.
  *
@@ -79,12 +80,16 @@ typedef enum nci_stall {
 /* Packet Boundary Flag (PBF) */
 #define NCI_PBF         (0x10)
 
-/* NCI protocol version */
-typedef enum nci_interface_version {
-    NCI_INTERFACE_VERSION_UNKNOWN,
-    NCI_INTERFACE_VERSION_1,
-    NCI_INTERFACE_VERSION_2
-} NCI_INTERFACE_VERSION;
+/* NCI version (major << 4) | minor */
+typedef enum nci_version {
+    NCI_VERSION_UNKNOWN,
+    NCI_VERSION_1   = 0x10,
+    NCI_VERSION_1_1 = 0x11,
+    NCI_VERSION_2   = 0x20,
+    NCI_VERSION_2_1 = 0x21,
+    NCI_VERSION_2_2 = 0x22,
+    NCI_VERSION_2_3 = 0x23
+} NCI_VERSION;
 
 /* NFCC Features */
 typedef enum nci_nfcc_discovery {

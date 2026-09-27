@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2026 Jolla Mobile Ltd
  * Copyright (C) 2019-2024 Slava Monich <slava@monich.com>
  * Copyright (C) 2019-2021 Jolla Ltd.
  *
@@ -477,8 +478,8 @@ nci_transition_reset_rsp(
          * +=========================================================+
          */
         if (len == 3) {
-            sm->version = NCI_INTERFACE_VERSION_1;
             if (pkt[0] == NCI_STATUS_OK) {
+                sm->version = pkt[1];
                 GDEBUG("%c CORE_RESET_RSP (v1) ok", DIR_IN);
                 GDEBUG("  NCI Version = %u.%u", pkt[1] >> 4, pkt[1] & 0x0f);
                 GDEBUG("  Configuration Status = %u", pkt[2]);
@@ -489,7 +490,6 @@ nci_transition_reset_rsp(
             }
             GWARN("CORE_RESET_CMD failed");
         } else if (len == 1) {
-            sm->version = NCI_INTERFACE_VERSION_2;
             if (pkt[0] == NCI_STATUS_OK) {
                 /* Wait for notification */
                 GDEBUG("%c CORE_RESET_RSP (v2) ok", DIR_IN);
@@ -541,7 +541,7 @@ nci_transition_reset_handle_ntf(
         switch (oid) {
         case NCI_OID_CORE_RESET:
             /* Notification is only expected in NCI 2.x case */
-            if (sm && sm->version == NCI_INTERFACE_VERSION_2) {
+            if (sm) {
                 const guint8* pkt = payload->bytes;
                 const guint len = payload->size;
 
@@ -566,10 +566,11 @@ nci_transition_reset_handle_ntf(
                      * | 5      | n    | Manufacturer Info                   |
                      * +=====================================================+
                      */
+                    sm->version = pkt[2];
                     GDEBUG("CORE_RESET_NTF (v2)");
                     GDEBUG("  Reset Trigger = %u", pkt[0]);
                     GDEBUG("  Configuration Status = %u", pkt[1]);
-                    GDEBUG("  NCI Version = %u.%u", pkt[2] >> 4, pkt[2]&0x0f);
+                    GDEBUG("  NCI Version = %u.%u", pkt[2] >> 4, pkt[2] & 0x0f);
                     GDEBUG("  Manufacturer = 0x%02x", pkt[3]);
 #if GUTIL_LOG_DEBUG
                     if (GLOG_ENABLED(GLOG_LEVEL_DEBUG)) {
@@ -625,7 +626,6 @@ nci_transition_reset_start(
             sm->rf_interfaces = NULL;
         }
         sm->max_routing_table_size = 0;
-        sm->version = NCI_INTERFACE_VERSION_UNKNOWN;
         sm->nfcc_discovery = NCI_NFCC_DISCOVERY_NONE;
         sm->nfcc_routing = NCI_NFCC_ROUTING_NONE;
         sm->nfcc_power = NCI_NFCC_POWER_NONE;
