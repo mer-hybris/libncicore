@@ -32,15 +32,16 @@ STATIC_LIB = $(LIB_NAME).a
 # Pull library version from nci_version.h
 #
 
-VERSION_FILE = $(INCLUDE_DIR)/nci_version.h
-get_version = $(shell grep -E '^ *\#define +NCI_CORE_VERSION_$1 +[0-9]+$$' $(VERSION_FILE) | sed 's/  */ /g' | cut -d ' ' -f 3)
+HASH := \#
+VERSION_FILE = include/nci_version.h
+get_version = $(shell grep -E '^ *$(HASH)define +NCI_CORE_VERSION_$1 +[0-9]+$$' $(VERSION_FILE) | sed 's/  */ /g' | cut -d ' ' -f 3)
 
-VERSION_MAJOR = $(call get_version,MAJOR)
-VERSION_MINOR = $(call get_version,MINOR)
-VERSION_RELEASE = $(call get_version,RELEASE)
+VERSION_MAJOR := $(call get_version,MAJOR)
+VERSION_MINOR := $(call get_version,MINOR)
+VERSION_RELEASE := $(call get_version,RELEASE)
 
 # Version for pkg-config
-PCVERSION = $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_RELEASE)
+PCVERSION := $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_RELEASE)
 
 #
 # Sources
